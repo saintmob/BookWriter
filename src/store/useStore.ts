@@ -17,9 +17,11 @@ interface AppState {
   activeChapterId: string | null;
   theme: 'dark' | 'light' | 'system';
   language: 'en' | 'zh';
+  geminiApiKey: string | null;
   draft: DraftState;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setLanguage: (lang: 'en' | 'zh') => void;
+  setGeminiApiKey: (key: string | null) => void;
   loadBooks: () => Promise<void>;
   createBook: (title: string, idea: string, summary: string, coverImage?: string) => Promise<Book>;
   setActiveBook: (id: string | null) => void;
@@ -45,9 +47,11 @@ export const useStore = create<AppState>()(
       activeChapterId: null,
       theme: 'system',
       language: 'zh',
+      geminiApiKey: null,
       draft: initialDraft,
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
+      setGeminiApiKey: (key) => set({ geminiApiKey: key }),
       loadBooks: async () => {
         const books = await db.getBooks();
         set({ books });
@@ -92,6 +96,7 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({ 
         theme: state.theme, 
         language: state.language,
+        geminiApiKey: state.geminiApiKey,
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
         activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
         draft: state.draft // Persist draft state to save progress

@@ -1,6 +1,13 @@
 import { GoogleGenAI, Type } from '@google/genai';
+import { useStore } from '../store/useStore';
 
-export const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const getAi = () => {
+  const apiKey = useStore.getState().geminiApiKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API Key is missing. Please set it in Settings.');
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export interface Proposal {
   title: string;
@@ -25,6 +32,7 @@ function parseJSON(text: string) {
 }
 
 export async function generateProposals(idea: string, language: string): Promise<Proposal[]> {
+  const ai = getAi();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Based on the following idea, generate 3 distinct book proposals.
@@ -54,6 +62,7 @@ export async function generateProposals(idea: string, language: string): Promise
 }
 
 export async function generateOutline(proposal: Proposal, language: string): Promise<Outline> {
+  const ai = getAi();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `Based on the following book proposal, generate a detailed summary and a chapter-by-chapter outline.
@@ -98,6 +107,7 @@ export async function generateChapterContent(
   previousChapterContent: string | null,
   language: string
 ): Promise<string> {
+  const ai = getAi();
   let prompt = `Write the content for a chapter of a book.
   Book Title: ${bookTitle}
   Book Summary: ${bookSummary}
@@ -120,6 +130,7 @@ export async function generateChapterContent(
 }
 
 export async function generateImage(prompt: string): Promise<string | null> {
+  const ai = getAi();
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
