@@ -155,3 +155,46 @@ export async function generateImage(prompt: string): Promise<string | null> {
     throw error; // Re-throw to let the UI handle the error message
   }
 }
+
+export async function updateOutlineWithAI(
+  currentChapters: { title: string; description: string }[],
+  instruction: string,
+  bookTitle: string,
+  bookSummary: string,
+  language: string
+): Promise<{ title: string; description: string }[]> {
+  const ai = getAi();
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `You are a professional book editor. Help me revise the book outline based on the user's instruction.
+    
+    Book Title: ${bookTitle}
+    Book Summary: ${bookSummary}
+    Language: ${language}
+    
+    Current Chapters:
+    ${JSON.stringify(currentChapters, null, 2)}
+    
+    User Instruction: "${instruction}"
+    
+    Return the UPDATED list of chapters as a JSON array. Each chapter must have 'title' and 'description'.
+    Maintain the existing structure unless the user explicitly asks to change it.
+    Do not return any other text, just the JSON array.`,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.ARRAY,
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            description: { type: Type.STRING },
+          },
+          required: ['title', 'description'],
+        },
+      },
+    },
+  });
+
+  return parseJSON(response.text || '[]');
+}

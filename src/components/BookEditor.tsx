@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book } from '../lib/db';
 import { generateChapterContent, generateImage } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Save, Check, Trash2, Edit2, Eye } from 'lucide-react';
+import { Loader2, Sparkles, Image as ImageIcon, Save, Check, Trash2, Edit2, Eye, ListPlus } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
+import { OutlineEditorModal } from './OutlineEditorModal';
 
 export function BookEditor() {
   const { t } = useTranslation();
@@ -22,6 +23,7 @@ export function BookEditor() {
   
   const [content, setContent] = useState('');
   const [isPreview, setIsPreview] = useState(false);
+  const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
 
   useEffect(() => {
     if (activeBookId) {
@@ -50,6 +52,35 @@ export function BookEditor() {
     
     if (c.length > 0 && !activeChapterId) {
       setActiveChapter(c[0].id);
+    }
+  };
+
+  const handleOutlineSave = async (newChapters: Chapter[]) => {
+    if (!book) return;
+    
+    // Save all new chapters to DB
+    // We need to handle deletions too: find chapters in DB that are NOT in newChapters
+    const existingIds = chapters.map(c => c.id);
+    const newIds = newChapters.map(c => c.id);
+    const idsToDelete = existingIds.filter(id => !newIds.includes(id));
+
+    for (const id of idsToDelete) {
+      await db.deleteChapter(id);
+    }
+
+    for (const chapter of newChapters) {
+      await db.saveChapter(chapter);
+    }
+
+    await loadBookData(); // Reload to refresh state
+    
+    // If active chapter was deleted, switch to the first one
+    if (activeChapter && !newIds.includes(activeChapter.id)) {
+      if (newChapters.length > 0) {
+        setActiveChapter(newChapters[0].id);
+      } else {
+        setActiveChapter(null);
+      }
     }
   };
 
@@ -154,8 +185,17 @@ export function BookEditor() {
         </div>
         
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          <div className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider mb-2 px-2">
-            {t('chapters')}
+          <div className="flex items-center justify-between px-2 mb-2">
+            <div className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+              {t('chapters')}
+            </div>
+            <button 
+              onClick={() => setIsOutlineEditorOpen(true)}
+              className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"
+              title={t('edit_outline')}
+            >
+              <ListPlus className="w-4 h-4" />
+            </button>
           </div>
           {chapters.map((chapter) => (
             <button
@@ -301,6 +341,15 @@ export function BookEditor() {
           </div>
         )}
       </div>
+      {book && (
+        <OutlineEditorModal 
+          isOpen={isOutlineEditorOpen} 
+          onClose={() => setIsOutlineEditorOpen(false)} 
+          bookId={book.id}
+          initialChapters={chapters}
+          onSave={handleOutlineSave}
+        />
+      )}
     </div>
   );
 }
