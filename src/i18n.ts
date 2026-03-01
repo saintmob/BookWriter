@@ -79,6 +79,9 @@ const resources = {
       'chat_welcome': 'Ask me to rewrite, expand, or polish your chapter.',
       'chat_example': 'Example: "Make the dialogue more intense" or "Describe the setting in more detail"',
       'chat_error': 'Sorry, I encountered an error. Please try again.',
+      'generating_content_placeholder': 'AI is writing chapter content...',
+      'generating_image_placeholder': 'AI is painting an illustration...',
+      'no_content_yet': 'No content yet.',
     }
   },
   zh: {
@@ -158,6 +161,9 @@ const resources = {
       'chat_welcome': '让助手帮你重写、扩充或润色章节。',
       'chat_example': '例如：“让对话更激烈一些”或“更详细地描述环境”',
       'chat_error': '抱歉，遇到了错误。请重试。',
+      'generating_content_placeholder': 'AI 正在创作章节内容...',
+      'generating_image_placeholder': 'AI 正在绘制插图...',
+      'no_content_yet': '暂无内容。',
     }
   }
 };

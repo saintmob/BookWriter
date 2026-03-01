@@ -451,32 +451,77 @@ export function BookEditor() {
             <div className="flex-1 flex overflow-hidden relative">
               <div className="flex-1 overflow-y-auto p-8 md:p-12 lg:px-24">
                 <div className="max-w-3xl mx-auto space-y-8 pb-32">
-                  {activeChapter.image && (
-                    <div className="relative group rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                      <img src={activeChapter.image} alt={activeChapter.title} className="w-full h-auto object-cover aspect-video" referrerPolicy="no-referrer" />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <button 
-                          onClick={handleGenerateImage}
-                          className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-                        >
-                          <Sparkles className="w-4 h-4" /> {t('regenerate_image')}
-                        </button>
-                      </div>
+                  {/* Image Area with Loading State */}
+                  {(activeChapter.image || isGeneratingImage) && (
+                    <div className="relative group rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm bg-zinc-100 dark:bg-zinc-900 aspect-video">
+                      {isGeneratingImage ? (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-900/50 animate-pulse">
+                          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                          <p className="text-sm font-medium text-zinc-500">{t('generating_image_placeholder')}</p>
+                        </div>
+                      ) : (
+                        <>
+                          <img src={activeChapter.image} alt={activeChapter.title} className="w-full h-auto object-cover aspect-video" referrerPolicy="no-referrer" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button 
+                              onClick={handleGenerateImage}
+                              className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                            >
+                              <Sparkles className="w-4 h-4" /> {t('regenerate_image')}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
 
-                  {isPreview ? (
-                    <div className="prose prose-zinc dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
-                      <ReactMarkdown>{content || '*No content yet.*'}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <textarea
-                      value={content}
-                      onChange={(e) => setContent(e.target.value)}
-                      placeholder={t('chapter_content_placeholder')}
-                      className="w-full min-h-[500px] bg-transparent border-none outline-none resize-none font-serif text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
-                    />
-                  )}
+                  {/* Content Area with Loading State */}
+                  <div className="relative">
+                    {isPreview ? (
+                      <div className="prose prose-zinc dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
+                        {isGeneratingContent && !content ? (
+                          <div className="space-y-4 animate-pulse">
+                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4"></div>
+                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-full"></div>
+                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-5/6"></div>
+                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3"></div>
+                            <p className="text-sm text-emerald-500 font-medium mt-4">{t('generating_content_placeholder')}</p>
+                          </div>
+                        ) : (
+                          <>
+                            <ReactMarkdown>{content || `*${t('no_content_yet')}*`}</ReactMarkdown>
+                            {isGeneratingContent && (
+                              <div className="mt-6 flex items-center gap-2 text-emerald-500 font-medium animate-pulse">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                <span>{t('generating_content_placeholder')}</span>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <textarea
+                          value={content}
+                          onChange={(e) => setContent(e.target.value)}
+                          placeholder={t('chapter_content_placeholder')}
+                          className={cn(
+                            "w-full min-h-[500px] bg-transparent border-none outline-none resize-none font-serif text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600",
+                            isGeneratingContent && !content && "opacity-50"
+                          )}
+                          disabled={isGeneratingContent}
+                        />
+                        {isGeneratingContent && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50 dark:bg-zinc-950/50 backdrop-blur-[1px] rounded-xl pointer-events-none">
+                            <div className="flex flex-col items-center gap-3 p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800">
+                              <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                              <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">{t('generating_content_placeholder')}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               
