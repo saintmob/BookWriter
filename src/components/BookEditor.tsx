@@ -26,12 +26,17 @@ export function BookEditor() {
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [showAIMenu, setShowAIMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+  const aiMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
         setShowExportMenu(false);
+      }
+      if (aiMenuRef.current && !aiMenuRef.current.contains(event.target as Node)) {
+        setShowAIMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -309,25 +314,45 @@ export function BookEditor() {
 
                 <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
 
-                <button
-                  onClick={handleGenerateContent}
-                  disabled={isGeneratingContent}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 rounded-md text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
-                  title={t('generate_content')}
-                >
-                  {isGeneratingContent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  <span className="hidden lg:inline">{t('generate_content')}</span>
-                </button>
-                
-                <button
-                  onClick={handleGenerateImage}
-                  disabled={isGeneratingImage || !content}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 rounded-md text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
-                  title={t('generate_image')}
-                >
-                  {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                  <span className="hidden lg:inline">{t('generate_image')}</span>
-                </button>
+                {/* AI Tools Dropdown */}
+                <div className="relative" ref={aiMenuRef}>
+                  <button
+                    onClick={() => setShowAIMenu(!showAIMenu)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 dark:text-emerald-400 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+                    title="AI Tools"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span className="hidden lg:inline">AI Tools</span>
+                    <ChevronDown className="w-3 h-3 opacity-50" />
+                  </button>
+
+                  {showAIMenu && (
+                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 z-50">
+                      <button
+                        onClick={() => {
+                          handleGenerateContent();
+                          setShowAIMenu(false);
+                        }}
+                        disabled={isGeneratingContent}
+                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isGeneratingContent ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
+                        {t('generate_content')}
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleGenerateImage();
+                          setShowAIMenu(false);
+                        }}
+                        disabled={isGeneratingImage || !content}
+                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                        {t('generate_image')}
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
 
