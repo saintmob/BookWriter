@@ -14,9 +14,19 @@ export interface Outline {
   chapters: { title: string; description: string }[];
 }
 
+function parseJSON(text: string) {
+  try {
+    const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.error("Failed to parse JSON:", text);
+    throw e;
+  }
+}
+
 export async function generateProposals(idea: string, language: string): Promise<Proposal[]> {
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: `Based on the following idea, generate 3 distinct book proposals.
     Idea: ${idea}
     Language: ${language}
@@ -40,12 +50,12 @@ export async function generateProposals(idea: string, language: string): Promise
     },
   });
 
-  return JSON.parse(response.text || '[]');
+  return parseJSON(response.text || '[]');
 }
 
 export async function generateOutline(proposal: Proposal, language: string): Promise<Outline> {
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: `Based on the following book proposal, generate a detailed summary and a chapter-by-chapter outline.
     Title: ${proposal.title}
     Concept: ${proposal.concept}
@@ -77,7 +87,7 @@ export async function generateOutline(proposal: Proposal, language: string): Pro
     },
   });
 
-  return JSON.parse(response.text || '{}');
+  return parseJSON(response.text || '{}');
 }
 
 export async function generateChapterContent(
@@ -102,7 +112,7 @@ export async function generateChapterContent(
   }
 
   const response = await ai.models.generateContent({
-    model: 'gemini-3.1-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: prompt,
   });
 

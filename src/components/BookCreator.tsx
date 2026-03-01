@@ -9,33 +9,29 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export function BookCreator() {
   const { t } = useTranslation();
-  const { createBook, language, loadBooks, setActiveBook } = useStore();
+  const { createBook, language, loadBooks, setActiveBook, draft, setDraft, resetDraft } = useStore();
   
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [idea, setIdea] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
+
+  const { step, idea, proposals, selectedProposal } = draft;
 
   const handleGenerateProposals = async () => {
     if (!idea.trim()) return;
     setIsGenerating(true);
     try {
       const results = await generateProposals(idea, language);
-      setProposals(results);
-      setStep(2);
-    } catch (error) {
+      setDraft({ proposals: results, step: 2 });
+    } catch (error: any) {
       console.error(error);
-      alert('Failed to generate proposals');
+      alert('Failed to generate proposals: ' + (error.message || error));
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleSelectProposal = async (proposal: Proposal) => {
-    setSelectedProposal(proposal);
+    setDraft({ selectedProposal: proposal, step: 3 });
     setIsGenerating(true);
-    setStep(3);
     try {
       const outline = await generateOutline(proposal, language);
       
@@ -68,12 +64,12 @@ export function BookCreator() {
       // Now load books and set active book
       await loadBooks();
       setActiveBook(newBookId);
-
+      resetDraft(); // Clear draft after successful creation
       
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert('Failed to generate outline');
-      setStep(2);
+      alert('Failed to generate outline: ' + (error.message || error));
+      setDraft({ step: 2 });
     } finally {
       setIsGenerating(false);
     }
@@ -109,7 +105,7 @@ export function BookCreator() {
                 </label>
                 <textarea
                   value={idea}
-                  onChange={(e) => setIdea(e.target.value)}
+                  onChange={(e) => setDraft({ idea: e.target.value })}
                   placeholder={t('idea_placeholder')}
                   className="w-full h-48 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none resize-none text-lg transition-all"
                 />

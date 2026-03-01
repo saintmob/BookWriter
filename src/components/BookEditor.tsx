@@ -90,9 +90,9 @@ export function BookEditor() {
       await db.saveChapter(updatedChapter);
       setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
       setActiveChapterState(updatedChapter);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate content', error);
-      alert('Failed to generate content');
+      alert('Failed to generate content: ' + (error.message || error));
     } finally {
       setIsGeneratingContent(false);
     }
@@ -111,9 +111,9 @@ export function BookEditor() {
         setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
         setActiveChapterState(updatedChapter);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to generate image', error);
-      alert('Failed to generate image');
+      alert('Failed to generate image: ' + (error.message || error));
     } finally {
       setIsGeneratingImage(false);
     }

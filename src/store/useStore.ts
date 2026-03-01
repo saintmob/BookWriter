@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { db, Book, Chapter } from '../lib/db';
+import { db, Book } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
+import { Proposal } from '../lib/ai';
+
+interface DraftState {
+  step: 1 | 2 | 3;
+  idea: string;
+  proposals: Proposal[];
+  selectedProposal: Proposal | null;
+}
 
 interface AppState {
   books: Book[];
@@ -9,6 +17,7 @@ interface AppState {
   activeChapterId: string | null;
   theme: 'dark' | 'light' | 'system';
   language: 'en' | 'zh';
+  draft: DraftState;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setLanguage: (lang: 'en' | 'zh') => void;
   loadBooks: () => Promise<void>;
@@ -17,7 +26,16 @@ interface AppState {
   setActiveChapter: (id: string | null) => void;
   deleteBook: (id: string) => Promise<void>;
   updateBook: (id: string, updates: Partial<Book>) => Promise<void>;
+  setDraft: (updates: Partial<DraftState>) => void;
+  resetDraft: () => void;
 }
+
+const initialDraft: DraftState = {
+  step: 1,
+  idea: '',
+  proposals: [],
+  selectedProposal: null,
+};
 
 export const useStore = create<AppState>()(
   persist(
@@ -27,6 +45,7 @@ export const useStore = create<AppState>()(
       activeChapterId: null,
       theme: 'system',
       language: 'zh',
+      draft: initialDraft,
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       loadBooks: async () => {
@@ -45,6 +64,7 @@ export const useStore = create<AppState>()(
         };
         await db.saveBook(newBook);
         await get().loadBooks();
+        set({ activeBookId: newBook.id });
         return newBook;
       },
       setActiveBook: (id) => set({ activeBookId: id, activeChapterId: null }),
@@ -64,10 +84,17 @@ export const useStore = create<AppState>()(
           await get().loadBooks();
         }
       },
+      setDraft: (updates) => set((state) => ({ draft: { ...state.draft, ...updates } })),
+      resetDraft: () => set({ draft: initialDraft }),
     }),
     {
       name: 'ai-book-writer-settings',
-      partialize: (state) => ({ theme: state.theme, language: state.language }),
+      partialize: (state) => ({ 
+        theme: state.theme, 
+        language: state.language,
+        activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
+        draft: state.draft // Persist draft state to save progress
+      }),
     }
   )
 );
