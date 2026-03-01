@@ -53,6 +53,10 @@ const resources = {
       'book_summary': 'Book Summary',
       'copy_to_clipboard': 'Copy to Clipboard',
       'copied': 'Copied!',
+      'export_json': 'Export JSON (Backup)',
+      'import_json': 'Import JSON',
+      'import_success': 'Import successful!',
+      'import_error': 'Import failed. Please check the file format.',
     }
   },
   zh: {
@@ -106,6 +110,10 @@ const resources = {
       'book_summary': '书籍简介',
       'copy_to_clipboard': '复制到剪贴板',
       'copied': '已复制！',
+      'export_json': '导出 JSON (备份)',
+      'import_json': '导入 JSON',
+      'import_success': '导入成功！',
+      'import_error': '导入失败。请检查文件格式。',
     }
   }
 };

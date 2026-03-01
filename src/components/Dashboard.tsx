@@ -1,11 +1,51 @@
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { BookPlus, Library } from 'lucide-react';
+import { BookPlus, Library, Upload, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useState, useRef } from 'react';
+import { db } from '../lib/db';
 
 export function Dashboard() {
   const { t } = useTranslation();
-  const { books, setActiveBook } = useStore();
+  const { books, setActiveBook, loadBooks } = useStore();
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      if (!data.book || !Array.isArray(data.chapters)) {
+        throw new Error('Invalid format');
+      }
+
+      // Save book
+      await db.saveBook(data.book);
+      
+      // Save chapters
+      for (const chapter of data.chapters) {
+        await db.saveChapter(chapter);
+      }
+
+      await loadBooks();
+      alert(t('import_success'));
+    } catch (error) {
+      console.error('Import failed', error);
+      alert(t('import_error'));
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   return (
     <div className="flex-1 h-screen overflow-y-auto bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-8 md:p-16 transition-colors duration-200">
@@ -15,13 +55,30 @@ export function Dashboard() {
             <Library className="w-8 h-8 text-emerald-500" />
             {t('my_books')}
           </h1>
-          <button
-            onClick={() => setActiveBook('new')}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
-          >
-            <BookPlus className="w-5 h-5" />
-            {t('new_book')}
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".json"
+              className="hidden"
+            />
+            <button
+              onClick={handleImportClick}
+              disabled={isImporting}
+              className="flex items-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 px-5 py-2.5 rounded-xl font-medium transition-colors border border-zinc-200 dark:border-zinc-800 shadow-sm disabled:opacity-50"
+            >
+              {isImporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Upload className="w-5 h-5" />}
+              {t('import_json')}
+            </button>
+            <button
+              onClick={() => setActiveBook('new')}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
+            >
+              <BookPlus className="w-5 h-5" />
+              {t('new_book')}
+            </button>
+          </div>
         </div>
 
         {books.length === 0 ? (
