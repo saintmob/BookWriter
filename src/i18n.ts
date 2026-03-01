@@ -48,6 +48,11 @@ const resources = {
       'regenerate_image': 'Regenerate Image',
       'select_chapter_hint': 'Select a chapter to start writing',
       'confirm_delete_book': 'Are you sure you want to delete this book?',
+      'book_info': 'Book Information',
+      'book_title': 'Book Title',
+      'book_summary': 'Book Summary',
+      'copy_to_clipboard': 'Copy to Clipboard',
+      'copied': 'Copied!',
     }
   },
   zh: {
@@ -96,6 +101,11 @@ const resources = {
       'regenerate_image': '重新生成图片',
       'select_chapter_hint': '选择一个章节开始写作',
       'confirm_delete_book': '你确定要删除这本书吗？',
+      'book_info': '书籍信息',
+      'book_title': '书名',
+      'book_summary': '书籍简介',
+      'copy_to_clipboard': '复制到剪贴板',
+      'copied': '已复制！',
     }
   }
 };

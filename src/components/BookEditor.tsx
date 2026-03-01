@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { OutlineEditorModal } from './OutlineEditorModal';
 import { ChapterChat } from './ChapterChat';
+import { BookInfoModal } from './BookInfoModal';
 
 export function BookEditor() {
   const { t } = useTranslation();
@@ -24,6 +25,7 @@ export function BookEditor() {
   const [content, setContent] = useState('');
   const [isPreview, setIsPreview] = useState(false);
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
+  const [isBookInfoOpen, setIsBookInfoOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
@@ -229,8 +231,14 @@ export function BookEditor() {
       {/* Outline Sidebar */}
       <div className="w-72 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col print:hidden">
         {/* ... (sidebar content) ... */}
-        <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
-          <h2 className="font-serif font-bold text-lg truncate" title={book.title}>{book.title}</h2>
+        <div 
+          className="p-4 border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors group"
+          onClick={() => setIsBookInfoOpen(true)}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="font-serif font-bold text-lg truncate flex-1" title={book.title}>{book.title}</h2>
+            <Edit2 className="w-3 h-3 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">{book.summary}</p>
         </div>
         
@@ -473,6 +481,14 @@ export function BookEditor() {
           bookId={book.id}
           initialChapters={chapters}
           onSave={handleOutlineSave}
+        />
+      )}
+      {book && (
+        <BookInfoModal
+          isOpen={isBookInfoOpen}
+          onClose={() => setIsBookInfoOpen(false)}
+          book={book}
+          onUpdate={(updatedBook) => setBook(updatedBook)}
         />
       )}
     </div>
