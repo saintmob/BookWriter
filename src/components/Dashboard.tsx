@@ -4,6 +4,7 @@ import { BookPlus, Library, Upload, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState, useRef } from 'react';
 import { db } from '../lib/db';
+import { toast } from 'sonner';
 
 export function Dashboard() {
   const { t } = useTranslation();
@@ -20,6 +21,7 @@ export function Dashboard() {
     if (!file) return;
 
     setIsImporting(true);
+    const toastId = toast.loading(t('importing_book'));
     try {
       const text = await file.text();
       const data = JSON.parse(text);
@@ -37,10 +39,10 @@ export function Dashboard() {
       }
 
       await loadBooks();
-      alert(t('import_success'));
+      toast.success(t('import_success'), { id: toastId });
     } catch (error) {
       console.error('Import failed', error);
-      alert(t('import_error'));
+      toast.error(t('import_error'), { id: toastId });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

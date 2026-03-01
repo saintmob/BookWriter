@@ -7,6 +7,7 @@ import { updateOutlineWithAI } from '../lib/ai';
 import { Chapter } from '../lib/db';
 import { cn } from '../lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { toast } from 'sonner';
 
 interface OutlineEditorModalProps {
   isOpen: boolean;
@@ -110,10 +111,11 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
     setIsSaving(true);
     try {
       await onSave(chapters);
+      toast.success(t('outline_saved_success'));
       onClose();
     } catch (error) {
       console.error('Failed to save outline:', error);
-      alert('Failed to save changes');
+      toast.error(t('outline_save_failed'));
     } finally {
       setIsSaving(false);
     }

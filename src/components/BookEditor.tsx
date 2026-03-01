@@ -9,6 +9,8 @@ import ReactMarkdown from 'react-markdown';
 import { OutlineEditorModal } from './OutlineEditorModal';
 import { ChapterChat } from './ChapterChat';
 import { BookInfoModal } from './BookInfoModal';
+import { ConfirmModal } from './ConfirmModal';
+import { toast } from 'sonner';
 
 export function BookEditor() {
   const { t } = useTranslation();
@@ -27,6 +29,7 @@ export function BookEditor() {
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
   const [isBookInfoOpen, setIsBookInfoOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -149,7 +152,7 @@ export function BookEditor() {
       setActiveChapterState(updatedChapter);
     } catch (error: any) {
       console.error('Failed to generate content', error);
-      alert('Failed to generate content: ' + (error.message || error));
+      toast.error(t('generate_content_error') || 'Failed to generate content');
     } finally {
       setIsGeneratingContent(false);
     }
@@ -167,10 +170,11 @@ export function BookEditor() {
         await db.saveChapter(updatedChapter);
         setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
         setActiveChapterState(updatedChapter);
+        toast.success(t('image_generated_success'));
       }
     } catch (error: any) {
       console.error('Failed to generate image', error);
-      alert('Failed to generate image: ' + (error.message || error));
+      toast.error(t('generate_image_error') || 'Failed to generate image');
     } finally {
       setIsGeneratingImage(false);
     }
@@ -294,6 +298,14 @@ export function BookEditor() {
         </div>
 
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+          <button
+            onClick={() => setIsDeleteModalOpen(true)}
+            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+            title={t('delete_book')}
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
+
           <div className="relative flex-1" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
@@ -331,18 +343,6 @@ export function BookEditor() {
               </div>
             )}
           </div>
-
-          <button
-            onClick={() => {
-              if (confirm(t('confirm_delete_book'))) {
-                deleteBook(book.id);
-              }
-            }}
-            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
-            title={t('delete_book')}
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
         </div>
       </div>
 
@@ -514,6 +514,17 @@ export function BookEditor() {
           onClose={() => setIsBookInfoOpen(false)}
           book={book}
           onUpdate={(updatedBook) => setBook(updatedBook)}
+        />
+      )}
+      {book && (
+        <ConfirmModal
+          isOpen={isDeleteModalOpen}
+          onClose={() => setIsDeleteModalOpen(false)}
+          onConfirm={() => deleteBook(book.id)}
+          title={t('delete_book')}
+          message={t('confirm_delete_book')}
+          confirmLabel={t('delete')}
+          isDanger
         />
       )}
     </div>

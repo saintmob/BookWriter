@@ -57,6 +57,17 @@ const resources = {
       'import_json': 'Import JSON',
       'import_success': 'Import successful!',
       'import_error': 'Import failed. Please check the file format.',
+      'importing_book': 'Importing book...',
+      'generate_content_error': 'Failed to generate content',
+      'image_generated_success': 'Image generated successfully!',
+      'generate_image_error': 'Failed to generate image',
+      'book_created_success': 'Book created successfully!',
+      'generate_proposals_error': 'Failed to generate proposals',
+      'generate_outline_error': 'Failed to generate outline',
+      'outline_saved_success': 'Outline saved successfully!',
+      'outline_save_failed': 'Failed to save outline',
+      'confirm': 'Confirm',
+      'delete': 'Delete',
     }
   },
   zh: {
@@ -114,6 +125,17 @@ const resources = {
       'import_json': '导入 JSON',
       'import_success': '导入成功！',
       'import_error': '导入失败。请检查文件格式。',
+      'importing_book': '正在导入书籍...',
+      'generate_content_error': '生成内容失败',
+      'image_generated_success': '图片生成成功！',
+      'generate_image_error': '生成图片失败',
+      'book_created_success': '书籍创建成功！',
+      'generate_proposals_error': '生成方案失败',
+      'generate_outline_error': '生成大纲失败',
+      'outline_saved_success': '大纲保存成功！',
+      'outline_save_failed': '保存大纲失败',
+      'confirm': '确认',
+      'delete': '删除',
     }
   }
 };

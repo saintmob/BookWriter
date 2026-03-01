@@ -6,6 +6,7 @@ import { db, Book } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { Loader2, Sparkles, ArrowRight, BookOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 
 export function BookCreator() {
   const { t } = useTranslation();
@@ -23,7 +24,7 @@ export function BookCreator() {
       setDraft({ proposals: results, step: 2 });
     } catch (error: any) {
       console.error(error);
-      alert('Failed to generate proposals: ' + (error.message || error));
+      toast.error(t('generate_proposals_error') || 'Failed to generate proposals');
     } finally {
       setIsGenerating(false);
     }
@@ -65,10 +66,11 @@ export function BookCreator() {
       await loadBooks();
       setActiveBook(newBookId);
       resetDraft(); // Clear draft after successful creation
+      toast.success(t('book_created_success'));
       
     } catch (error: any) {
       console.error(error);
-      alert('Failed to generate outline: ' + (error.message || error));
+      toast.error(t('generate_outline_error') || 'Failed to generate outline');
       setDraft({ step: 2 });
     } finally {
       setIsGenerating(false);
