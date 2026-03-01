@@ -49,26 +49,26 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
                 <Monitor className="w-4 h-4" />
-                Appearance
+                {t('appearance')}
               </label>
               <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
                 <button 
                   onClick={() => setTheme('light')} 
                   className={cn("flex-1 flex items-center justify-center gap-2 py-2 rounded-md transition-all text-sm font-medium", theme === 'light' ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300")}
                 >
-                  <Sun className="w-4 h-4" /> Light
+                  <Sun className="w-4 h-4" /> {t('light')}
                 </button>
                 <button 
                   onClick={() => setTheme('system')} 
                   className={cn("flex-1 flex items-center justify-center gap-2 py-2 rounded-md transition-all text-sm font-medium", theme === 'system' ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300")}
                 >
-                  <Monitor className="w-4 h-4" /> System
+                  <Monitor className="w-4 h-4" /> {t('system')}
                 </button>
                 <button 
                   onClick={() => setTheme('dark')} 
                   className={cn("flex-1 flex items-center justify-center gap-2 py-2 rounded-md transition-all text-sm font-medium", theme === 'dark' ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300")}
                 >
-                  <Moon className="w-4 h-4" /> Dark
+                  <Moon className="w-4 h-4" /> {t('dark')}
                 </button>
               </div>
             </div>
@@ -77,7 +77,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <div>
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-3 flex items-center gap-2">
                 <Globe className="w-4 h-4" />
-                Language
+                {t('language')}
               </label>
               <div className="flex gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
                 <button 
@@ -98,14 +98,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             {/* API Key */}
             <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
               <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                Gemini API Key
+                {t('api_key')}
               </label>
               <div className="relative">
                 <input
                   type={showKey ? "text" : "password"}
                   value={key}
                   onChange={(e) => setKey(e.target.value)}
-                  placeholder="Enter your Gemini API Key"
+                  placeholder={t('api_key_placeholder')}
                   className="w-full px-4 py-2 pr-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                 />
                 <button
@@ -118,7 +118,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 flex items-start gap-1">
                 <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
                 <span>
-                  Required for external deployments. Get your key from{' '}
+                  {t('api_key_help')}{' '}
                   <a 
                     href="https://aistudio.google.com/app/apikey" 
                     target="_blank" 

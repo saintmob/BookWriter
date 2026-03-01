@@ -4,7 +4,7 @@ import { initReactI18next } from 'react-i18next';
 const resources = {
   en: {
     translation: {
-      'app_title': 'AI Book Writer',
+      'app_title': 'InkSpire',
       'new_book': 'New Book',
       'my_books': 'My Books',
       'idea_placeholder': 'What is your book about? E.g., A sci-fi novel about a detective solving crimes in a city where memories can be traded.',
@@ -37,11 +37,22 @@ const resources = {
       'concept': 'Concept',
       'select': 'Select',
       'creating_book': 'Creating your book...',
+      'appearance': 'Appearance',
+      'api_key': 'Gemini API Key',
+      'api_key_placeholder': 'Enter your Gemini API Key',
+      'api_key_help': 'Required for external deployments. Get your key from Google AI Studio.',
+      'cancel': 'Cancel',
+      'export': 'Export',
+      'export_markdown': 'Export Markdown',
+      'print_pdf': 'Print / Save PDF',
+      'regenerate_image': 'Regenerate Image',
+      'select_chapter_hint': 'Select a chapter to start writing',
+      'confirm_delete_book': 'Are you sure you want to delete this book?',
     }
   },
   zh: {
     translation: {
-      'app_title': 'AI 智能写书',
+      'app_title': 'InkSpire 神来之笔',
       'new_book': '新建书籍',
       'my_books': '我的书籍',
       'idea_placeholder': '你的书是关于什么的？例如：一部科幻小说，讲述一个侦探在记忆可以交易的城市里破案的故事。',
@@ -74,6 +85,17 @@ const resources = {
       'concept': '核心概念',
       'select': '选择',
       'creating_book': '正在创建你的书籍...',
+      'appearance': '外观',
+      'api_key': 'Gemini API 密钥',
+      'api_key_placeholder': '输入你的 Gemini API 密钥',
+      'api_key_help': '外部部署需要此密钥。从 Google AI Studio 获取。',
+      'cancel': '取消',
+      'export': '导出',
+      'export_markdown': '导出 Markdown',
+      'print_pdf': '打印 / 另存为 PDF',
+      'regenerate_image': '重新生成图片',
+      'select_chapter_hint': '选择一个章节开始写作',
+      'confirm_delete_book': '你确定要删除这本书吗？',
     }
   }
 };

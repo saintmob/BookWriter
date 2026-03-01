@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { BookPlus, Library, Settings } from 'lucide-react';
+import { BookPlus, Feather, Settings } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useEffect, useState } from 'react';
 import { SettingsModal } from './SettingsModal';
@@ -32,7 +32,7 @@ export function Sidebar() {
           onClick={() => setActiveBook(null)}
           className="p-4 flex items-center gap-2 font-serif text-xl font-semibold text-zinc-900 dark:text-zinc-100 hover:opacity-80 transition-opacity text-left"
         >
-          <Library className="w-6 h-6 text-emerald-600 dark:text-emerald-500" />
+          <Feather className="w-6 h-6 text-emerald-600 dark:text-emerald-500" />
           {t('app_title')}
         </button>
 

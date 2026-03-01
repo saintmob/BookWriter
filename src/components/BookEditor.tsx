@@ -261,7 +261,7 @@ export function BookEditor() {
         <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
           <button
             onClick={() => {
-              if (confirm('Are you sure you want to delete this book?')) {
+              if (confirm(t('confirm_delete_book'))) {
                 deleteBook(book.id);
               }
             }}
@@ -347,14 +347,14 @@ export function BookEditor() {
                         className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                       >
                         <FileText className="w-4 h-4" />
-                        Export Markdown
+                        {t('export_markdown')}
                       </button>
                       <button
                         onClick={handlePrint}
                         className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                       >
                         <Printer className="w-4 h-4" />
-                        Print / Save PDF
+                        {t('print_pdf')}
                       </button>
                     </div>
                   )}
@@ -373,7 +373,7 @@ export function BookEditor() {
                         onClick={handleGenerateImage}
                         className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
                       >
-                        <Sparkles className="w-4 h-4" /> Regenerate Image
+                        <Sparkles className="w-4 h-4" /> {t('regenerate_image')}
                       </button>
                     </div>
                   </div>
@@ -396,7 +396,7 @@ export function BookEditor() {
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center text-zinc-400 dark:text-zinc-600">
-            Select a chapter to start writing
+            {t('select_chapter_hint')}
           </div>
         )}
       </div>
