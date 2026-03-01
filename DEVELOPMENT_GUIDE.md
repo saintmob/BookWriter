@@ -10,6 +10,7 @@
 
 ### 1.2 沉浸式体验 (Immersive UX)
 *   **无感加载**：使用 `motion/react` (Framer Motion) 处理页面切换和元素入场动画，消除 Web 应用的“生硬感”。
+*   **即时反馈 (Immediate Feedback)**：在 AI 生成内容或图片时，必须立即显示占位符（如 Skeleton 骨架屏或 Loading 蒙层），避免用户产生“应用卡死”的错觉。
 *   **非阻塞反馈**：严禁使用原生 `alert()` 或 `confirm()`。统一使用 `sonner` (Toast) 提供操作反馈，使用自定义 `ConfirmModal` 处理二次确认。
 *   **深色模式**：原生支持 `dark` 模式，并遵循系统偏好。
 
@@ -30,15 +31,18 @@
 
 ### 3.2 交互式协作 (Interactive Collaboration)
 *   **流式输出 (Streaming)**：正文生成必须支持流式传输，减少用户等待焦虑。
+*   **核心功能高亮**：将 AI 对话 (AI Chat) 等核心协作功能在 UI 上进行视觉强化（如使用品牌色、加粗、阴影），引导用户深度参与 AI 协作。
 *   **上下文感知**：在章节对话 (ChapterChat) 中，务必将书籍背景和大纲作为 `systemInstruction` 传入，确保 AI 了解创作上下文。
 
 ## 4. 代码组织规范 (Code Structure)
 
-### 4.1 目录结构
-*   `/src/components`: 纯 UI 组件或功能组件。
-*   `/src/store`: 业务逻辑与全局状态 (Zustand)。
-*   `/src/lib`: 核心库封装 (DB, AI API, Utils)。
-*   `/src/hooks`: 可复用的逻辑钩子。
+### 4.1 目录结构与布局
+*   **目录组织**：
+    *   `/src/components`: 纯 UI 组件或功能组件。
+    *   `/src/store`: 业务逻辑与全局状态 (Zustand)。
+    *   `/src/lib`: 核心库封装 (DB, AI API, Utils)。
+    *   `/src/hooks`: 可复用的逻辑钩子。
+*   **布局平衡**：顶部工具栏等关键交互区域应采用对称布局（如 `grid-cols-3`），确保核心切换按钮（如 编辑/预览）居中，视觉重心稳定。
 
 ### 4.2 类型安全 (TypeScript)
 *   所有数据模型 (Book, Chapter, Proposal) 必须在 `lib/db.ts` 或专门的 `types.ts` 中定义接口。
