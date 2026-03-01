@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book } from '../lib/db';
 import { generateChapterContent, generateImage } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown } from 'lucide-react';
+import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { OutlineEditorModal } from './OutlineEditorModal';
+import { ChapterChat } from './ChapterChat';
 
 export function BookEditor() {
   const { t } = useTranslation();
@@ -23,6 +24,7 @@ export function BookEditor() {
   const [content, setContent] = useState('');
   const [isPreview, setIsPreview] = useState(false);
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -329,6 +331,22 @@ export function BookEditor() {
 
                 <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
 
+                <button
+                  onClick={() => setIsChatOpen(!isChatOpen)}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap",
+                    isChatOpen 
+                      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-400" 
+                      : "bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200"
+                  )}
+                  title="AI Assistant"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span className="hidden lg:inline">AI Chat</span>
+                </button>
+
+                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
+
                 {/* Export Menu */}
                 <div className="relative" ref={exportMenuRef}>
                   <button
@@ -363,35 +381,58 @@ export function BookEditor() {
             </div>
 
             {/* Editor Area */}
-            <div className="flex-1 overflow-y-auto p-8 md:p-12 lg:px-24">
-              <div className="max-w-3xl mx-auto space-y-8 pb-32">
-                {activeChapter.image && (
-                  <div className="relative group rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                    <img src={activeChapter.image} alt={activeChapter.title} className="w-full h-auto object-cover aspect-video" referrerPolicy="no-referrer" />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button 
-                        onClick={handleGenerateImage}
-                        className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-                      >
-                        <Sparkles className="w-4 h-4" /> {t('regenerate_image')}
-                      </button>
+            <div className="flex-1 flex overflow-hidden relative">
+              <div className="flex-1 overflow-y-auto p-8 md:p-12 lg:px-24">
+                <div className="max-w-3xl mx-auto space-y-8 pb-32">
+                  {activeChapter.image && (
+                    <div className="relative group rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm">
+                      <img src={activeChapter.image} alt={activeChapter.title} className="w-full h-auto object-cover aspect-video" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <button 
+                          onClick={handleGenerateImage}
+                          className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
+                        >
+                          <Sparkles className="w-4 h-4" /> {t('regenerate_image')}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {isPreview ? (
-                  <div className="prose prose-zinc dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
-                    <ReactMarkdown>{content || '*No content yet.*'}</ReactMarkdown>
-                  </div>
-                ) : (
-                  <textarea
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder={t('chapter_content_placeholder')}
-                    className="w-full min-h-[500px] bg-transparent border-none outline-none resize-none font-serif text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
-                  />
-                )}
+                  {isPreview ? (
+                    <div className="prose prose-zinc dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
+                      <ReactMarkdown>{content || '*No content yet.*'}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <textarea
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      placeholder={t('chapter_content_placeholder')}
+                      className="w-full min-h-[500px] bg-transparent border-none outline-none resize-none font-serif text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600"
+                    />
+                  )}
+                </div>
               </div>
+              
+              {isChatOpen && (
+                <ChapterChat
+                  content={content}
+                  chapterTitle={activeChapter.title}
+                  bookTitle={book.title}
+                  language={language}
+                  onApplyContent={(newContent) => {
+                    setContent(newContent);
+                    // Trigger auto-save immediately
+                    const updatedChapter = { ...activeChapter, content: newContent, updatedAt: Date.now() };
+                    db.saveChapter(updatedChapter).then(() => {
+                      setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
+                      setActiveChapterState(updatedChapter);
+                      setSaveSuccess(true);
+                      setTimeout(() => setSaveSuccess(false), 2000);
+                    });
+                  }}
+                  onClose={() => setIsChatOpen(false)}
+                />
+              )}
             </div>
           </>
         ) : (

@@ -198,3 +198,61 @@ export async function updateOutlineWithAI(
 
   return parseJSON(response.text || '[]');
 }
+
+export interface ChatResponse {
+  reply: string;
+  updatedContent?: string;
+}
+
+export async function chatWithChapter(
+  currentContent: string,
+  instruction: string,
+  chapterTitle: string,
+  bookTitle: string,
+  language: string
+): Promise<ChatResponse> {
+  const ai = getAi();
+  const prompt = `You are a professional book editor and co-author.
+  
+  Book Title: ${bookTitle}
+  Chapter Title: ${chapterTitle}
+  Language: ${language}
+  
+  Current Chapter Content:
+  """
+  ${currentContent}
+  """
+  
+  User Instruction: "${instruction}"
+  
+  If the user is asking for a revision or modification to the content:
+  1. Rewrite the content based on the instruction.
+  2. Provide a brief reply explaining what you changed.
+  
+  If the user is asking a question or asking for advice (and not explicitly asking to change the text yet):
+  1. Provide a helpful answer or suggestion in the reply.
+  2. Do NOT provide updatedContent.
+  
+  Return a JSON object with:
+  - 'reply': Your message to the user.
+  - 'updatedContent': The full updated chapter content (only if a change was made).
+  `;
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: prompt,
+    config: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          reply: { type: Type.STRING },
+          updatedContent: { type: Type.STRING },
+        },
+        required: ['reply'],
+      },
+    },
+  });
+
+  return parseJSON(response.text || '{}');
+}
