@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book } from '../lib/db';
 import { generateChapterContent, generateImage } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Save, Check, Trash2, Edit2, Eye, ListPlus } from 'lucide-react';
+import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { OutlineEditorModal } from './OutlineEditorModal';
@@ -18,12 +18,23 @@ export function BookEditor() {
   
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   const [content, setContent] = useState('');
   const [isPreview, setIsPreview] = useState(false);
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (activeBookId) {
@@ -107,23 +118,6 @@ export function BookEditor() {
     return () => clearTimeout(timer);
   }, [content, activeChapter]);
 
-  const handleSave = async () => {
-    if (!activeChapter) return;
-    setIsSaving(true);
-    try {
-      const updatedChapter = { ...activeChapter, content, updatedAt: Date.now() };
-      await db.saveChapter(updatedChapter);
-      setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
-      setActiveChapterState(updatedChapter);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (error) {
-      console.error('Failed to save', error);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleGenerateContent = async () => {
     if (!book || !activeChapter) return;
     setIsGeneratingContent(true);
@@ -173,12 +167,61 @@ export function BookEditor() {
     }
   };
 
+  const handleExportMarkdown = () => {
+    if (!book) return;
+    
+    let markdownContent = `# ${book.title}\n\n${book.summary}\n\n`;
+    
+    chapters.forEach((chapter, index) => {
+      markdownContent += `## Chapter ${index + 1}: ${chapter.title}\n\n`;
+      if (chapter.description) {
+        markdownContent += `*${chapter.description}*\n\n`;
+      }
+      markdownContent += `${chapter.content || ''}\n\n---\n\n`;
+    });
+
+    const blob = new Blob([markdownContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${book.title.replace(/\s+/g, '_')}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+  };
+
+  const handlePrint = () => {
+    window.print();
+    setShowExportMenu(false);
+  };
+
   if (!book) return <div className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-500" /></div>;
 
   return (
     <div className="flex-1 flex h-screen overflow-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
+      {/* Print Container (Hidden by default, visible in print) */}
+      <div id="print-container" className="hidden">
+        <h1 className="text-3xl font-bold mb-4">{book.title}</h1>
+        <p className="text-gray-600 mb-8 italic">{book.summary}</p>
+        {chapters.map((chapter, index) => (
+          <div key={chapter.id} className="mb-8 break-inside-avoid">
+            <h2 className="text-2xl font-bold mb-4">Chapter {index + 1}: {chapter.title}</h2>
+            {chapter.image && (
+              <img src={chapter.image} alt={chapter.title} className="w-full max-w-2xl mx-auto mb-4 rounded-lg" />
+            )}
+            <div className="prose max-w-none">
+              <ReactMarkdown>{chapter.content || ''}</ReactMarkdown>
+            </div>
+            <hr className="my-8 border-gray-200" />
+          </div>
+        ))}
+      </div>
+
       {/* Outline Sidebar */}
-      <div className="w-72 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col">
+      <div className="w-72 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col print:hidden">
+        {/* ... (sidebar content) ... */}
         <div className="p-4 border-b border-zinc-200 dark:border-zinc-800">
           <h2 className="font-serif font-bold text-lg truncate" title={book.title}>{book.title}</h2>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">{book.summary}</p>
@@ -231,7 +274,7 @@ export function BookEditor() {
       </div>
 
       {/* Main Editor */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
+      <div className="flex-1 flex flex-col overflow-hidden relative print:hidden">
         {activeChapter ? (
           <>
             {/* Toolbar */}
@@ -286,20 +329,36 @@ export function BookEditor() {
 
                 <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
 
-                <button
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap",
-                    saveSuccess 
-                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
-                      : "bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900"
+                {/* Export Menu */}
+                <div className="relative" ref={exportMenuRef}>
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="hidden sm:inline">{t('export')}</span>
+                    <ChevronDown className="w-3 h-3 opacity-50" />
+                  </button>
+
+                  {showExportMenu && (
+                    <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 z-50">
+                      <button
+                        onClick={handleExportMarkdown}
+                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Export Markdown
+                      </button>
+                      <button
+                        onClick={handlePrint}
+                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
+                      >
+                        <Printer className="w-4 h-4" />
+                        Print / Save PDF
+                      </button>
+                    </div>
                   )}
-                  title={saveSuccess ? t('saved') : t('save')}
-                >
-                  {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : saveSuccess ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                  <span className="hidden sm:inline">{saveSuccess ? t('saved') : t('save')}</span>
-                </button>
+                </div>
               </div>
             </div>
 
