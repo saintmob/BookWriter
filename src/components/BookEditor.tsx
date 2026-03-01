@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book } from '../lib/db';
 import { generateChapterContent, generateImage } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Save, Check, Trash2 } from 'lucide-react';
+import { Loader2, Sparkles, Image as ImageIcon, Save, Check, Trash2, Edit2, Eye } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 
@@ -195,11 +195,11 @@ export function BookEditor() {
         {activeChapter ? (
           <>
             {/* Toolbar */}
-            <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-6 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm z-10">
-              <h3 className="font-serif font-semibold text-lg truncate">{activeChapter.title}</h3>
+            <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-4 md:px-6 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm z-10 gap-4">
+              <h3 className="font-serif font-semibold text-lg truncate flex-1 min-w-0" title={activeChapter.title}>{activeChapter.title}</h3>
               
-              <div className="flex items-center gap-2">
-                <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-md p-1">
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-md p-1 hidden sm:flex">
                   <button
                     onClick={() => setIsPreview(false)}
                     className={cn("px-3 py-1 text-sm font-medium rounded-sm transition-colors", !isPreview ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300")}
@@ -214,40 +214,51 @@ export function BookEditor() {
                   </button>
                 </div>
 
-                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
+                {/* Mobile Toggle for Edit/Preview */}
+                <button
+                   onClick={() => setIsPreview(!isPreview)}
+                   className="sm:hidden p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md"
+                >
+                  {isPreview ? <Edit2 className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+
+                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
 
                 <button
                   onClick={handleGenerateContent}
                   disabled={isGeneratingContent}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 rounded-md text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+                  title={t('generate_content')}
                 >
                   {isGeneratingContent ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {t('generate_content')}
+                  <span className="hidden lg:inline">{t('generate_content')}</span>
                 </button>
                 
                 <button
                   onClick={handleGenerateImage}
                   disabled={isGeneratingImage || !content}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 rounded-md text-sm font-medium transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 rounded-md text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap"
+                  title={t('generate_image')}
                 >
                   {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                  {t('generate_image')}
+                  <span className="hidden lg:inline">{t('generate_image')}</span>
                 </button>
 
-                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1"></div>
+                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
 
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50",
+                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 whitespace-nowrap",
                     saveSuccess 
                       ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
                       : "bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-900"
                   )}
+                  title={saveSuccess ? t('saved') : t('save')}
                 >
                   {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : saveSuccess ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                  {saveSuccess ? t('saved') : t('save')}
+                  <span className="hidden sm:inline">{saveSuccess ? t('saved') : t('save')}</span>
                 </button>
               </div>
             </div>
