@@ -53,6 +53,29 @@ export function BookEditor() {
     }
   };
 
+  // Auto-save effect
+  useEffect(() => {
+    if (!activeChapter || !content || content === activeChapter.content) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const updatedChapter = { ...activeChapter, content, updatedAt: Date.now() };
+        await db.saveChapter(updatedChapter);
+        // Only update local state if we're still on the same chapter
+        if (activeChapter.id === updatedChapter.id) {
+          setChapters(prev => prev.map(c => c.id === updatedChapter.id ? updatedChapter : c));
+          setActiveChapterState(updatedChapter);
+          setSaveSuccess(true);
+          setTimeout(() => setSaveSuccess(false), 2000);
+        }
+      } catch (error) {
+        console.error('Auto-save failed', error);
+      }
+    }, 2000); // Debounce for 2 seconds
+
+    return () => clearTimeout(timer);
+  }, [content, activeChapter]);
+
   const handleSave = async () => {
     if (!activeChapter) return;
     setIsSaving(true);

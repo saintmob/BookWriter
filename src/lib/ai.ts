@@ -122,14 +122,13 @@ export async function generateChapterContent(
 export async function generateImage(prompt: string): Promise<string | null> {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-image-preview',
+      model: 'gemini-2.5-flash-image',
       contents: {
         parts: [{ text: prompt }],
       },
       config: {
         imageConfig: {
           aspectRatio: '16:9',
-          imageSize: '1K',
         },
       },
     });
@@ -142,6 +141,6 @@ export async function generateImage(prompt: string): Promise<string | null> {
     return null;
   } catch (error) {
     console.error('Image generation failed', error);
-    return null;
+    throw error; // Re-throw to let the UI handle the error message
   }
 }

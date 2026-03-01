@@ -93,6 +93,7 @@ export const useStore = create<AppState>()(
         theme: state.theme, 
         language: state.language,
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
+        activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
         draft: state.draft // Persist draft state to save progress
       }),
     }
