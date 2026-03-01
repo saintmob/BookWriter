@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Send, Loader2, Sparkles, Check, X } from 'lucide-react';
 import { chatWithChapter } from '../lib/ai';
 import ReactMarkdown from 'react-markdown';
@@ -19,6 +20,7 @@ interface Message {
 }
 
 export function ChapterChat({ content, chapterTitle, bookTitle, language, onApplyContent, onClose }: ChapterChatProps) {
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,7 +51,7 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
       }]);
     } catch (error) {
       console.error('Chat failed', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error. Please try again.' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: t('chat_error') }]);
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +62,7 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
       <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
         <h3 className="font-semibold flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-emerald-500" />
-          AI Assistant
+          {t('ai_assistant')}
         </h3>
         <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
           <X className="w-4 h-4" />
@@ -70,8 +72,8 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-zinc-500 text-sm mt-8">
-            <p>Ask me to rewrite, expand, or polish your chapter.</p>
-            <p className="mt-2 text-xs opacity-70">Example: "Make the dialogue more intense" or "Describe the setting in more detail"</p>
+            <p>{t('chat_welcome')}</p>
+            <p className="mt-2 text-xs opacity-70">{t('chat_example')}</p>
           </div>
         )}
         
@@ -96,7 +98,7 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
                   className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-300 rounded-lg text-xs font-medium transition-colors border border-emerald-200 dark:border-emerald-800"
                 >
                   <Check className="w-3 h-3" />
-                  Apply Changes
+                  {t('apply_to_editor')}
                 </button>
               </div>
             )}
@@ -123,7 +125,7 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
                 handleSend();
               }
             }}
-            placeholder="Type instructions..."
+            placeholder={t('type_message')}
             className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-lg pl-3 pr-10 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/50 min-h-[40px] max-h-32"
             rows={1}
           />

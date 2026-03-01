@@ -351,44 +351,53 @@ export function BookEditor() {
         {activeChapter ? (
           <>
             {/* Toolbar */}
-            <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-4 md:px-6 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm z-10 gap-4">
-              <h3 className="font-serif font-semibold text-lg truncate flex-1 min-w-0" title={activeChapter.title}>{activeChapter.title}</h3>
+            <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 grid grid-cols-3 items-center px-4 md:px-6 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm z-10">
+              {/* Left: Chapter Title */}
+              <div className="flex items-center min-w-0">
+                <h3 className="font-serif font-semibold text-lg truncate" title={activeChapter.title}>
+                  {activeChapter.title}
+                </h3>
+              </div>
               
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-md p-1 hidden sm:flex">
+              {/* Center: Edit/Preview Toggle */}
+              <div className="flex justify-center">
+                <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1">
                   <button
                     onClick={() => setIsPreview(false)}
-                    className={cn("px-3 py-1 text-sm font-medium rounded-sm transition-colors", !isPreview ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300")}
+                    className={cn(
+                      "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                      !isPreview 
+                        ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" 
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    )}
                   >
-                    Edit
+                    {t('edit')}
                   </button>
                   <button
                     onClick={() => setIsPreview(true)}
-                    className={cn("px-3 py-1 text-sm font-medium rounded-sm transition-colors", isPreview ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300")}
+                    className={cn(
+                      "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
+                      isPreview 
+                        ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" 
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    )}
                   >
-                    Preview
+                    {t('preview')}
                   </button>
                 </div>
+              </div>
 
-                {/* Mobile Toggle for Edit/Preview */}
-                <button
-                   onClick={() => setIsPreview(!isPreview)}
-                   className="sm:hidden p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md"
-                >
-                  {isPreview ? <Edit2 className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-
-                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
-
-                {/* AI Tools Dropdown */}
+              {/* Right: AI Tools & Chat */}
+              <div className="flex items-center justify-end gap-3">
+                {/* AI Tools Dropdown (Renamed to Generate) */}
                 <div className="relative" ref={aiMenuRef}>
                   <button
                     onClick={() => setShowAIMenu(!showAIMenu)}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:hover:bg-emerald-900/40 dark:text-emerald-400 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
-                    title="AI Tools"
+                    className="flex items-center gap-2 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
+                    title={t('generate')}
                   >
-                    <Sparkles className="w-4 h-4" />
-                    <span className="hidden lg:inline">AI Tools</span>
+                    <Sparkles className="w-4 h-4 text-emerald-500" />
+                    <span className="hidden lg:inline">{t('generate')}</span>
                     <ChevronDown className="w-3 h-3 opacity-50" />
                   </button>
 
@@ -425,15 +434,15 @@ export function BookEditor() {
                 <button
                   onClick={() => setIsChatOpen(!isChatOpen)}
                   className={cn(
-                    "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap",
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 whitespace-nowrap shadow-sm",
                     isChatOpen 
-                      ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-400" 
-                      : "bg-zinc-100 hover:bg-zinc-200 text-zinc-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200"
+                      ? "bg-emerald-700 text-white ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-zinc-950" 
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white"
                   )}
-                  title="AI Assistant"
+                  title={t('ai_assistant')}
                 >
                   <MessageSquare className="w-4 h-4" />
-                  <span className="hidden lg:inline">AI Chat</span>
+                  <span className="hidden lg:inline">{t('ai_chat')}</span>
                 </button>
               </div>
             </div>

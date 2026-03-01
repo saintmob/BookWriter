@@ -68,6 +68,17 @@ const resources = {
       'outline_save_failed': 'Failed to save outline',
       'confirm': 'Confirm',
       'delete': 'Delete',
+      'edit': 'Edit',
+      'preview': 'Preview',
+      'generate': 'Generate',
+      'ai_chat': 'AI Chat',
+      'ai_assistant': 'AI Assistant',
+      'type_message': 'Type a message...',
+      'apply_to_editor': 'Apply to Editor',
+      'ai_thinking': 'AI is thinking...',
+      'chat_welcome': 'Ask me to rewrite, expand, or polish your chapter.',
+      'chat_example': 'Example: "Make the dialogue more intense" or "Describe the setting in more detail"',
+      'chat_error': 'Sorry, I encountered an error. Please try again.',
     }
   },
   zh: {
@@ -136,6 +147,17 @@ const resources = {
       'outline_save_failed': '保存大纲失败',
       'confirm': '确认',
       'delete': '删除',
+      'edit': '编辑',
+      'preview': '预览',
+      'generate': '生成',
+      'ai_chat': 'AI 对话',
+      'ai_assistant': 'AI 助手',
+      'type_message': '输入消息...',
+      'apply_to_editor': '应用到编辑器',
+      'ai_thinking': 'AI 正在思考...',
+      'chat_welcome': '让助手帮你重写、扩充或润色章节。',
+      'chat_example': '例如：“让对话更激烈一些”或“更详细地描述环境”',
+      'chat_error': '抱歉，遇到了错误。请重试。',
     }
   }
 };
