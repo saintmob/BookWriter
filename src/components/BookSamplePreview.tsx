@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Book, Chapter } from '../lib/db';
-import { X, ChevronLeft, ChevronRight, Printer, BookOpen } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Printer, BookOpen, Minus, Plus, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from '../lib/utils';
 
@@ -16,19 +16,57 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [scale, setScale] = useState(1);
   const contentRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
 
-  // Reset page when opening
+  // Auto-fit function
+  const fitToScreen = () => {
+    if (!wrapperRef.current) return;
+    
+    // Target dimensions (Fixed Book Size)
+    const targetWidth = 1100;
+    const targetHeight = 780;
+    const padding = 40; // Minimum padding
+    const headerHeight = 80; // Toolbar height
+
+    const availableWidth = window.innerWidth - padding * 2;
+    const availableHeight = window.innerHeight - headerHeight - padding * 2;
+
+    const scaleX = availableWidth / targetWidth;
+    const scaleY = availableHeight / targetHeight;
+
+    // Fit to screen, max scale 1.2 (allow slight zoom on large screens, but mostly shrink)
+    const newScale = Math.min(scaleX, scaleY, 1.2);
+    // Ensure we don't scale down to 0 or negative
+    setScale(Math.max(0.1, newScale));
+  };
+
+  // Reset page and fit to screen when opening
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(0);
       // Allow some time for layout to settle before calculating pages
-      setTimeout(() => setIsReady(true), 300);
+      setTimeout(() => {
+        setIsReady(true);
+        fitToScreen();
+      }, 300);
     } else {
       setIsReady(false);
     }
+  }, [isOpen]);
+
+  // Handle window resize
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleResize = () => {
+      // Debounce slightly or just run
+      requestAnimationFrame(fitToScreen);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [isOpen]);
 
   // Calculate total pages based on scrollWidth
@@ -67,7 +105,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900/95 backdrop-blur-sm text-zinc-100 animate-in fade-in duration-200">
       {/* Header / Toolbar */}
-      <div className="flex items-center justify-between px-6 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0">
+      <div className="flex items-center justify-between px-6 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0 z-50">
         <div className="flex items-center gap-4">
           <div className="p-2 bg-emerald-500/10 rounded-lg">
             <BookOpen className="w-5 h-5 text-emerald-500" />
@@ -101,13 +139,16 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
       </div>
 
       {/* Main Preview Area */}
-      <div className="flex-1 flex items-center justify-center p-4 overflow-hidden relative bg-zinc-950">
+      <div 
+        ref={wrapperRef}
+        className="flex-1 flex items-center justify-center p-4 overflow-hidden relative bg-zinc-950"
+      >
         
-        {/* Navigation Buttons */}
+        {/* Navigation Buttons - Fixed to screen edges */}
         <button 
           onClick={prevPage}
           disabled={currentPage === 0}
-          className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-4 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white disabled:opacity-0 disabled:pointer-events-none transition-all z-30 shadow-xl backdrop-blur-sm border border-zinc-700"
+          className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-4 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white disabled:opacity-0 disabled:pointer-events-none transition-all z-40 shadow-xl backdrop-blur-sm border border-zinc-700"
         >
           <ChevronLeft className="w-6 h-6" />
         </button>
@@ -115,121 +156,182 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
         <button 
           onClick={nextPage}
           disabled={currentPage >= totalPages - 1}
-          className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-4 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white disabled:opacity-0 disabled:pointer-events-none transition-all z-30 shadow-xl backdrop-blur-sm border border-zinc-700"
+          className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-4 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white disabled:opacity-0 disabled:pointer-events-none transition-all z-40 shadow-xl backdrop-blur-sm border border-zinc-700"
         >
           <ChevronRight className="w-6 h-6" />
         </button>
 
-        {/* Book Container (Viewport) */}
-        <div 
-          ref={containerRef}
-          className="relative bg-[#f5f5f0] text-zinc-900 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out origin-center"
-          style={{
-            width: '1000px', // 2 * 500px pages (Standard spread width)
-            height: '700px', // Fixed height (Standard page height ratio)
-            maxWidth: '90vw',
-            maxHeight: '85vh',
-            // Aspect ratio maintenance if screen is small
-            aspectRatio: '1000 / 700'
-          }}
-        >
-          {/* Spine Shadow / Binding Effect */}
-          <div className="absolute left-1/2 top-0 bottom-0 w-16 -ml-8 bg-gradient-to-r from-transparent via-black/5 to-transparent pointer-events-none z-20 mix-blend-multiply"></div>
-          <div className="absolute left-1/2 top-0 bottom-0 w-px bg-black/10 z-20"></div>
+        {/* Zoom Controls */}
+        <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-zinc-900/90 backdrop-blur px-2 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg">
+           <button 
+             onClick={() => setScale(s => Math.max(0.2, s - 0.1))}
+             className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+             title="Zoom Out"
+           >
+             <Minus className="w-4 h-4" />
+           </button>
+           <span className="text-xs font-mono w-12 text-center text-zinc-300 select-none">{Math.round(scale * 100)}%</span>
+           <button 
+             onClick={() => setScale(s => Math.min(2.0, s + 0.1))}
+             className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+             title="Zoom In"
+           >
+             <Plus className="w-4 h-4" />
+           </button>
+           <div className="w-px h-4 bg-zinc-800 mx-1"></div>
+           <button 
+             onClick={fitToScreen}
+             className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+             title="Fit to Screen"
+           >
+             <Maximize className="w-4 h-4" />
+           </button>
+        </div>
 
-          {/* Content Wrapper (Scrollable/Transformable) */}
+        {/* Scalable Container Wrapper */}
+        <div 
+          className="transition-transform duration-300 ease-out origin-center will-change-transform"
+          style={{ transform: `scale(${scale})` }}
+        >
+          {/* Book Container (Viewport) - Fixed Dimensions */}
           <div 
-            ref={contentRef}
-            className="h-full transition-transform duration-500 ease-in-out will-change-transform"
+            ref={containerRef}
+            className="relative bg-[#fcfbf9] text-zinc-900 shadow-2xl overflow-hidden"
             style={{
-              transform: `translateX(-${currentPage * 100}%)`, // Move by 100% of viewport width
-              columnWidth: '440px', // Page width minus margins (approx 500 - 60)
-              columnGap: '120px', // Gap between pages (60px margin * 2)
-              padding: '50px 60px', // Top/Bottom padding, Left/Right padding for first/last columns
-              height: '100%',
-              columnFill: 'auto', // Fill columns sequentially
-              width: 'max-content', // Allow width to grow as needed
+              width: '1100px', // Fixed logical width
+              height: '780px', // Fixed logical height
+              // No maxWidth/maxHeight here to preserve layout
             }}
           >
-            {/* Render Content */}
-            <div className="prose prose-zinc max-w-none font-serif text-justify leading-relaxed text-sm">
-              <style>{`
-                .sample-content h1 { 
-                  margin-top: 0; 
-                  font-size: 2.5em; 
-                  text-align: center; 
-                  margin-bottom: 3rem; 
-                  break-before: column; 
-                  font-family: "Playfair Display", serif;
-                }
-                .sample-content h2 { 
-                  font-size: 1.8em; 
-                  margin-top: 2rem; 
-                  margin-bottom: 1.5rem; 
-                  font-family: "Playfair Display", serif;
-                  border-bottom: 1px solid #e5e5e5;
-                  padding-bottom: 0.5rem;
-                }
-                .sample-content p { 
-                  margin-bottom: 1.2em; 
-                  text-indent: 2em; 
-                  font-size: 1.05em;
-                  line-height: 1.8;
-                }
-                .sample-content img { 
-                  max-width: 100%; 
-                  height: auto; 
-                  margin: 2rem auto; 
-                  display: block; 
-                  break-inside: avoid; 
-                  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                  border-radius: 2px;
-                }
-                .sample-content hr { 
-                  border: 0; 
-                  text-align: center; 
-                  margin: 3rem 0; 
-                }
-                .sample-content hr:after { 
-                  content: "❦"; 
-                  font-size: 1.5em; 
-                  color: #a1a1aa; 
-                }
-                .chapter-start {
-                  break-before: column;
-                  padding-top: 2rem;
-                }
-              `}</style>
-              <div className="sample-content w-[440px]"> {/* Constrain width for correct column flow calculation */}
-                 {/* Title Page */}
-                 <div style={{ breakAfter: 'column', height: '600px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-                    <h1 className="text-5xl font-bold mb-6 tracking-tight">{book.title}</h1>
-                    <p className="text-xl italic text-zinc-600 max-w-md mx-auto leading-relaxed">{book.summary}</p>
-                    <div className="mt-24 text-xs uppercase tracking-widest text-zinc-400">Generated by InkSpire</div>
-                 </div>
+            {/* Paper Texture Effect */}
+            <div className="absolute inset-0 opacity-[0.03] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")` }}></div>
 
-                 {chapters.map((chapter, idx) => (
-                   <div key={chapter.id} className="chapter-start">
-                     <div className="text-center mb-10 mt-4">
-                       <span className="text-xs uppercase tracking-[0.2em] text-zinc-500 block mb-2">Chapter {idx + 1}</span>
-                       <h2 className="text-3xl font-bold mt-0 border-none">{chapter.title}</h2>
-                     </div>
-                     
-                     {chapter.image && (
-                       <img src={chapter.image} alt={chapter.title} className="w-full h-auto rounded-sm shadow-sm mb-8 grayscale-[0.1]" />
-                     )}
-                     
-                     <ReactMarkdown 
-                       components={{
-                         p: ({node, ...props}) => <p {...props} />,
-                       }}
-                     >
-                       {chapter.content || ''}
-                     </ReactMarkdown>
-                     
-                     {idx < chapters.length - 1 && <hr />}
+            {/* Spine Shadow / Binding Effect */}
+            <div className="absolute left-1/2 top-0 bottom-0 w-24 -ml-12 bg-gradient-to-r from-transparent via-black/5 to-transparent pointer-events-none z-20 mix-blend-multiply"></div>
+            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-black/5 z-20"></div>
+
+            {/* Content Wrapper (Scrollable/Transformable) */}
+            <div 
+              ref={contentRef}
+              className="h-full transition-transform duration-500 ease-in-out will-change-transform"
+              style={{
+                transform: `translateX(-${currentPage * 100}%)`,
+                // Precise math for 2 columns:
+                // Total Width (1100) - Padding L/R (80*2=160) = 940
+                // Gap = 100
+                // Remaining = 840 / 2 = 420px per column
+                columnWidth: '420px',
+                columnGap: '100px',
+                padding: '60px 80px 80px 80px', // Top, Right, Bottom, Left (Outer margins)
+                height: '100%',
+                columnFill: 'auto',
+                width: 'max-content',
+              }}
+            >
+              {/* Render Content */}
+              <div className="prose prose-zinc max-w-none font-serif text-justify leading-relaxed antialiased">
+                <style>{`
+                  .sample-content {
+                    font-size: 15px; /* More realistic book font size */
+                    line-height: 1.75;
+                    color: #27272a;
+                  }
+                  .sample-content h1 { 
+                    margin-top: 0; 
+                    font-size: 2.2em; 
+                    text-align: center; 
+                    margin-bottom: 4rem; 
+                    break-before: column; 
+                    font-family: "Playfair Display", serif;
+                    font-weight: 700;
+                    letter-spacing: -0.02em;
+                  }
+                  .sample-content h2 { 
+                    font-size: 1.4em; 
+                    margin-top: 3rem; 
+                    margin-bottom: 2rem; 
+                    font-family: "Playfair Display", serif;
+                    font-weight: 600;
+                    text-align: center;
+                    letter-spacing: 0.05em;
+                  }
+                  /* Traditional Paragraph Styling */
+                  .sample-content p { 
+                    margin-bottom: 0; 
+                    text-indent: 2em; 
+                  }
+                  /* No indent for first paragraph after headings */
+                  .sample-content h1 + p,
+                  .sample-content h2 + p,
+                  .sample-content hr + p {
+                    text-indent: 0;
+                  }
+                  /* Add spacing back for non-paragraph elements if needed */
+                  .sample-content blockquote {
+                    margin: 1.5rem 2rem;
+                    font-style: italic;
+                    text-indent: 0;
+                    color: #52525b;
+                  }
+                  .sample-content img { 
+                    max-width: 100%; 
+                    height: auto; 
+                    margin: 2rem auto; 
+                    display: block; 
+                    break-inside: avoid; 
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    filter: sepia(0.2) contrast(1.05);
+                  }
+                  .sample-content hr { 
+                    border: 0; 
+                    text-align: center; 
+                    margin: 2.5rem 0; 
+                    height: auto;
+                    background: none;
+                  }
+                  .sample-content hr:after { 
+                    content: "❦"; 
+                    font-size: 1.2em; 
+                    color: #a1a1aa; 
+                    display: block;
+                  }
+                  .chapter-start {
+                    break-before: column;
+                    padding-top: 4rem; /* Sink */
+                  }
+                `}</style>
+                <div className="sample-content w-[420px]"> {/* Constrain width to match column width exactly */}
+                   {/* Title Page */}
+                   <div style={{ breakAfter: 'column', height: '640px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
+                      <div className="mb-8 text-xs font-bold tracking-[0.3em] uppercase text-zinc-400">InkSpire Edition</div>
+                      <h1 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight text-zinc-900 !text-center !break-before-auto">{book.title}</h1>
+                      <div className="w-12 h-1 bg-zinc-900 mb-8"></div>
+                      <p className="text-lg italic text-zinc-600 max-w-xs mx-auto leading-relaxed !text-indent-0 !text-center">{book.summary}</p>
                    </div>
-                 ))}
+
+                   {chapters.map((chapter, idx) => (
+                     <div key={chapter.id} className="chapter-start">
+                       <div className="text-center mb-12">
+                         <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500 block mb-4">Chapter {idx + 1}</span>
+                         <h2 className="!mt-0 !mb-0 !text-2xl border-none">{chapter.title}</h2>
+                       </div>
+                       
+                       {chapter.image && (
+                         <img src={chapter.image} alt={chapter.title} className="w-full h-auto mb-8" />
+                       )}
+                       
+                       <ReactMarkdown 
+                         components={{
+                           p: ({node, ...props}) => <p {...props} />,
+                         }}
+                       >
+                         {chapter.content || ''}
+                       </ReactMarkdown>
+                       
+                       {idx < chapters.length - 1 && <hr />}
+                     </div>
+                   ))}
+                </div>
               </div>
             </div>
           </div>
