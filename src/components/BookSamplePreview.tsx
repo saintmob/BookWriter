@@ -22,25 +22,32 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
 
+  // Constants for Book Layout
+  const BOOK_WIDTH = 1100;
+  const BOOK_HEIGHT = 780;
+  const OUTER_PADDING = 80;
+  const COLUMN_GAP = 100;
+  // Derived Constants
+  // Content Width = 1100 - 160 = 940
+  // Column Width = (940 - 100) / 2 = 420
+  const COLUMN_WIDTH = (BOOK_WIDTH - (OUTER_PADDING * 2) - COLUMN_GAP) / 2;
+  const SPREAD_STRIDE = (COLUMN_WIDTH + COLUMN_GAP) * 2; // Distance to scroll for next spread
+
   // Auto-fit function
   const fitToScreen = () => {
     if (!wrapperRef.current) return;
     
-    // Target dimensions (Fixed Book Size)
-    const targetWidth = 1100;
-    const targetHeight = 780;
     const padding = 40; // Minimum padding
     const headerHeight = 80; // Toolbar height
 
     const availableWidth = window.innerWidth - padding * 2;
     const availableHeight = window.innerHeight - headerHeight - padding * 2;
 
-    const scaleX = availableWidth / targetWidth;
-    const scaleY = availableHeight / targetHeight;
+    const scaleX = availableWidth / BOOK_WIDTH;
+    const scaleY = availableHeight / BOOK_HEIGHT;
 
-    // Fit to screen, max scale 1.2 (allow slight zoom on large screens, but mostly shrink)
+    // Fit to screen, max scale 1.2
     const newScale = Math.min(scaleX, scaleY, 1.2);
-    // Ensure we don't scale down to 0 or negative
     setScale(Math.max(0.1, newScale));
   };
 
@@ -48,11 +55,10 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(0);
-      // Allow some time for layout to settle before calculating pages
       setTimeout(() => {
         setIsReady(true);
         fitToScreen();
-      }, 300);
+      }, 100);
     } else {
       setIsReady(false);
     }
@@ -62,7 +68,6 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   useEffect(() => {
     if (!isOpen) return;
     const handleResize = () => {
-      // Debounce slightly or just run
       requestAnimationFrame(fitToScreen);
     };
     window.addEventListener('resize', handleResize);
@@ -71,16 +76,13 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
 
   // Calculate total pages based on scrollWidth
   useEffect(() => {
-    if (isReady && contentRef.current && containerRef.current) {
+    if (isReady && contentRef.current) {
       const { scrollWidth } = contentRef.current;
-      const { clientWidth } = containerRef.current;
-      
-      // clientWidth is the width of the viewport (showing 2 pages)
-      // scrollWidth is the total width of the content
-      // Total pages (spreads) = Math.ceil(scrollWidth / clientWidth)
-      
-      const pages = Math.ceil(scrollWidth / clientWidth);
-      setTotalPages(pages);
+      // Calculate total spreads
+      // We subtract the initial padding to get "content length" logic roughly
+      // But simpler: Math.ceil((scrollWidth - OUTER_PADDING) / SPREAD_STRIDE)
+      const pages = Math.ceil((scrollWidth - OUTER_PADDING) / SPREAD_STRIDE);
+      setTotalPages(Math.max(1, pages));
     }
   }, [isReady, book, chapters]);
 
@@ -198,9 +200,8 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
             ref={containerRef}
             className="relative bg-[#fcfbf9] text-zinc-900 shadow-2xl overflow-hidden"
             style={{
-              width: '1100px', // Fixed logical width
-              height: '780px', // Fixed logical height
-              // No maxWidth/maxHeight here to preserve layout
+              width: `${BOOK_WIDTH}px`,
+              height: `${BOOK_HEIGHT}px`,
             }}
           >
             {/* Paper Texture Effect */}
@@ -215,21 +216,20 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
               ref={contentRef}
               className="h-full transition-transform duration-500 ease-in-out will-change-transform"
               style={{
-                transform: `translateX(-${currentPage * 100}%)`,
-                // Precise math for 2 columns:
-                // Total Width (1100) - Padding L/R (80*2=160) = 940
-                // Gap = 100
-                // Remaining = 840 / 2 = 420px per column
-                columnWidth: '420px',
-                columnGap: '100px',
-                padding: '60px 80px 80px 80px', // Top, Right, Bottom, Left (Outer margins)
+                transform: `translateX(-${currentPage * SPREAD_STRIDE}px)`,
+                columnWidth: `${COLUMN_WIDTH}px`,
+                columnGap: `${COLUMN_GAP}px`,
+                padding: `60px ${OUTER_PADDING}px 80px ${OUTER_PADDING}px`,
                 height: '100%',
                 columnFill: 'auto',
                 width: 'max-content',
               }}
             >
               {/* Render Content */}
-              <div className="prose prose-zinc max-w-none font-serif text-justify leading-relaxed antialiased">
+              <div 
+                className="prose prose-zinc max-w-none font-serif text-justify leading-relaxed antialiased"
+                style={{ width: `${COLUMN_WIDTH}px` }} // Explicitly set width to force column break
+              >
                 <style>{`
                   .sample-content {
                     font-size: 15px; /* More realistic book font size */
@@ -300,7 +300,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                     padding-top: 4rem; /* Sink */
                   }
                 `}</style>
-                <div className="sample-content w-[420px]"> {/* Constrain width to match column width exactly */}
+                <div className="sample-content">
                    {/* Title Page */}
                    <div style={{ breakAfter: 'column', height: '640px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
                       <div className="mb-8 text-xs font-bold tracking-[0.3em] uppercase text-zinc-400">InkSpire Edition</div>
