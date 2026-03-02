@@ -80,8 +80,11 @@ const resources = {
       'chat_example': 'Example: "Make the dialogue more intense" or "Describe the setting in more detail"',
       'chat_error': 'Sorry, I encountered an error. Please try again.',
       'generating_content_placeholder': 'AI is writing chapter content...',
-      'generating_image_placeholder': 'AI is painting an illustration...',
-      'no_content_yet': 'No content yet.',
+      'generate_sample': 'Generate Sample',
+      'sample_preview': 'Book Sample Preview',
+      'double_page_view': 'Double Page View',
+      'print_sample': 'Print Sample',
+      'close': 'Close',
     }
   },
   zh: {
@@ -162,8 +165,11 @@ const resources = {
       'chat_example': '例如：“让对话更激烈一些”或“更详细地描述环境”',
       'chat_error': '抱歉，遇到了错误。请重试。',
       'generating_content_placeholder': 'AI 正在创作章节内容...',
-      'generating_image_placeholder': 'AI 正在绘制插图...',
-      'no_content_yet': '暂无内容。',
+      'generate_sample': '生成样张',
+      'sample_preview': '书籍样张预览',
+      'double_page_view': '双开本视图',
+      'print_sample': '打印样张',
+      'close': '关闭',
     }
   }
 };

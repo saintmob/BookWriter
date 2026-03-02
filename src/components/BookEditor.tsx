@@ -3,13 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book } from '../lib/db';
 import { generateChapterContent, generateImage } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare } from 'lucide-react';
+import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { OutlineEditorModal } from './OutlineEditorModal';
 import { ChapterChat } from './ChapterChat';
 import { BookInfoModal } from './BookInfoModal';
 import { ConfirmModal } from './ConfirmModal';
+import { BookSamplePreview } from './BookSamplePreview';
 import { toast } from 'sonner';
 
 export function BookEditor() {
@@ -30,6 +31,7 @@ export function BookEditor() {
   const [isBookInfoOpen, setIsBookInfoOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSamplePreviewOpen, setIsSamplePreviewOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -340,6 +342,17 @@ export function BookEditor() {
                   <Download className="w-4 h-4 text-emerald-500" />
                   {t('export_json')}
                 </button>
+                <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1"></div>
+                <button
+                  onClick={() => {
+                    setIsSamplePreviewOpen(true);
+                    setShowExportMenu(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
+                >
+                  <BookOpen className="w-4 h-4 text-purple-500" />
+                  {t('generate_sample')}
+                </button>
               </div>
             )}
           </div>
@@ -579,6 +592,14 @@ export function BookEditor() {
           message={t('confirm_delete_book')}
           confirmLabel={t('delete')}
           isDanger
+        />
+      )}
+      {book && (
+        <BookSamplePreview
+          isOpen={isSamplePreviewOpen}
+          onClose={() => setIsSamplePreviewOpen(false)}
+          book={book}
+          chapters={chapters}
         />
       )}
     </div>
