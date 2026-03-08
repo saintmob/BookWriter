@@ -197,13 +197,15 @@ export function BookEditor() {
   const handleProofread = async () => {
     if (!activeChapter || !content) return;
     setIsProofreading(true);
+    setProofreadFeedback(null);
+    setIsProofreadModalOpen(true);
     try {
       const feedback = await proofreadChapter(content, activeChapter.title, language);
       setProofreadFeedback(feedback);
-      setIsProofreadModalOpen(true);
     } catch (error: any) {
       console.error('Failed to proofread', error);
       toast.error(t('chat_error') || 'Failed to proofread');
+      setIsProofreadModalOpen(false);
     } finally {
       setIsProofreading(false);
     }
@@ -691,7 +693,7 @@ export function BookEditor() {
       )}
 
       {/* Proofread Modal */}
-      {isProofreadModalOpen && proofreadFeedback && (
+      {isProofreadModalOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
             <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/50">
@@ -707,52 +709,61 @@ export function BookEditor() {
               <button 
                 onClick={() => setIsProofreadModalOpen(false)}
                 className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors p-2"
-                disabled={isApplyingChanges}
+                disabled={isApplyingChanges || isProofreading}
               >
                 {t('close')}
               </button>
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-3 flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-zinc-400" />
-                  {t('proofread_feedback')}
-                </h3>
-                <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 text-zinc-700 dark:text-zinc-300 leading-relaxed text-sm border border-zinc-100 dark:border-zinc-800">
-                  {proofreadFeedback.feedback}
+              {isProofreading ? (
+                <div className="flex flex-col items-center justify-center py-16 space-y-4">
+                  <Loader2 className="w-10 h-10 animate-spin text-purple-500" />
+                  <p className="text-zinc-500 dark:text-zinc-400 font-medium animate-pulse">{t('proofreading')}</p>
                 </div>
-              </div>
+              ) : proofreadFeedback ? (
+                <>
+                  <div>
+                    <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-zinc-400" />
+                      {t('proofread_feedback')}
+                    </h3>
+                    <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 text-zinc-700 dark:text-zinc-300 leading-relaxed text-sm border border-zinc-100 dark:border-zinc-800">
+                      {proofreadFeedback.feedback}
+                    </div>
+                  </div>
 
-              {proofreadFeedback.suggestions && proofreadFeedback.suggestions.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-3 flex items-center gap-2">
-                    <ListPlus className="w-4 h-4 text-zinc-400" />
-                    {t('proofread_suggestions')}
-                  </h3>
-                  <ul className="space-y-2">
-                    {proofreadFeedback.suggestions.map((suggestion, index) => (
-                      <li key={index} className="flex gap-3 text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg shadow-sm">
-                        <span className="text-purple-500 font-bold shrink-0">{index + 1}.</span>
-                        <span>{suggestion}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+                  {proofreadFeedback.suggestions && proofreadFeedback.suggestions.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <ListPlus className="w-4 h-4 text-zinc-400" />
+                        {t('proofread_suggestions')}
+                      </h3>
+                      <ul className="space-y-2">
+                        {proofreadFeedback.suggestions.map((suggestion, index) => (
+                          <li key={index} className="flex gap-3 text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg shadow-sm">
+                            <span className="text-purple-500 font-bold shrink-0">{index + 1}.</span>
+                            <span>{suggestion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </>
+              ) : null}
             </div>
 
             <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 flex justify-end gap-3">
               <button
                 onClick={() => setIsProofreadModalOpen(false)}
                 className="px-5 py-2.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
-                disabled={isApplyingChanges}
+                disabled={isApplyingChanges || isProofreading}
               >
                 {t('ignore_changes')}
               </button>
               <button
                 onClick={handleApplyProofreadChanges}
-                disabled={isApplyingChanges}
+                disabled={isApplyingChanges || isProofreading || !proofreadFeedback}
                 className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
               >
                 {isApplyingChanges ? (
