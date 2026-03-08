@@ -8,6 +8,7 @@ import { Chapter } from '../lib/db';
 import { cn } from '../lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
+import ReactMarkdown from 'react-markdown';
 
 interface OutlineEditorModalProps {
   isOpen: boolean;
@@ -71,7 +72,7 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
         language
       );
 
-      if (response.updatedOutline) {
+      if (response.updatedOutline && response.updatedOutline.length > 0) {
         // Merge AI response with existing chapters to preserve IDs and content where possible
         const newChapters: Chapter[] = response.updatedOutline.map((item, index) => {
           const existing = chapters.find(c => c.title === item.title);
@@ -212,7 +213,13 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
                         : "bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-bl-none shadow-sm"
                     )}
                   >
-                    {msg.content}
+                    {msg.role === 'assistant' ? (
+                      <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-zinc-100 dark:prose-pre:bg-zinc-900 prose-pre:text-zinc-800 dark:prose-pre:text-zinc-200">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      msg.content
+                    )}
                   </div>
                 </div>
               ))}

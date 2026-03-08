@@ -185,11 +185,11 @@ If the user is asking for a revision or modification to the outline (e.g., add, 
 
 If the user is asking a question or asking for advice (and not explicitly asking to change the outline yet):
 1. Provide a helpful answer or suggestion in the reply.
-2. Do NOT provide updatedOutline.
+2. OMIT the 'updatedOutline' field entirely. Do NOT return an empty array.
 
 Return ONLY a JSON object with:
-- 'reply': Your message to the user.
-- 'updatedOutline': The full updated list of chapters as a JSON array (only if a change was made). Each chapter must have 'title' and 'description'.
+- 'reply': Your message to the user. Use markdown formatting for readability (e.g., bolding, bullet points).
+- 'updatedOutline': The full updated list of chapters as a JSON array (only if a change was made). Each chapter must have 'title' and 'description'. If no changes are made to the outline, do not include this field.
 Do not include markdown formatting like \`\`\`json.`;
 
   const text = await callTextAI(prompt, true);
