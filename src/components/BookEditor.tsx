@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book } from '../lib/db';
-import { generateChapterContent, generateImage } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen } from 'lucide-react';
+import { generateChapterContent, generateImage, proofreadChapter, applyProofreadChanges, ProofreadFeedback } from '../lib/ai';
+import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import ReactMarkdown from 'react-markdown';
 import { OutlineEditorModal } from './OutlineEditorModal';
@@ -23,6 +23,10 @@ export function BookEditor() {
   
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isProofreading, setIsProofreading] = useState(false);
+  const [isApplyingChanges, setIsApplyingChanges] = useState(false);
+  const [proofreadFeedback, setProofreadFeedback] = useState<ProofreadFeedback | null>(null);
+  const [isProofreadModalOpen, setIsProofreadModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   const [content, setContent] = useState('');
@@ -179,6 +183,45 @@ export function BookEditor() {
       toast.error(t('generate_image_error') || 'Failed to generate image');
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  const handleProofread = async () => {
+    if (!activeChapter || !content) return;
+    setIsProofreading(true);
+    try {
+      const feedback = await proofreadChapter(content, activeChapter.title, language);
+      setProofreadFeedback(feedback);
+      setIsProofreadModalOpen(true);
+    } catch (error: any) {
+      console.error('Failed to proofread', error);
+      toast.error(t('chat_error') || 'Failed to proofread');
+    } finally {
+      setIsProofreading(false);
+    }
+  };
+
+  const handleApplyProofreadChanges = async () => {
+    if (!activeChapter || !content || !proofreadFeedback) return;
+    setIsApplyingChanges(true);
+    try {
+      const newContent = await applyProofreadChanges(content, proofreadFeedback, activeChapter.title, language);
+      setContent(newContent);
+      
+      // Auto save
+      const updatedChapter = { ...activeChapter, content: newContent, updatedAt: Date.now() };
+      await db.saveChapter(updatedChapter);
+      setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
+      setActiveChapterState(updatedChapter);
+      
+      setIsProofreadModalOpen(false);
+      setProofreadFeedback(null);
+      toast.success(t('saved'));
+    } catch (error: any) {
+      console.error('Failed to apply changes', error);
+      toast.error(t('chat_error') || 'Failed to apply changes');
+    } finally {
+      setIsApplyingChanges(false);
     }
   };
 
@@ -438,6 +481,18 @@ export function BookEditor() {
                         {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                         {t('generate_image')}
                       </button>
+                      <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1"></div>
+                      <button
+                        onClick={() => {
+                          handleProofread();
+                          setShowAIMenu(false);
+                        }}
+                        disabled={isProofreading || !content}
+                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {isProofreading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-purple-500" />}
+                        {t('ai_proofread')}
+                      </button>
                     </div>
                   )}
                 </div>
@@ -601,6 +656,88 @@ export function BookEditor() {
           book={book}
           chapters={chapters}
         />
+      )}
+
+      {/* Proofread Modal */}
+      {isProofreadModalOpen && proofreadFeedback && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800">
+            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-900/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <Wand2 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{t('ai_proofread')}</h2>
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">{activeChapter?.title}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsProofreadModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors p-2"
+                disabled={isApplyingChanges}
+              >
+                {t('close')}
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div>
+                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-3 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-zinc-400" />
+                  {t('proofread_feedback')}
+                </h3>
+                <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-xl p-4 text-zinc-700 dark:text-zinc-300 leading-relaxed text-sm border border-zinc-100 dark:border-zinc-800">
+                  {proofreadFeedback.feedback}
+                </div>
+              </div>
+
+              {proofreadFeedback.suggestions && proofreadFeedback.suggestions.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <ListPlus className="w-4 h-4 text-zinc-400" />
+                    {t('proofread_suggestions')}
+                  </h3>
+                  <ul className="space-y-2">
+                    {proofreadFeedback.suggestions.map((suggestion, index) => (
+                      <li key={index} className="flex gap-3 text-sm text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-3 rounded-lg shadow-sm">
+                        <span className="text-purple-500 font-bold shrink-0">{index + 1}.</span>
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 flex justify-end gap-3">
+              <button
+                onClick={() => setIsProofreadModalOpen(false)}
+                className="px-5 py-2.5 text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors"
+                disabled={isApplyingChanges}
+              >
+                {t('ignore_changes')}
+              </button>
+              <button
+                onClick={handleApplyProofreadChanges}
+                disabled={isApplyingChanges}
+                className="flex items-center gap-2 px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {isApplyingChanges ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {t('applying_changes')}
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    {t('accept_changes')}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

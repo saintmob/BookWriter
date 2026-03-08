@@ -85,6 +85,17 @@ const resources = {
       'double_page_view': 'Double Page View',
       'print_sample': 'Print Sample',
       'close': 'Close',
+      'ai_provider': 'AI Provider',
+      'openrouter_api_key': 'OpenRouter API Key',
+      'openrouter_api_key_placeholder': 'sk-or-v1-...',
+      'openrouter_model': 'Model',
+      'ai_proofread': 'AI Proofread',
+      'proofread_feedback': 'Editorial Feedback',
+      'proofread_suggestions': 'Suggestions',
+      'accept_changes': 'Accept & Apply',
+      'ignore_changes': 'Ignore',
+      'applying_changes': 'Applying changes...',
+      'proofreading': 'Proofreading...',
     }
   },
   zh: {
@@ -170,6 +181,17 @@ const resources = {
       'double_page_view': '双开本视图',
       'print_sample': '打印样张',
       'close': '关闭',
+      'ai_provider': 'AI 接入点',
+      'openrouter_api_key': 'OpenRouter API 密钥',
+      'openrouter_api_key_placeholder': 'sk-or-v1-...',
+      'openrouter_model': '模型',
+      'ai_proofread': 'AI 编辑校稿',
+      'proofread_feedback': '编辑反馈',
+      'proofread_suggestions': '修改建议',
+      'accept_changes': '采纳并应用',
+      'ignore_changes': '忽略',
+      'applying_changes': '正在应用修改...',
+      'proofreading': '正在校稿...',
     }
   }
 };

@@ -17,11 +17,19 @@ interface AppState {
   activeChapterId: string | null;
   theme: 'dark' | 'light' | 'system';
   language: 'en' | 'zh';
+  aiProvider: 'gemini' | 'openrouter';
   geminiApiKey: string | null;
+  openRouterApiKey: string | null;
+  openRouterModel: string;
   draft: DraftState;
+  isSidebarCollapsed: boolean;
+  setIsSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setLanguage: (lang: 'en' | 'zh') => void;
+  setAiProvider: (provider: 'gemini' | 'openrouter') => void;
   setGeminiApiKey: (key: string | null) => void;
+  setOpenRouterApiKey: (key: string | null) => void;
+  setOpenRouterModel: (model: string) => void;
   loadBooks: () => Promise<void>;
   createBook: (title: string, idea: string, summary: string, coverImage?: string) => Promise<Book>;
   setActiveBook: (id: string | null) => void;
@@ -47,11 +55,19 @@ export const useStore = create<AppState>()(
       activeChapterId: null,
       theme: 'system',
       language: 'zh',
+      aiProvider: 'openrouter',
       geminiApiKey: null,
+      openRouterApiKey: null,
+      openRouterModel: 'stepfun/step-3.5-flash:free',
       draft: initialDraft,
+      isSidebarCollapsed: false,
+      setIsSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
+      setAiProvider: (provider) => set({ aiProvider: provider }),
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
+      setOpenRouterApiKey: (key) => set({ openRouterApiKey: key }),
+      setOpenRouterModel: (model) => set({ openRouterModel: model }),
       loadBooks: async () => {
         const books = await db.getBooks();
         set({ books });
@@ -96,7 +112,10 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({ 
         theme: state.theme, 
         language: state.language,
+        aiProvider: state.aiProvider,
         geminiApiKey: state.geminiApiKey,
+        openRouterApiKey: state.openRouterApiKey,
+        openRouterModel: state.openRouterModel,
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
         activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
         draft: state.draft // Persist draft state to save progress
