@@ -40,6 +40,7 @@ export function BookEditor() {
   const [showAIMenu, setShowAIMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const aiMenuRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -70,6 +71,13 @@ export function BookEditor() {
       setContent('');
     }
   }, [activeChapterId, chapters]);
+
+  useEffect(() => {
+    if (!isPreview && textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [content, isPreview, activeChapterId]);
 
   const loadBookData = async () => {
     if (!activeBookId) return;
@@ -517,8 +525,27 @@ export function BookEditor() {
 
             {/* Editor Area */}
             <div className="flex-1 flex overflow-hidden relative">
-              <div className="flex-1 overflow-y-auto p-8 md:p-12 lg:px-24">
-                <div className="max-w-3xl mx-auto space-y-8 pb-32">
+              <div 
+                className={cn("flex-1 overflow-y-auto p-8 md:p-12 lg:px-24", !isPreview && "cursor-text")}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget && !isPreview) {
+                    textareaRef.current?.focus();
+                    // Place cursor at the end
+                    const length = textareaRef.current?.value.length || 0;
+                    textareaRef.current?.setSelectionRange(length, length);
+                  }
+                }}
+              >
+                <div 
+                  className={cn("max-w-3xl mx-auto space-y-8 pb-32", !isPreview && "cursor-default")}
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget && !isPreview) {
+                      textareaRef.current?.focus();
+                      const length = textareaRef.current?.value.length || 0;
+                      textareaRef.current?.setSelectionRange(length, length);
+                    }
+                  }}
+                >
                   {/* Image Area with Loading State */}
                   {(activeChapter.image || isGeneratingImage) && (
                     <div className="relative group rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm bg-zinc-100 dark:bg-zinc-900 aspect-video">
@@ -570,11 +597,16 @@ export function BookEditor() {
                     ) : (
                       <div className="relative">
                         <textarea
+                          ref={textareaRef}
                           value={content}
-                          onChange={(e) => setContent(e.target.value)}
+                          onChange={(e) => {
+                            setContent(e.target.value);
+                            e.target.style.height = 'auto';
+                            e.target.style.height = `${e.target.scrollHeight}px`;
+                          }}
                           placeholder={t('chapter_content_placeholder')}
                           className={cn(
-                            "w-full min-h-[500px] bg-transparent border-none outline-none resize-none font-serif text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600",
+                            "w-full min-h-[calc(100vh-300px)] bg-transparent border-none outline-none resize-none font-serif text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 overflow-hidden",
                             isGeneratingContent && !content && "opacity-50"
                           )}
                           disabled={isGeneratingContent}
