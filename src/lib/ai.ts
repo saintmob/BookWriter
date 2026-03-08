@@ -156,14 +156,19 @@ export async function generateImage(prompt: string): Promise<string | null> {
   }
 }
 
+export interface ChatOutlineResponse {
+  reply: string;
+  updatedOutline?: { title: string; description: string }[];
+}
+
 export async function updateOutlineWithAI(
   currentChapters: { title: string; description: string }[],
   instruction: string,
   bookTitle: string,
   bookSummary: string,
   language: string
-): Promise<{ title: string; description: string }[]> {
-  const prompt = `You are a professional book editor. Help me revise the book outline based on the user's instruction.
+): Promise<ChatOutlineResponse> {
+  const prompt = `You are a professional book editor and co-author. Help me revise the book outline based on the user's instruction.
   
 Book Title: ${bookTitle}
 Book Summary: ${bookSummary}
@@ -174,12 +179,21 @@ ${JSON.stringify(currentChapters, null, 2)}
 
 User Instruction: "${instruction}"
 
-Return ONLY the UPDATED list of chapters as a JSON array. Each chapter must have 'title' and 'description'.
-Maintain the existing structure unless the user explicitly asks to change it.
-Do not return any other text, just the JSON array. Do not include markdown formatting like \`\`\`json.`;
+If the user is asking for a revision or modification to the outline (e.g., add, remove, or rename chapters):
+1. Update the outline based on the instruction.
+2. Provide a brief reply explaining what you changed.
+
+If the user is asking a question or asking for advice (and not explicitly asking to change the outline yet):
+1. Provide a helpful answer or suggestion in the reply.
+2. Do NOT provide updatedOutline.
+
+Return ONLY a JSON object with:
+- 'reply': Your message to the user.
+- 'updatedOutline': The full updated list of chapters as a JSON array (only if a change was made). Each chapter must have 'title' and 'description'.
+Do not include markdown formatting like \`\`\`json.`;
 
   const text = await callTextAI(prompt, true);
-  return parseJSON(text || '[]');
+  return parseJSON(text || '{}');
 }
 
 export interface ChatResponse {

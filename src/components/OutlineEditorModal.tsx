@@ -63,7 +63,7 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
         description: c.description
       }));
 
-      const updatedOutline = await updateOutlineWithAI(
+      const response = await updateOutlineWithAI(
         simplifiedChapters,
         userMessage,
         book.title,
@@ -71,33 +71,28 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
         language
       );
 
-      // Merge AI response with existing chapters to preserve IDs and content where possible
-      const newChapters: Chapter[] = updatedOutline.map((item, index) => {
-        // Try to find a matching existing chapter by title (fuzzy match could be better but exact is safer for now)
-        // or just by index if the structure seems similar? 
-        // Strategy: We'll generate new IDs for everything to avoid conflicts, 
-        // UNLESS we can confidently match.
-        // Actually, preserving content is tricky if the AI reorders or renames heavily.
-        // For this MVP, we will try to match by Title. If title matches, keep the ID and Content.
-        // If not, it's a new chapter (content lost/reset).
-        
-        const existing = chapters.find(c => c.title === item.title);
-        
-        return {
-          id: existing ? existing.id : uuidv4(),
-          bookId: bookId,
-          title: item.title,
-          description: item.description,
-          content: existing ? existing.content : '', // Preserve content if title matches
-          image: existing ? existing.image : undefined,
-          order: index,
-          createdAt: existing ? existing.createdAt : Date.now(),
-          updatedAt: Date.now()
-        };
-      });
+      if (response.updatedOutline) {
+        // Merge AI response with existing chapters to preserve IDs and content where possible
+        const newChapters: Chapter[] = response.updatedOutline.map((item, index) => {
+          const existing = chapters.find(c => c.title === item.title);
+          
+          return {
+            id: existing ? existing.id : uuidv4(),
+            bookId: bookId,
+            title: item.title,
+            description: item.description,
+            content: existing ? existing.content : '', // Preserve content if title matches
+            image: existing ? existing.image : undefined,
+            order: index,
+            createdAt: existing ? existing.createdAt : Date.now(),
+            updatedAt: Date.now()
+          };
+        });
 
-      setChapters(newChapters);
-      setMessages(prev => [...prev, { role: 'assistant', content: t('outline_updated_success') || "I've updated the outline based on your request. Please review the changes on the left." }]);
+        setChapters(newChapters);
+      }
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: response.reply }]);
 
     } catch (error) {
       console.error('Failed to update outline:', error);

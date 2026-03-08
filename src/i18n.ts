@@ -96,6 +96,14 @@ const resources = {
       'ignore_changes': 'Ignore',
       'applying_changes': 'Applying changes...',
       'proofreading': 'Proofreading...',
+      'edit_outline': 'Edit Outline',
+      'outline_preview': 'Outline Preview',
+      'outline_editor_welcome': 'I can help you modify the book outline. You can ask me to add, remove, or rename chapters.',
+      'outline_updated_success': 'I\'ve updated the outline based on your request. Please review the changes on the left.',
+      'outline_update_failed': 'Sorry, I couldn\'t update the outline. Please try again.',
+      'ask_ai_to_change_outline': 'e.g., Add a chapter about...',
+      'save_changes': 'Save Changes',
+      'ai_can_make_mistakes': 'AI can make mistakes. Please review the changes before saving.',
     }
   },
   zh: {
@@ -192,6 +200,14 @@ const resources = {
       'ignore_changes': '忽略',
       'applying_changes': '正在应用修改...',
       'proofreading': '正在校稿...',
+      'edit_outline': '编辑大纲',
+      'outline_preview': '大纲预览',
+      'outline_editor_welcome': '我可以帮你修改书籍大纲。你可以让我添加、删除或重命名章节。',
+      'outline_updated_success': '我已经根据你的要求更新了大纲，请在左侧预览修改结果。',
+      'outline_update_failed': '抱歉，大纲更新失败，请重试。',
+      'ask_ai_to_change_outline': '例如：增加一章关于...',
+      'save_changes': '保存修改',
+      'ai_can_make_mistakes': 'AI 可能会犯错，请在保存前仔细核对。',
     }
   }
 };
