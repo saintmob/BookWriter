@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { BookPlus, Library, Upload, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { BookPlus, Library, Upload, Loader2, Sparkles, X, Zap, Layout, FileText, Share2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useState, useRef } from 'react';
 import { db } from '../lib/db';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ export function Dashboard() {
   const { t } = useTranslation();
   const { books, setActiveBook, loadBooks } = useStore();
   const [isImporting, setIsImporting] = useState(false);
+  const [showFeatures, setShowFeatures] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleImportClick = () => {
@@ -52,12 +53,19 @@ export function Dashboard() {
   return (
     <div className="flex-1 h-screen overflow-y-auto bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-8 md:p-16 transition-colors duration-200">
       <div className="max-w-5xl mx-auto">
-        <div className="flex items-center justify-between mb-12">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
           <h1 className="text-4xl font-serif font-bold flex items-center gap-3">
             <Library className="w-8 h-8 text-emerald-500" />
             {t('my_books')}
           </h1>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setShowFeatures(true)}
+              className="flex items-center gap-2 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-emerald-600 dark:text-emerald-400 px-5 py-2.5 rounded-xl font-medium transition-colors border border-emerald-100 dark:border-emerald-900/30 shadow-sm"
+            >
+              <Sparkles className="w-5 h-5" />
+              {t('feature_highlights')}
+            </button>
             <input
               type="file"
               ref={fileInputRef}
@@ -82,6 +90,92 @@ export function Dashboard() {
             </button>
           </div>
         </div>
+
+        {/* Features Modal */}
+        <AnimatePresence>
+          {showFeatures && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800"
+              >
+                <div className="flex items-center justify-between p-6 border-b border-zinc-100 dark:border-zinc-800">
+                  <h2 className="text-2xl font-serif font-bold flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-emerald-500" />
+                    {t('feature_highlights')}
+                  </h2>
+                  <button 
+                    onClick={() => setShowFeatures(false)}
+                    className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full transition-colors"
+                  >
+                    <X className="w-6 h-6 text-zinc-400" />
+                  </button>
+                </div>
+                
+                <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center shrink-0">
+                      <Zap className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg mb-1">{t('features.multimodal')}</h3>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                        {t('features.multimodal_desc')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
+                      <Layout className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg mb-1">{t('features.realtime')}</h3>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                        {t('features.realtime_desc')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center shrink-0">
+                      <FileText className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg mb-1">{t('features.formatting')}</h3>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                        {t('features.formatting_desc')}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-orange-50 dark:bg-orange-900/20 flex items-center justify-center shrink-0">
+                      <Share2 className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg mb-1">{t('features.export')}</h3>
+                      <p className="text-sm text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                        {t('features.export_desc')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-6 bg-zinc-50 dark:bg-zinc-800/50 flex justify-end">
+                  <button
+                    onClick={() => setShowFeatures(false)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
+                  >
+                    {t('close')}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {books.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-3xl text-zinc-400 dark:text-zinc-600">

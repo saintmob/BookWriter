@@ -116,6 +116,17 @@ const resources = {
       'ask_ai_to_change_outline': 'e.g., Add a chapter about...',
       'save_changes': 'Save Changes',
       'ai_can_make_mistakes': 'AI can make mistakes. Please review the changes before saving.',
+      'feature_highlights': 'Feature Highlights',
+      'features': {
+        'multimodal': 'Multimodal Support',
+        'multimodal_desc': 'Seamlessly switch between Gemini and OpenRouter for text and image generation.',
+        'realtime': 'Real-time Collaboration',
+        'realtime_desc': 'AI-assisted writing, outlining, and proofreading in real-time.',
+        'formatting': 'Rich Formatting',
+        'formatting_desc': 'Support for Markdown, Mermaid diagrams, and Mathematical formulas (LaTeX).',
+        'export': 'Flexible Export',
+        'export_desc': 'Export your masterpiece as Markdown, PDF, or JSON backups.'
+      }
     }
   },
   zh: {
@@ -232,6 +243,17 @@ const resources = {
       'ask_ai_to_change_outline': '例如：增加一章关于...',
       'save_changes': '保存修改',
       'ai_can_make_mistakes': 'AI 可能会犯错，请在保存前仔细核对。',
+      'feature_highlights': '功能亮点',
+      'features': {
+        'multimodal': '多模态支持',
+        'multimodal_desc': '在 Gemini 和 OpenRouter 之间无缝切换，支持文本与图像生成的自由组合。',
+        'realtime': '实时协作',
+        'realtime_desc': 'AI 辅助写作、大纲生成及编辑校稿，实时响应你的创意。',
+        'formatting': '丰富格式',
+        'formatting_desc': '支持 Markdown、Mermaid 图表以及数学公式 (LaTeX) 解析。',
+        'export': '灵活导出',
+        'export_desc': '支持将作品导出为 Markdown、PDF 或 JSON 备份文件。'
+      }
     }
   }
 };
