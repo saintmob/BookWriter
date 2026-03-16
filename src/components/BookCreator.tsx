@@ -24,7 +24,7 @@ export function BookCreator() {
       setDraft({ proposals: results, step: 2 });
     } catch (error: any) {
       console.error(error);
-      toast.error(t('generate_proposals_error') || 'Failed to generate proposals');
+      toast.error(error.message || t('generate_proposals_error') || 'Failed to generate proposals');
     } finally {
       setIsGenerating(false);
     }
@@ -70,7 +70,7 @@ export function BookCreator() {
       
     } catch (error: any) {
       console.error(error);
-      toast.error(t('generate_outline_error') || 'Failed to generate outline');
+      toast.error(error.message || t('generate_outline_error') || 'Failed to generate outline');
       setDraft({ step: 2 });
     } finally {
       setIsGenerating(false);

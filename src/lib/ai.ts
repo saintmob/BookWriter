@@ -11,14 +11,14 @@ const getGeminiAi = () => {
 
 async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<string> {
   const state = useStore.getState();
-  const provider = state.aiProvider;
+  const provider = state.textProvider || state.aiProvider || 'openrouter';
 
   if (provider === 'openrouter') {
     const apiKey = state.openRouterApiKey || process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       throw new Error('OpenRouter API Key is missing. Please set it in Settings.');
     }
-    const model = state.openRouterModel || 'stepfun/step-3.5-flash:free';
+    const model = state.openRouterTextModel || 'stepfun/step-3.5-flash:free';
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -41,7 +41,8 @@ async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<st
     }
 
     const data = await response.json();
-    return data.choices?.[0]?.message?.content || '';
+    const content = data.choices?.[0]?.message?.content || '';
+    return jsonMode ? content : stripMarkdownCodeBlocks(content);
   } else {
     // Gemini
     const ai = getGeminiAi();
@@ -49,12 +50,14 @@ async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<st
     if (jsonMode) {
       config.responseMimeType = 'application/json';
     }
+    const model = state.geminiTextModel || 'gemini-3.1-flash-preview';
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: model,
       contents: prompt,
       config: Object.keys(config).length > 0 ? config : undefined,
     });
-    return response.text || '';
+    const content = response.text || '';
+    return jsonMode ? content : stripMarkdownCodeBlocks(content);
   }
 }
 
@@ -78,6 +81,16 @@ function parseJSON(text: string) {
     console.error("Failed to parse JSON:", text);
     throw e;
   }
+}
+
+function stripMarkdownCodeBlocks(text: string): string {
+  const cleaned = text.trim();
+  // If the entire text is wrapped in a markdown code block, remove it.
+  const match = cleaned.match(/^```(?:markdown)?\s*([\s\S]*?)\s*```$/i);
+  if (match) {
+    return match[1].trim();
+  }
+  return cleaned;
 }
 
 export async function generateProposals(idea: string, language: string): Promise<Proposal[]> {
@@ -130,10 +143,75 @@ Write engaging, well-structured content that fits the tone of the book. Use mark
 }
 
 export async function generateImage(prompt: string): Promise<string | null> {
-  const ai = getGeminiAi(); // Always use Gemini for images for now
+  const state = useStore.getState();
+  const provider = state.imageProvider || 'gemini';
+  
+  if (provider === 'openrouter') {
+    const apiKey = state.openRouterApiKey;
+    if (!apiKey) {
+      throw new Error('OpenRouter API key is not set. Please configure it in Settings.');
+    }
+    const model = state.openRouterImageModel || 'google/gemini-3.1-flash-image-preview';
+    
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'AI Book Writer',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `OpenRouter API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      // OpenRouter image models usually return the image URL in the content, or as base64
+      // We need to parse the markdown image or URL from the response
+      const content = data.choices[0]?.message?.content || '';
+      
+      // Try to extract markdown image URL
+      const markdownMatch = content.match(/!\[.*?\]\((.*?)\)/);
+      if (markdownMatch && markdownMatch[1]) {
+        return markdownMatch[1];
+      }
+      
+      // Try to extract plain URL
+      const urlMatch = content.match(/https?:\/\/[^\s)]+/);
+      if (urlMatch && urlMatch[0]) {
+        return urlMatch[0];
+      }
+      
+      // If it's base64 data URI
+      if (content.includes('data:image/')) {
+        const base64Match = content.match(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/);
+        if (base64Match && base64Match[0]) {
+          return base64Match[0];
+        }
+      }
+
+      throw new Error('Could not extract image URL from OpenRouter response');
+    } catch (error) {
+      console.error('OpenRouter image generation error:', error);
+      throw error;
+    }
+  }
+
+  const ai = getGeminiAi();
+  const model = state.geminiImageModel || 'gemini-2.5-flash-image';
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+      model: model,
       contents: {
         parts: [{ text: prompt }],
       },
@@ -257,11 +335,13 @@ Return ONLY the fully rewritten chapter content in markdown format. Do not inclu
 
   // Force Gemini for applying changes as requested: "采纳则调用原来的Gemini模型进行改动内容"
   const ai = getGeminiAi();
+  const state = useStore.getState();
+  const model = state.geminiTextModel || 'gemini-3.1-flash-preview';
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: model,
     contents: prompt,
   });
-  return response.text || content;
+  return stripMarkdownCodeBlocks(response.text || content);
 }
 export async function chatWithChapter(
   currentContent: string,
@@ -297,5 +377,9 @@ Return ONLY a JSON object with:
 Do not include markdown formatting like \`\`\`json.`;
 
   const text = await callTextAI(prompt, true);
-  return parseJSON(text || '{}');
+  const result = parseJSON(text || '{}');
+  if (result.updatedContent) {
+    result.updatedContent = stripMarkdownCodeBlocks(result.updatedContent);
+  }
+  return result;
 }

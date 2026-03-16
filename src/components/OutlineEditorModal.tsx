@@ -8,7 +8,7 @@ import { Chapter } from '../lib/db';
 import { cn } from '../lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
-import ReactMarkdown from 'react-markdown';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface OutlineEditorModalProps {
   isOpen: boolean;
@@ -95,9 +95,9 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
       
       setMessages(prev => [...prev, { role: 'assistant', content: response.reply }]);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to update outline:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: t('outline_update_failed') || "Sorry, I couldn't update the outline. Please try again." }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: error.message || t('outline_update_failed') || "Sorry, I couldn't update the outline. Please try again." }]);
     } finally {
       setIsProcessing(false);
     }
@@ -109,9 +109,9 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
       await onSave(chapters);
       toast.success(t('outline_saved_success'));
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save outline:', error);
-      toast.error(t('outline_save_failed'));
+      toast.error(error.message || t('outline_save_failed'));
     } finally {
       setIsSaving(false);
     }
@@ -215,7 +215,7 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
                   >
                     {msg.role === 'assistant' ? (
                       <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-zinc-100 dark:prose-pre:bg-zinc-900 prose-pre:text-zinc-800 dark:prose-pre:text-zinc-200">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <MarkdownRenderer>{msg.content}</MarkdownRenderer>
                       </div>
                     ) : (
                       msg.content

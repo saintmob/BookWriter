@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Send, Loader2, Sparkles, Check, X } from 'lucide-react';
 import { chatWithChapter } from '../lib/ai';
-import ReactMarkdown from 'react-markdown';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface ChapterChatProps {
   content: string;
@@ -49,9 +49,9 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
         content: response.reply,
         updatedContent: response.updatedContent
       }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chat failed', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: t('chat_error') }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: error.message || t('chat_error') }]);
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +87,7 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
               }`}
             >
               <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <MarkdownRenderer>{msg.content}</MarkdownRenderer>
               </div>
             </div>
             

@@ -5,7 +5,7 @@ import { db, Chapter, Book } from '../lib/db';
 import { generateChapterContent, generateImage, proofreadChapter, applyProofreadChanges, ProofreadFeedback } from '../lib/ai';
 import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import ReactMarkdown from 'react-markdown';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import { OutlineEditorModal } from './OutlineEditorModal';
 import { ChapterChat } from './ChapterChat';
 import { BookInfoModal } from './BookInfoModal';
@@ -166,7 +166,7 @@ export function BookEditor() {
       setActiveChapterState(updatedChapter);
     } catch (error: any) {
       console.error('Failed to generate content', error);
-      toast.error(t('generate_content_error') || 'Failed to generate content');
+      toast.error(error.message || t('generate_content_error') || 'Failed to generate content');
     } finally {
       setIsGeneratingContent(false);
     }
@@ -188,7 +188,7 @@ export function BookEditor() {
       }
     } catch (error: any) {
       console.error('Failed to generate image', error);
-      toast.error(t('generate_image_error') || 'Failed to generate image');
+      toast.error(error.message || t('generate_image_error') || 'Failed to generate image');
     } finally {
       setIsGeneratingImage(false);
     }
@@ -204,7 +204,7 @@ export function BookEditor() {
       setProofreadFeedback(feedback);
     } catch (error: any) {
       console.error('Failed to proofread', error);
-      toast.error(t('chat_error') || 'Failed to proofread');
+      toast.error(error.message || t('chat_error') || 'Failed to proofread');
       setIsProofreadModalOpen(false);
     } finally {
       setIsProofreading(false);
@@ -229,7 +229,7 @@ export function BookEditor() {
       toast.success(t('saved'));
     } catch (error: any) {
       console.error('Failed to apply changes', error);
-      toast.error(t('chat_error') || 'Failed to apply changes');
+      toast.error(error.message || t('chat_error') || 'Failed to apply changes');
     } finally {
       setIsApplyingChanges(false);
     }
@@ -300,7 +300,7 @@ export function BookEditor() {
               <img src={chapter.image} alt={chapter.title} className="w-full max-w-2xl mx-auto mb-4 rounded-lg" />
             )}
             <div className="prose max-w-none">
-              <ReactMarkdown>{chapter.content || ''}</ReactMarkdown>
+              <MarkdownRenderer>{chapter.content || ''}</MarkdownRenderer>
             </div>
             <hr className="my-8 border-gray-200" />
           </div>
@@ -586,7 +586,7 @@ export function BookEditor() {
                           </div>
                         ) : (
                           <>
-                            <ReactMarkdown>{content || `*${t('no_content_yet')}*`}</ReactMarkdown>
+                            <MarkdownRenderer>{content || `*${t('no_content_yet')}*`}</MarkdownRenderer>
                             {isGeneratingContent && (
                               <div className="mt-6 flex items-center gap-2 text-emerald-500 font-medium animate-pulse">
                                 <Loader2 className="w-4 h-4 animate-spin" />

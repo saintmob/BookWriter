@@ -40,9 +40,9 @@ export function Dashboard() {
 
       await loadBooks();
       toast.success(t('import_success'), { id: toastId });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Import failed', error);
-      toast.error(t('import_error'), { id: toastId });
+      toast.error(error.message || t('import_error'), { id: toastId });
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

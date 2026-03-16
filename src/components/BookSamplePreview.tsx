@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Book, Chapter } from '../lib/db';
 import { X, ChevronLeft, ChevronRight, Printer, BookOpen, Minus, Plus, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { MarkdownRenderer } from './MarkdownRenderer';
 import { cn } from '../lib/utils';
 
 interface BookSamplePreviewProps {
@@ -320,13 +320,9 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                          <img src={chapter.image} alt={chapter.title} className="w-full h-auto mb-8" />
                        )}
                        
-                       <ReactMarkdown 
-                         components={{
-                           p: ({node, ...props}) => <p {...props} />,
-                         }}
-                       >
+                       <MarkdownRenderer>
                          {chapter.content || ''}
-                       </ReactMarkdown>
+                       </MarkdownRenderer>
                        
                        {idx < chapters.length - 1 && <hr />}
                      </div>

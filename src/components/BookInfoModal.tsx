@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { X, Copy, Check, Save } from 'lucide-react';
 import { Book, db } from '../lib/db';
 import { cn } from '../lib/utils';
+import { toast } from 'sonner';
 
 interface BookInfoModalProps {
   isOpen: boolean;
@@ -39,8 +40,9 @@ export function BookInfoModal({ isOpen, onClose, book, onUpdate }: BookInfoModal
       await db.saveBook(updatedBook);
       onUpdate(updatedBook);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save book info', error);
+      toast.error(error.message || 'Failed to save book info');
     } finally {
       setIsSaving(false);
     }

@@ -17,19 +17,27 @@ interface AppState {
   activeChapterId: string | null;
   theme: 'dark' | 'light' | 'system';
   language: 'en' | 'zh';
-  aiProvider: 'gemini' | 'openrouter';
+  textProvider: 'gemini' | 'openrouter';
+  imageProvider: 'gemini' | 'openrouter';
   geminiApiKey: string | null;
+  geminiTextModel: string;
+  geminiImageModel: string;
   openRouterApiKey: string | null;
-  openRouterModel: string;
+  openRouterTextModel: string;
+  openRouterImageModel: string;
   draft: DraftState;
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setLanguage: (lang: 'en' | 'zh') => void;
-  setAiProvider: (provider: 'gemini' | 'openrouter') => void;
+  setTextProvider: (provider: 'gemini' | 'openrouter') => void;
+  setImageProvider: (provider: 'gemini' | 'openrouter') => void;
   setGeminiApiKey: (key: string | null) => void;
+  setGeminiTextModel: (model: string) => void;
+  setGeminiImageModel: (model: string) => void;
   setOpenRouterApiKey: (key: string | null) => void;
-  setOpenRouterModel: (model: string) => void;
+  setOpenRouterTextModel: (model: string) => void;
+  setOpenRouterImageModel: (model: string) => void;
   loadBooks: () => Promise<void>;
   createBook: (title: string, idea: string, summary: string, coverImage?: string) => Promise<Book>;
   setActiveBook: (id: string | null) => void;
@@ -55,19 +63,27 @@ export const useStore = create<AppState>()(
       activeChapterId: null,
       theme: 'system',
       language: 'zh',
-      aiProvider: 'openrouter',
+      textProvider: 'openrouter',
+      imageProvider: 'gemini',
       geminiApiKey: null,
+      geminiTextModel: 'gemini-3.1-flash-preview',
+      geminiImageModel: 'gemini-2.5-flash-image',
       openRouterApiKey: null,
-      openRouterModel: 'stepfun/step-3.5-flash:free',
+      openRouterTextModel: 'stepfun/step-3.5-flash:free',
+      openRouterImageModel: 'google/gemini-3.1-flash-image-preview',
       draft: initialDraft,
       isSidebarCollapsed: false,
       setIsSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
-      setAiProvider: (provider) => set({ aiProvider: provider }),
+      setTextProvider: (provider) => set({ textProvider: provider }),
+      setImageProvider: (provider) => set({ imageProvider: provider }),
       setGeminiApiKey: (key) => set({ geminiApiKey: key }),
+      setGeminiTextModel: (model) => set({ geminiTextModel: model }),
+      setGeminiImageModel: (model) => set({ geminiImageModel: model }),
       setOpenRouterApiKey: (key) => set({ openRouterApiKey: key }),
-      setOpenRouterModel: (model) => set({ openRouterModel: model }),
+      setOpenRouterTextModel: (model) => set({ openRouterTextModel: model }),
+      setOpenRouterImageModel: (model) => set({ openRouterImageModel: model }),
       loadBooks: async () => {
         const books = await db.getBooks();
         set({ books });
@@ -112,10 +128,14 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({ 
         theme: state.theme, 
         language: state.language,
-        aiProvider: state.aiProvider,
+        textProvider: state.textProvider,
+        imageProvider: state.imageProvider,
         geminiApiKey: state.geminiApiKey,
+        geminiTextModel: state.geminiTextModel,
+        geminiImageModel: state.geminiImageModel,
         openRouterApiKey: state.openRouterApiKey,
-        openRouterModel: state.openRouterModel,
+        openRouterTextModel: state.openRouterTextModel,
+        openRouterImageModel: state.openRouterImageModel,
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
         activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
         draft: state.draft // Persist draft state to save progress
