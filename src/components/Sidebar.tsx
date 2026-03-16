@@ -7,8 +7,13 @@ import { SettingsModal } from './SettingsModal';
 
 export function Sidebar() {
   const { t, i18n } = useTranslation();
-  const { books, activeBookId, setActiveBook, theme, language, isSidebarCollapsed, setIsSidebarCollapsed } = useStore();
+  const { books, activeBookId, setActiveBook, theme, language, isSidebarCollapsed, setIsSidebarCollapsed, resetDraft } = useStore();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const handleNewBook = () => {
+    resetDraft();
+    setActiveBook('new');
+  };
 
   useEffect(() => {
     i18n.changeLanguage(language);
@@ -44,7 +49,7 @@ export function Sidebar() {
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           <button
-            onClick={() => setActiveBook('new')}
+            onClick={handleNewBook}
             title={isSidebarCollapsed ? t('new_book') : undefined}
             className={cn(
               "w-full flex items-center rounded-lg text-sm font-medium transition-colors",

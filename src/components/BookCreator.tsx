@@ -80,7 +80,16 @@ export function BookCreator() {
   return (
     <div className="flex-1 h-screen overflow-y-auto bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-8 md:p-16 transition-colors duration-200">
       <div className="max-w-3xl mx-auto">
-        <div className="mb-12 text-center">
+        <div className="mb-12 text-center relative">
+          {step > 1 && (
+            <button
+              onClick={resetDraft}
+              className="absolute left-0 top-0 text-sm text-zinc-500 hover:text-emerald-600 transition-colors flex items-center gap-1"
+            >
+              <ArrowRight className="w-4 h-4 rotate-180" />
+              {t('start_over', 'Start Over')}
+            </button>
+          )}
           <h1 className="text-4xl font-serif font-bold mb-4 flex items-center justify-center gap-3">
             <Sparkles className="w-8 h-8 text-emerald-500" />
             {t('new_book')}

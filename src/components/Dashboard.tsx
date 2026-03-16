@@ -8,10 +8,15 @@ import { toast } from 'sonner';
 
 export function Dashboard() {
   const { t } = useTranslation();
-  const { books, setActiveBook, loadBooks } = useStore();
+  const { books, setActiveBook, loadBooks, resetDraft } = useStore();
   const [isImporting, setIsImporting] = useState(false);
   const [showFeatures, setShowFeatures] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleNewBook = () => {
+    resetDraft();
+    setActiveBook('new');
+  };
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -82,7 +87,7 @@ export function Dashboard() {
               {t('import_json')}
             </button>
             <button
-              onClick={() => setActiveBook('new')}
+              onClick={handleNewBook}
               className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-medium transition-colors shadow-sm"
             >
               <BookPlus className="w-5 h-5" />
