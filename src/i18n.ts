@@ -117,6 +117,11 @@ const resources = {
       'save_changes': 'Save Changes',
       'ai_can_make_mistakes': 'AI can make mistakes. Please review the changes before saving.',
       'feature_highlights': 'Feature Highlights',
+      'error_rate_limit': 'Rate limit exceeded. Please wait a moment before trying again.',
+      'error_invalid_key': 'Invalid API key. Please check your settings.',
+      'error_model_not_found': 'The selected model was not found.',
+      'error_quota_exhausted': 'API quota exhausted. Please check your billing or usage limits.',
+      'error_network': 'Network error. Please check your internet connection.',
       'features': {
         'multimodal': 'Multimodal Support',
         'multimodal_desc': 'Seamlessly switch between Gemini and OpenRouter for text and image generation.',
@@ -244,6 +249,11 @@ const resources = {
       'save_changes': '保存修改',
       'ai_can_make_mistakes': 'AI 可能会犯错，请在保存前仔细核对。',
       'feature_highlights': '功能亮点',
+      'error_rate_limit': '请求过于频繁（429）。请稍后再试。',
+      'error_invalid_key': 'API 密钥无效。请检查设置。',
+      'error_model_not_found': '找不到所选模型。',
+      'error_quota_exhausted': 'API 配额已耗尽。请检查账户余额或使用限制。',
+      'error_network': '网络错误。请检查您的网络连接。',
       'features': {
         'multimodal': '多模态支持',
         'multimodal_desc': '在 Gemini 和 OpenRouter 之间无缝切换，支持文本与图像生成的自由组合。',

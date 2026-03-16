@@ -1,5 +1,31 @@
 import { GoogleGenAI, Type } from '@google/genai';
 import { useStore } from '../store/useStore';
+import i18n from '../i18n';
+
+const handleAIError = (error: any, provider: string) => {
+  console.error(`${provider} API Error:`, error);
+  
+  const status = error.status || (error.message?.match(/status: (\d+)/)?.[1]);
+  const message = error.message?.toLowerCase() || '';
+
+  if (status === '429' || message.includes('429') || message.includes('rate limit')) {
+    return i18n.t('error_rate_limit');
+  }
+  if (status === '401' || message.includes('401') || message.includes('invalid api key') || message.includes('unauthorized')) {
+    return i18n.t('error_invalid_key');
+  }
+  if (status === '404' || message.includes('404') || message.includes('not found')) {
+    return i18n.t('error_model_not_found');
+  }
+  if (message.includes('quota') || message.includes('exhausted')) {
+    return i18n.t('error_quota_exhausted');
+  }
+  if (message.includes('network') || message.includes('fetch') || message.includes('failed to fetch')) {
+    return i18n.t('error_network');
+  }
+
+  return error.message || i18n.t('chat_error');
+};
 
 const getGeminiAi = () => {
   const apiKey = useStore.getState().geminiApiKey || process.env.GEMINI_API_KEY;
@@ -11,7 +37,7 @@ const getGeminiAi = () => {
 
 async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<string> {
   const state = useStore.getState();
-  const provider = state.textProvider || state.aiProvider || 'openrouter';
+  const provider = state.textProvider || 'openrouter';
 
   if (provider === 'openrouter') {
     const apiKey = state.openRouterApiKey || process.env.OPENROUTER_API_KEY;
@@ -19,45 +45,52 @@ async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<st
       throw new Error('OpenRouter API Key is missing. Please set it in Settings.');
     }
     const model = state.openRouterTextModel || 'stepfun/step-3.5-flash:free';
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'InkSpire',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: 'user', content: prompt }],
+          // response_format: jsonMode ? { type: 'json_object' } : undefined, // Not all models support this
+        }),
+      });
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'InkSpire',
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: [{ role: 'user', content: prompt }],
-        // response_format: jsonMode ? { type: 'json_object' } : undefined, // Not all models support this
-      }),
-    });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`OpenRouter API error: ${response.status} ${errorData.error?.message || response.statusText}`);
+      }
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`OpenRouter API error: ${response.status} ${errorData.error?.message || response.statusText}`);
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      return jsonMode ? content : stripMarkdownCodeBlocks(content);
+    } catch (error: any) {
+      throw new Error(handleAIError(error, 'OpenRouter'));
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
-    return jsonMode ? content : stripMarkdownCodeBlocks(content);
   } else {
     // Gemini
-    const ai = getGeminiAi();
-    const config: any = {};
-    if (jsonMode) {
-      config.responseMimeType = 'application/json';
+    try {
+      const ai = getGeminiAi();
+      const config: any = {};
+      if (jsonMode) {
+        config.responseMimeType = 'application/json';
+      }
+      const model = state.geminiTextModel || 'gemini-3.1-flash-preview';
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+        config: Object.keys(config).length > 0 ? config : undefined,
+      });
+      const content = response.text || '';
+      return jsonMode ? content : stripMarkdownCodeBlocks(content);
+    } catch (error: any) {
+      throw new Error(handleAIError(error, 'Gemini'));
     }
-    const model = state.geminiTextModel || 'gemini-3.1-flash-preview';
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
-      config: Object.keys(config).length > 0 ? config : undefined,
-    });
-    const content = response.text || '';
-    return jsonMode ? content : stripMarkdownCodeBlocks(content);
   }
 }
 
@@ -201,15 +234,14 @@ export async function generateImage(prompt: string): Promise<string | null> {
       }
 
       throw new Error('Could not extract image URL from OpenRouter response');
-    } catch (error) {
-      console.error('OpenRouter image generation error:', error);
-      throw error;
+    } catch (error: any) {
+      throw new Error(handleAIError(error, 'OpenRouter Image'));
     }
   }
 
-  const ai = getGeminiAi();
-  const model = state.geminiImageModel || 'gemini-2.5-flash-image';
   try {
+    const ai = getGeminiAi();
+    const model = state.geminiImageModel || 'gemini-2.5-flash-image';
     const response = await ai.models.generateContent({
       model: model,
       contents: {
@@ -228,9 +260,8 @@ export async function generateImage(prompt: string): Promise<string | null> {
       }
     }
     return null;
-  } catch (error) {
-    console.error('Image generation failed', error);
-    throw error; // Re-throw to let the UI handle the error message
+  } catch (error: any) {
+    throw new Error(handleAIError(error, 'Gemini Image'));
   }
 }
 
@@ -334,14 +365,18 @@ ${feedback.suggestions.map(s => `- ${s}`).join('\n')}
 Return ONLY the fully rewritten chapter content in markdown format. Do not include any conversational text or explanations.`;
 
   // Force Gemini for applying changes as requested: "采纳则调用原来的Gemini模型进行改动内容"
-  const ai = getGeminiAi();
-  const state = useStore.getState();
-  const model = state.geminiTextModel || 'gemini-3.1-flash-preview';
-  const response = await ai.models.generateContent({
-    model: model,
-    contents: prompt,
-  });
-  return stripMarkdownCodeBlocks(response.text || content);
+  try {
+    const ai = getGeminiAi();
+    const state = useStore.getState();
+    const model = state.geminiTextModel || 'gemini-3.1-flash-preview';
+    const response = await ai.models.generateContent({
+      model: model,
+      contents: prompt,
+    });
+    return stripMarkdownCodeBlocks(response.text || content);
+  } catch (error: any) {
+    throw new Error(handleAIError(error, 'Gemini Proofread Apply'));
+  }
 }
 export async function chatWithChapter(
   currentContent: string,

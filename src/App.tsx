@@ -8,11 +8,36 @@ import { Toaster } from 'sonner';
 import './i18n';
 
 export default function App() {
-  const { loadBooks, activeBookId, books } = useStore();
+  const { loadBooks, activeBookId, books, theme } = useStore();
 
   useEffect(() => {
     loadBooks();
   }, [loadBooks]);
+
+  useEffect(() => {
+    const root = window.document.documentElement;
+    
+    const applyTheme = (t: 'light' | 'dark') => {
+      if (t === 'dark') {
+        root.classList.add('dark');
+        root.style.colorScheme = 'dark';
+      } else {
+        root.classList.remove('dark');
+        root.style.colorScheme = 'light';
+      }
+    };
+
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      applyTheme(mediaQuery.matches ? 'dark' : 'light');
+      
+      const handler = (e: MediaQueryListEvent) => applyTheme(e.matches ? 'dark' : 'light');
+      mediaQuery.addEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler);
+    } else {
+      applyTheme(theme);
+    }
+  }, [theme]);
 
   const activeBook = books.find(b => b.id === activeBookId);
 

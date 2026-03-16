@@ -8,6 +8,8 @@
   --font-serif: "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
 }
 
+@variant dark (&:where(.dark, .dark *));
+
 @media print {
   /* Hide all UI elements by default */
   body * {
