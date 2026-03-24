@@ -80,7 +80,10 @@ async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<st
       if (jsonMode) {
         config.responseMimeType = 'application/json';
       }
-      const model = state.geminiTextModel || 'gemini-3.1-flash-preview';
+      let model = state.geminiTextModel || 'gemini-3-flash-preview';
+      if (model === 'gemini-3.1-flash-preview') {
+        model = 'gemini-3-flash-preview';
+      }
       const response = await ai.models.generateContent({
         model: model,
         contents: prompt,
@@ -368,7 +371,10 @@ Return ONLY the fully rewritten chapter content in markdown format. Do not inclu
   try {
     const ai = getGeminiAi();
     const state = useStore.getState();
-    const model = state.geminiTextModel || 'gemini-3.1-flash-preview';
+    let model = state.geminiTextModel || 'gemini-3-flash-preview';
+    if (model === 'gemini-3.1-flash-preview') {
+      model = 'gemini-3-flash-preview';
+    }
     const response = await ai.models.generateContent({
       model: model,
       contents: prompt,

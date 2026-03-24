@@ -66,7 +66,7 @@ export const useStore = create<AppState>()(
       textProvider: 'openrouter',
       imageProvider: 'gemini',
       geminiApiKey: null,
-      geminiTextModel: 'gemini-3.1-flash-preview',
+      geminiTextModel: 'gemini-3-flash-preview',
       geminiImageModel: 'gemini-2.5-flash-image',
       openRouterApiKey: null,
       openRouterTextModel: 'stepfun/step-3.5-flash:free',
