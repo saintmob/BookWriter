@@ -26,10 +26,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   } = useStore();
   
   const [geminiKey, setGeminiKey] = useState(geminiApiKey || '');
-  const [gTextModel, setGTextModel] = useState(geminiTextModel || 'gemini-3-flash-preview');
+  const [gTextModel, setGTextModel] = useState(geminiTextModel || 'gemini-3.5-flash');
   const [gImageModel, setGImageModel] = useState(geminiImageModel || 'gemini-2.5-flash-image');
   const [orKey, setOrKey] = useState(openRouterApiKey || '');
-  const [orTextModel, setOrTextModel] = useState(openRouterTextModel || 'stepfun/step-3.5-flash:free');
+  const [orTextModel, setOrTextModel] = useState(openRouterTextModel || 'google/gemma-4-31b-it:free');
   const [orImageModel, setOrImageModel] = useState(openRouterImageModel || 'google/gemini-3.1-flash-image-preview');
   const [localTextProvider, setLocalTextProvider] = useState(textProvider || 'openrouter');
   const [localImageProvider, setLocalImageProvider] = useState(imageProvider || 'gemini');
@@ -40,10 +40,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const handleSave = () => {
     setGeminiApiKey(geminiKey.trim() || null);
-    setGeminiTextModel(gTextModel.trim() || 'gemini-3-flash-preview');
+    setGeminiTextModel(gTextModel.trim() || 'gemini-3.5-flash');
     setGeminiImageModel(gImageModel.trim() || 'gemini-2.5-flash-image');
     setOpenRouterApiKey(orKey.trim() || null);
-    setOpenRouterTextModel(orTextModel.trim() || 'stepfun/step-3.5-flash:free');
+    setOpenRouterTextModel(orTextModel.trim() || 'google/gemma-4-31b-it:free');
     setOpenRouterImageModel(orImageModel.trim() || 'google/gemini-3.1-flash-image-preview');
     setTextProvider(localTextProvider);
     setImageProvider(localImageProvider);
@@ -186,7 +186,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           type="text"
                           value={orTextModel}
                           onChange={(e) => setOrTextModel(e.target.value)}
-                          placeholder="stepfun/step-3.5-flash:free"
+                          placeholder="google/gemma-4-31b-it:free"
                           className="w-full px-4 py-2 pr-12 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                         />
                         <button
@@ -282,7 +282,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           type="text"
                           value={gTextModel}
                           onChange={(e) => setGTextModel(e.target.value)}
-                          placeholder="gemini-3-flash-preview"
+                          placeholder="gemini-3.5-flash"
                           className="w-full px-4 py-2 pr-12 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                         />
                         <button

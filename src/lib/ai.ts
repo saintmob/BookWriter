@@ -44,7 +44,7 @@ async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<st
     if (!apiKey) {
       throw new Error('OpenRouter API Key is missing. Please set it in Settings.');
     }
-    const model = state.openRouterTextModel || 'stepfun/step-3.5-flash:free';
+    const model = state.openRouterTextModel || 'google/gemma-4-31b-it:free';
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -80,9 +80,9 @@ async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<st
       if (jsonMode) {
         config.responseMimeType = 'application/json';
       }
-      let model = state.geminiTextModel || 'gemini-3-flash-preview';
-      if (model === 'gemini-3.1-flash-preview') {
-        model = 'gemini-3-flash-preview';
+      let model = state.geminiTextModel || 'gemini-3.5-flash';
+      if (model === 'gemini-3.1-flash-preview' || model === 'gemini-3-flash-preview') {
+        model = 'gemini-3.5-flash';
       }
       const response = await ai.models.generateContent({
         model: model,
@@ -371,9 +371,9 @@ Return ONLY the fully rewritten chapter content in markdown format. Do not inclu
   try {
     const ai = getGeminiAi();
     const state = useStore.getState();
-    let model = state.geminiTextModel || 'gemini-3-flash-preview';
-    if (model === 'gemini-3.1-flash-preview') {
-      model = 'gemini-3-flash-preview';
+    let model = state.geminiTextModel || 'gemini-3.5-flash';
+    if (model === 'gemini-3.1-flash-preview' || model === 'gemini-3-flash-preview') {
+      model = 'gemini-3.5-flash';
     }
     const response = await ai.models.generateContent({
       model: model,
