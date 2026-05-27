@@ -213,18 +213,15 @@ function extractImageFromObject(obj: any): string | null {
   if (typeof obj === 'string') {
     const trimmed = obj.trim();
     
-    // Check if it is a complete base64 image data URI
-    if (trimmed.startsWith('data:image/')) {
-      const base64Match = trimmed.match(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/);
-      if (base64Match && base64Match[0]) {
-        return base64Match[0];
-      }
-      return trimmed;
+    // Check if it is a complete base64 image data URI (clearing internal whitespaces/newlines)
+    const cleanDataUri = trimmed.replace(/[\s\r\n]+/g, '');
+    if (cleanDataUri.startsWith('data:image/') && cleanDataUri.includes(';base64,')) {
+      return cleanDataUri;
     }
     
     // Check if it is a raw base64 string without data:image/ scheme (sometimes models output raw base64)
-    if (trimmed.length > 500 && /^[a-zA-Z0-9+/]+={0,2}$/.test(trimmed)) {
-      return `data:image/png;base64,${trimmed}`;
+    if (cleanDataUri.length > 100 && /^[a-zA-Z0-9+/]+={0,2}$/.test(cleanDataUri)) {
+      return `data:image/png;base64,${cleanDataUri}`;
     }
 
     // Check if it is a direct HTTP/HTTPS URL
@@ -253,7 +250,8 @@ function extractImageFromObject(obj: any): string | null {
       const lowerUrl = url.toLowerCase();
       if (!lowerUrl.includes('openrouter.ai/schemas') && 
           !lowerUrl.includes('schema.org') && 
-          !lowerUrl.includes('w3.org')) {
+          !lowerUrl.includes('w3.org') &&
+          !lowerUrl.includes('openai.com/schemas')) {
         return url;
       }
     }
@@ -286,10 +284,19 @@ function extractImageFromObject(obj: any): string | null {
     const priorityKeys = [
       'url', 
       'image_url', 
+      'imageUrl',
       'image', 
+      'uri',
+      'imageUri',
+      'src',
+      'imageSrc',
+      'link',
+      'asset',
       'b64_json', 
+      'b64Json',
       'b64', 
       'base64', 
+      'imageData',
       'output', 
       'img', 
       'file', 
@@ -324,7 +331,7 @@ export async function generateImage(prompt: string): Promise<string | null> {
   const provider = state.imageProvider || 'gemini';
   
   if (provider === 'openrouter') {
-    const apiKey = state.openRouterApiKey;
+    const apiKey = state.openRouterApiKey || process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       // Fallback if OpenRouter Key is missing
       const geminiApiKey = state.geminiApiKey || process.env.GEMINI_API_KEY;
@@ -338,6 +345,7 @@ export async function generateImage(prompt: string): Promise<string | null> {
     
     // First attempt: Standard image generation endpoint (/images/generations)
     try {
+      console.log(`Sending image request to OpenRouter /images/generations for model ${model}...`);
       const response = await fetch('https://openrouter.ai/api/v1/images/generations', {
         method: 'POST',
         headers: {
@@ -353,6 +361,8 @@ export async function generateImage(prompt: string): Promise<string | null> {
       });
 
       const data = await response.json().catch(() => null);
+      console.log('OpenRouter /images/generations raw API response object:', data);
+
       if (data && data.error) {
         const errMsg = data.error.message || JSON.stringify(data.error);
         throw new Error(`OpenRouter image generate error: ${errMsg}`);
@@ -361,7 +371,10 @@ export async function generateImage(prompt: string): Promise<string | null> {
       if (response.ok && data) {
         // Use our super-robust extractor for the standard endpoint data structure as well!
         const extracted = extractImageFromObject(data);
-        if (extracted) return extracted;
+        if (extracted) {
+          console.log('Successfully extracted image from /images/generations response.');
+          return extracted;
+        }
       }
     } catch (e: any) {
       console.warn('OpenRouter image generation endpoint failed, trying chat fallback...', e);
@@ -369,6 +382,7 @@ export async function generateImage(prompt: string): Promise<string | null> {
 
     // Second attempt: Fallback to chat completions endpoint (/chat/completions)
     try {
+      console.log(`Sending fallback image request to OpenRouter /chat/completions for model ${model}...`);
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -386,6 +400,7 @@ export async function generateImage(prompt: string): Promise<string | null> {
       });
 
       const data = await response.json().catch(() => ({}));
+      console.log('OpenRouter /chat/completions raw API response object:', data);
 
       if (data.error) {
         throw new Error(data.error.message || JSON.stringify(data.error));
@@ -397,7 +412,10 @@ export async function generateImage(prompt: string): Promise<string | null> {
 
       // Try fully robust search of entire payload object first
       const extracted = extractImageFromObject(data);
-      if (extracted) return extracted;
+      if (extracted) {
+        console.log('Successfully extracted image from /chat/completions fallback response.');
+        return extracted;
+      }
 
       // Fallback directly to Gemini if parsing yielded no valid URL
       const geminiApiKey = state.geminiApiKey || process.env.GEMINI_API_KEY;
@@ -409,8 +427,8 @@ export async function generateImage(prompt: string): Promise<string | null> {
       const content = data.choices?.[0]?.message?.content || '';
       const jsonSnippet = JSON.stringify(data);
       const responseSnippet = typeof content === 'string' && content.trim() !== ''
-        ? (content.substring(0, 150) + (content.length > 150 ? '...' : '')) 
-        : (jsonSnippet.substring(0, 150) + (jsonSnippet.length > 150 ? '...' : ''));
+        ? (content.substring(0, 500) + (content.length > 500 ? '...' : '')) 
+        : (jsonSnippet.substring(0, 1000) + (jsonSnippet.length > 1000 ? '...' : ''));
 
       throw new Error(`Could not extract image URL from OpenRouter response. Response content: "${responseSnippet}"`);
     } catch (error: any) {
