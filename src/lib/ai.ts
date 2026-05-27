@@ -209,7 +209,109 @@ async function generateImageWithGemini(prompt: string): Promise<string | null> {
 function extractImageFromObject(obj: any): string | null {
   if (!obj) return null;
 
-  // 1. If it's a string, see if it is a URL or base64 data URI
+  // 0. Direct, high-priority, bulletproof path for known OpenRouter chat completions & normal generations structures
+  try {
+    if (typeof obj === 'object') {
+      // Look for standard chat completion formats
+      const choices = obj.choices;
+      if (Array.isArray(choices) && choices.length > 0) {
+        const message = choices[0]?.message;
+        if (message && typeof message === 'object') {
+          // Check for message.images list (standard OpenRouter vision/image format like Seedream 4.5)
+          const images = message.images;
+          if (Array.isArray(images) && images.length > 0) {
+            const firstImg = images[0];
+            if (firstImg) {
+              const url = typeof firstImg === 'string' ? firstImg : (firstImg.image_url?.url || firstImg.url || firstImg.image_url);
+              if (url && typeof url === 'string') {
+                const trimmed = url.trim();
+                const clean = trimmed.replace(/[\s\r\n]+/g, '');
+                if (clean.startsWith('data:image/') && clean.includes(';base64,')) {
+                  console.log('Directly extracted base64 image from message.images in choices.');
+                  return clean;
+                }
+                if (/^https?:\/\/[^\s"'()]+/i.test(trimmed)) {
+                  console.log('Directly extracted HTTP/HTTPS image URL from message.images in choices.');
+                  return trimmed;
+                }
+              }
+            }
+          }
+
+          // Check for markdown image format or embedded image URL inside message.content
+          const content = message.content;
+          if (typeof content === 'string' && content.trim() !== '') {
+            const markdownMatch = content.match(/!\[.*?\]\((.*?)\)/);
+            if (markdownMatch && markdownMatch[1]) {
+              console.log('Directly extracted markdown image URL from message.content.');
+              return markdownMatch[1].trim();
+            }
+            const embeddedUrlMatch = content.match(/https?:\/\/[^\s"'()]+/i);
+            if (embeddedUrlMatch && embeddedUrlMatch[0]) {
+              const url = embeddedUrlMatch[0];
+              const lowerUrl = url.toLowerCase();
+              if (!lowerUrl.includes('openrouter.ai/schemas') && 
+                  !lowerUrl.includes('schema.org') && 
+                  !lowerUrl.includes('w3.org') &&
+                  !lowerUrl.includes('openai.com/schemas')) {
+                console.log('Directly extracted embedded image URL from message.content.');
+                return url;
+              }
+            }
+          }
+        }
+      }
+
+      // Check if current level is message object or contains images array directly
+      if (Array.isArray(obj.images) && obj.images.length > 0) {
+        const firstImg = obj.images[0];
+        if (firstImg) {
+          const url = typeof firstImg === 'string' ? firstImg : (firstImg.image_url?.url || firstImg.url || firstImg.image_url);
+          if (url && typeof url === 'string') {
+            const trimmed = url.trim();
+            const clean = trimmed.replace(/[\s\r\n]+/g, '');
+            if (clean.startsWith('data:image/') && clean.includes(';base64,')) {
+              console.log('Directly extracted base64 image from images array.');
+              return clean;
+            }
+            if (/^https?:\/\/[^\s"'()]+/i.test(trimmed)) {
+              console.log('Directly extracted HTTP/HTTPS image URL from images array.');
+              return trimmed;
+            }
+          }
+        }
+      }
+
+      // Check standard DALL-E format ({ data: [ { url: "..." } ] }) or similar generations format
+      const dataArr = obj.data;
+      if (Array.isArray(dataArr) && dataArr.length > 0) {
+        const firstData = dataArr[0];
+        if (firstData && typeof firstData === 'object') {
+          const url = firstData.url || firstData.b64_json || firstData.b64Json || firstData.b64 || firstData.base64;
+          if (url && typeof url === 'string') {
+            const trimmed = url.trim();
+            const clean = trimmed.replace(/[\s\r\n]+/g, '');
+            if (clean.startsWith('data:image/') && clean.includes(';base64,')) {
+              console.log('Directly extracted base64 image from standard generations data array.');
+              return clean;
+            }
+            if (clean.length > 100 && /^[a-zA-Z0-9+/=_-]+$/.test(clean)) {
+              console.log('Directly extracted raw base64 data from standard generations data array and wrapped it.');
+              return `data:image/png;base64,${clean}`;
+            }
+            if (/^https?:\/\/[^\s"'()]+/i.test(trimmed)) {
+              console.log('Directly extracted HTTP/HTTPS URL from standard generations data array.');
+              return trimmed;
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Error in high-priority direct image extraction:', err);
+  }
+
+  // 1. Fallback to generic string/regex parsers
   if (typeof obj === 'string') {
     const trimmed = obj.trim();
     
@@ -220,7 +322,7 @@ function extractImageFromObject(obj: any): string | null {
     }
     
     // Check if it is a raw base64 string without data:image/ scheme (sometimes models output raw base64)
-    if (cleanDataUri.length > 100 && /^[a-zA-Z0-9+/]+={0,2}$/.test(cleanDataUri)) {
+    if (cleanDataUri.length > 100 && /^[a-zA-Z0-9+/=_-]+$/.test(cleanDataUri)) {
       return `data:image/png;base64,${cleanDataUri}`;
     }
 
@@ -279,7 +381,7 @@ function extractImageFromObject(obj: any): string | null {
     return null;
   }
 
-  // 3. If it's an object, search keys in prioritized order of importance for images
+  // 3. Fallback to recursive object search based on key priorities
   if (typeof obj === 'object') {
     const priorityKeys = [
       'url', 
