@@ -178,70 +178,8 @@ Write engaging, well-structured content that fits the tone of the book. Use mark
   return await callTextAI(prompt, false);
 }
 
-export async function generateImage(prompt: string): Promise<string | null> {
+async function generateImageWithGemini(prompt: string): Promise<string | null> {
   const state = useStore.getState();
-  const provider = state.imageProvider || 'gemini';
-  
-  if (provider === 'openrouter') {
-    const apiKey = state.openRouterApiKey;
-    if (!apiKey) {
-      throw new Error('OpenRouter API key is not set. Please configure it in Settings.');
-    }
-    const model = state.openRouterImageModel || 'google/gemini-3.1-flash-image-preview';
-    
-    try {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'AI Book Writer',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            { role: 'user', content: prompt }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `OpenRouter API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      // OpenRouter image models usually return the image URL in the content, or as base64
-      // We need to parse the markdown image or URL from the response
-      const content = data.choices[0]?.message?.content || '';
-      
-      // Try to extract markdown image URL
-      const markdownMatch = content.match(/!\[.*?\]\((.*?)\)/);
-      if (markdownMatch && markdownMatch[1]) {
-        return markdownMatch[1];
-      }
-      
-      // Try to extract plain URL
-      const urlMatch = content.match(/https?:\/\/[^\s)]+/);
-      if (urlMatch && urlMatch[0]) {
-        return urlMatch[0];
-      }
-      
-      // If it's base64 data URI
-      if (content.includes('data:image/')) {
-        const base64Match = content.match(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/);
-        if (base64Match && base64Match[0]) {
-          return base64Match[0];
-        }
-      }
-
-      throw new Error('Could not extract image URL from OpenRouter response');
-    } catch (error: any) {
-      throw new Error(handleAIError(error, 'OpenRouter Image'));
-    }
-  }
-
   try {
     const ai = getGeminiAi();
     const model = state.geminiImageModel || 'gemini-2.5-flash-image';
@@ -266,6 +204,231 @@ export async function generateImage(prompt: string): Promise<string | null> {
   } catch (error: any) {
     throw new Error(handleAIError(error, 'Gemini Image'));
   }
+}
+
+function extractImageFromObject(obj: any): string | null {
+  if (!obj) return null;
+
+  // 1. If it's a string, see if it is a URL or base64 data URI
+  if (typeof obj === 'string') {
+    const trimmed = obj.trim();
+    
+    // Check if it is a complete base64 image data URI
+    if (trimmed.startsWith('data:image/')) {
+      const base64Match = trimmed.match(/data:image\/[^;]+;base64,[a-zA-Z0-9+/=]+/);
+      if (base64Match && base64Match[0]) {
+        return base64Match[0];
+      }
+      return trimmed;
+    }
+    
+    // Check if it is a raw base64 string without data:image/ scheme (sometimes models output raw base64)
+    if (trimmed.length > 500 && /^[a-zA-Z0-9+/]+={0,2}$/.test(trimmed)) {
+      return `data:image/png;base64,${trimmed}`;
+    }
+
+    // Check if it is a direct HTTP/HTTPS URL
+    if (/^https?:\/\/[^\s"'()]+/i.test(trimmed)) {
+      const urlMatch = trimmed.match(/^https?:\/\/[^\s"'()]+/i);
+      const url = urlMatch ? urlMatch[0] : trimmed;
+      const lowerUrl = url.toLowerCase();
+      if (!lowerUrl.includes('openrouter.ai/schemas') && 
+          !lowerUrl.includes('schema.org') && 
+          !lowerUrl.includes('w3.org') &&
+          !lowerUrl.includes('openai.com/schemas')) {
+        return url;
+      }
+    }
+
+    // Check if it contains markdown image syntax
+    const markdownMatch = trimmed.match(/!\[.*?\]\((.*?)\)/);
+    if (markdownMatch && markdownMatch[1]) {
+      return markdownMatch[1].trim();
+    }
+
+    // Check if it has a plain URL embedded in some text
+    const embeddedUrlMatch = trimmed.match(/https?:\/\/[^\s"'()]+/i);
+    if (embeddedUrlMatch && embeddedUrlMatch[0]) {
+      const url = embeddedUrlMatch[0];
+      const lowerUrl = url.toLowerCase();
+      if (!lowerUrl.includes('openrouter.ai/schemas') && 
+          !lowerUrl.includes('schema.org') && 
+          !lowerUrl.includes('w3.org')) {
+        return url;
+      }
+    }
+
+    // Check if it is a JSON string
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const res = extractImageFromObject(parsed);
+        if (res) return res;
+      } catch (e) {
+        // Ignore JSON parse errors
+      }
+    }
+
+    return null;
+  }
+
+  // 2. If it's an array, search every item recursively
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      const res = extractImageFromObject(item);
+      if (res) return res;
+    }
+    return null;
+  }
+
+  // 3. If it's an object, search keys in prioritized order of importance for images
+  if (typeof obj === 'object') {
+    const priorityKeys = [
+      'url', 
+      'image_url', 
+      'image', 
+      'b64_json', 
+      'b64', 
+      'base64', 
+      'output', 
+      'img', 
+      'file', 
+      'data', 
+      'images', 
+      'content',
+      'result',
+      'results'
+    ];
+
+    for (const key of priorityKeys) {
+      if (key in obj && obj[key] !== undefined && obj[key] !== null) {
+        const res = extractImageFromObject(obj[key]);
+        if (res) return res;
+      }
+    }
+
+    // Fallback: search all other keys recursively
+    for (const key in obj) {
+      if (!priorityKeys.includes(key) && obj[key] !== undefined && obj[key] !== null) {
+        const res = extractImageFromObject(obj[key]);
+        if (res) return res;
+      }
+    }
+  }
+
+  return null;
+}
+
+export async function generateImage(prompt: string): Promise<string | null> {
+  const state = useStore.getState();
+  const provider = state.imageProvider || 'gemini';
+  
+  if (provider === 'openrouter') {
+    const apiKey = state.openRouterApiKey;
+    if (!apiKey) {
+      // Fallback if OpenRouter Key is missing
+      const geminiApiKey = state.geminiApiKey || process.env.GEMINI_API_KEY;
+      if (geminiApiKey) {
+        console.warn('OpenRouter API key not found. Querying Gemini as fallback image generator.');
+        return await generateImageWithGemini(prompt);
+      }
+      throw new Error('OpenRouter API key is not set. Please configure it in Settings.');
+    }
+    const model = state.openRouterImageModel || 'google/gemini-3.1-flash-image-preview';
+    
+    // First attempt: Standard image generation endpoint (/images/generations)
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'AI Book Writer',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: model,
+          prompt: prompt
+        })
+      });
+
+      const data = await response.json().catch(() => null);
+      if (data && data.error) {
+        const errMsg = data.error.message || JSON.stringify(data.error);
+        throw new Error(`OpenRouter image generate error: ${errMsg}`);
+      }
+
+      if (response.ok && data) {
+        // Use our super-robust extractor for the standard endpoint data structure as well!
+        const extracted = extractImageFromObject(data);
+        if (extracted) return extracted;
+      }
+    } catch (e: any) {
+      console.warn('OpenRouter image generation endpoint failed, trying chat fallback...', e);
+    }
+
+    // Second attempt: Fallback to chat completions endpoint (/chat/completions)
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'AI Book Writer',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (data.error) {
+        throw new Error(data.error.message || JSON.stringify(data.error));
+      }
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter API error: ${response.status}`);
+      }
+
+      // Try fully robust search of entire payload object first
+      const extracted = extractImageFromObject(data);
+      if (extracted) return extracted;
+
+      // Fallback directly to Gemini if parsing yielded no valid URL
+      const geminiApiKey = state.geminiApiKey || process.env.GEMINI_API_KEY;
+      if (geminiApiKey) {
+        console.warn('Could not extract image URL from OpenRouter content. Falling back to Gemini.');
+        return await generateImageWithGemini(prompt);
+      }
+
+      const content = data.choices?.[0]?.message?.content || '';
+      const jsonSnippet = JSON.stringify(data);
+      const responseSnippet = typeof content === 'string' && content.trim() !== ''
+        ? (content.substring(0, 150) + (content.length > 150 ? '...' : '')) 
+        : (jsonSnippet.substring(0, 150) + (jsonSnippet.length > 150 ? '...' : ''));
+
+      throw new Error(`Could not extract image URL from OpenRouter response. Response content: "${responseSnippet}"`);
+    } catch (error: any) {
+      // Automatic fallback to Gemini if OpenRouter overall failed and we have a Gemini Key
+      const geminiApiKey = state.geminiApiKey || process.env.GEMINI_API_KEY;
+      if (geminiApiKey) {
+        console.warn('OpenRouter image generation failed. Performing automatic fallback to Gemini...', error);
+        try {
+          return await generateImageWithGemini(prompt);
+        } catch (geminiError) {
+          // If fallback fails, throw the original OpenRouter error
+          throw new Error(handleAIError(error, 'OpenRouter Image'));
+        }
+      }
+      throw new Error(handleAIError(error, 'OpenRouter Image'));
+    }
+  }
+  return await generateImageWithGemini(prompt);
 }
 
 export interface ChatOutlineResponse {
