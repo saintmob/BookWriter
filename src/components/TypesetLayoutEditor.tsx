@@ -62,6 +62,8 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
         shadow: 'none',
         objectFit: 'cover',
         blendMode: 'normal',
+        layoutMode: 'wrap-left',
+        paragraphIndex: 0,
       };
       setFloatingImages(prev => [...prev, newImg]);
       setSelectedImageId(newImg.id);
@@ -131,6 +133,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
         
         let dropX = 100;
         let dropY = 100;
+        let paragraphIndex = 0;
 
         if (workspaceRef.current) {
           const rect = workspaceRef.current.getBoundingClientRect();
@@ -139,6 +142,16 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
           
           dropX = (targetX + workspaceRef.current.scrollLeft) / zoom - 100;
           dropY = (targetY + workspaceRef.current.scrollTop) / zoom - 100;
+        }
+
+        const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
+        if (dropTarget && textContainerRef.current) {
+          const allParagraphs = Array.from(textContainerRef.current.querySelectorAll('p, h1, h2, h3, h4, ul, ol, blockquote'));
+          const closestP = dropTarget.closest('p, h1, h2, h3, h4, ul, ol, blockquote');
+          if (closestP) {
+            paragraphIndex = allParagraphs.indexOf(closestP as Element);
+            if (paragraphIndex === -1) paragraphIndex = 0;
+          }
         }
 
         const newImg: FloatingImage = {
@@ -153,6 +166,8 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
           shadow: 'none',
           objectFit: 'cover',
           blendMode: 'normal',
+          layoutMode: 'wrap-left',
+          paragraphIndex: paragraphIndex,
         };
         setFloatingImages(prev => [...prev, newImg]);
         setSelectedImageId(newImg.id);
@@ -189,6 +204,8 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
         shadow: 'none',
         objectFit: 'cover',
         blendMode: 'normal',
+        layoutMode: 'wrap-left',
+        paragraphIndex: 0,
       };
       setFloatingImages(prev => [...prev, newImg]);
       setSelectedImageId(newImg.id);
@@ -333,7 +350,13 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
                 }}
                 className="prose prose-zinc dark:prose-invert font-serif max-w-none"
               >
-                <MarkdownRenderer>{content || `*${t('no_content_yet')}*`}</MarkdownRenderer>
+                <MarkdownRenderer 
+                  floatingImages={floatingImages}
+                  selectedImageId={selectedImageId}
+                  onImageClick={setSelectedImageId}
+                >
+                  {content || `*${t('no_content_yet')}*`}
+                </MarkdownRenderer>
               </div>
             </div>
 
@@ -341,7 +364,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
             <div 
               className="absolute top-0 left-0 w-full h-full pointer-events-none"
             >
-              {floatingImages.map((img, i) => (
+              {floatingImages.filter(img => !img.layoutMode || img.layoutMode === 'absolute').map((img, i) => (
                 <Rnd
                   key={img.id}
                   default={{
@@ -441,12 +464,83 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
                 <div>
                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Size & Position (px)</label>
                    <div className="grid grid-cols-2 gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">W: {img.width}</div>
-                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">H: {img.height}</div>
+                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded flex items-center">
+                       <span className="text-zinc-400 mr-2">W</span>
+                       <input 
+                         type="number" 
+                         value={img.width} 
+                         onChange={e => updateImg({ width: Number(e.target.value) })}
+                         className="bg-transparent w-full outline-none"
+                       />
+                     </div>
+                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded flex items-center">
+                       <span className="text-zinc-400 mr-2">H</span>
+                       <input 
+                         type="number" 
+                         value={img.height} 
+                         onChange={e => updateImg({ height: Number(e.target.value) })}
+                         className="bg-transparent w-full outline-none"
+                       />
+                     </div>
                      <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">X: {Math.round(img.x)}</div>
                      <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">Y: {Math.round(img.y)}</div>
                    </div>
-                   <p className="text-[10px] text-zinc-400 mt-2">Drag image on canvas to move. Drag edges to resize.</p>
+                   <p className="text-[10px] text-zinc-400 mt-2">Adjust dimensions manually here or drag edges.</p>
+                </div>
+
+                <hr className="border-zinc-200 dark:border-zinc-800" />
+
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Layout Mode</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: 'absolute', label: 'Absolute', desc: 'Free drag' },
+                      { id: 'wrap-left', label: 'Float Left', desc: 'Text wraps right' },
+                      { id: 'wrap-right', label: 'Float Right', desc: 'Text wraps left' },
+                      { id: 'wrap-center', label: 'Center', desc: 'Block break' }
+                    ].map(mode => (
+                      <button
+                        key={mode.id}
+                        onClick={() => updateImg({ layoutMode: mode.id as any })}
+                        className={cn(
+                          "text-left p-2 text-xs rounded-md border transition-all",
+                          (img.layoutMode || 'absolute') === mode.id
+                            ? "bg-emerald-50 border-emerald-500 text-emerald-900 dark:bg-emerald-900/30"
+                            : "bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400"
+                        )}
+                      >
+                        <div className="font-medium">{mode.label}</div>
+                        <div className="text-[10px] opacity-70 truncate">{mode.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {(img.layoutMode && img.layoutMode !== 'absolute') && (
+                    <div className="mt-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
+                      <label className="text-xs font-medium text-zinc-500 block mb-2">Block Attachment Index</label>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => updateImg({ paragraphIndex: Math.max(0, (img.paragraphIndex || 0) - 1) })}
+                          className="px-2 py-1 bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded shadow-sm text-xs hover:bg-zinc-50"
+                        >
+                          Prev
+                        </button>
+                        <input 
+                          type="number"
+                          value={img.paragraphIndex || 0}
+                          onChange={e => updateImg({ paragraphIndex: Math.max(0, Number(e.target.value)) })}
+                          className="w-full text-center text-sm p-1 bg-transparent border-none outline-none"
+                        />
+                        <button 
+                          onClick={() => updateImg({ paragraphIndex: (img.paragraphIndex || 0) + 1 })}
+                          className="px-2 py-1 bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded shadow-sm text-xs hover:bg-zinc-50"
+                        >
+                          Next
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-zinc-400 mt-2 text-center">Move the image to previous or next text block</p>
+                    </div>
+                  )}
                 </div>
 
                 <hr className="border-zinc-200 dark:border-zinc-800" />
@@ -523,6 +617,18 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
                       </select>
                     </div>
                   </div>
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-zinc-200 dark:border-zinc-800">
+                  <button 
+                    onClick={() => {
+                      setFloatingImages(prev => prev.filter(f => f.id !== selectedImageId));
+                      setSelectedImageId(null);
+                    }}
+                    className="w-full py-2 hover:bg-red-50 text-red-600 dark:hover:bg-red-900/30 rounded-md text-sm font-medium transition-colors"
+                  >
+                    Delete Image
+                  </button>
                 </div>
               </div>
             );

@@ -24,6 +24,8 @@ export interface FloatingImage {
   shadow?: string;
   objectFit?: 'cover' | 'contain' | 'fill';
   blendMode?: string;
+  layoutMode?: 'absolute' | 'wrap-left' | 'wrap-right' | 'wrap-center';
+  paragraphIndex?: number;
 }
 
 export type TrimFormat = 'a4' | 'letter' | 'trade' | 'pocket';
