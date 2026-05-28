@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book, FloatingImage } from '../lib/db';
 import { generateChapterContent, generateImage, proofreadChapter, applyProofreadChanges, ProofreadFeedback } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2, ChevronLeft, ChevronRight, ArrowLeft, PenLine, LayoutTemplate, Settings as SettingsIcon } from 'lucide-react';
+import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2, ChevronLeft, ChevronRight, ArrowLeft, PenLine, LayoutTemplate, Settings as SettingsIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, ZoomIn, ZoomOut, Grid, Columns } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { OutlineEditorModal } from './OutlineEditorModal';
@@ -25,7 +25,15 @@ export function BookEditor() {
     deleteBook, 
     language, 
     isOutlineSidebarOpen,
-    setIsOutlineSidebarOpen
+    setIsOutlineSidebarOpen,
+    isRightSidebarOpen,
+    setIsRightSidebarOpen,
+    workspaceMode,
+    setWorkspaceMode,
+    zoom,
+    setZoom,
+    showGuides,
+    setShowGuides
   } = useStore();
   
   const [book, setBook] = useState<Book | null>(null);
@@ -349,65 +357,172 @@ export function BookEditor() {
   if (!book) return <div className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-emerald-500" /></div>;
 
   return (
-    <div className="flex-1 flex h-screen overflow-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
-      {/* Print Container (Hidden by default, visible in print) */}
-      <div id="print-container" className="hidden">
-        <h1 className="text-3xl font-bold mb-4">{book.title}</h1>
-        <p className="text-gray-600 mb-8 italic">{book.summary}</p>
-        {chapters.map((chapter, index) => (
-          <div key={chapter.id} className="mb-8 break-inside-avoid">
-            <h2 className="text-2xl font-bold mb-4">Chapter {index + 1}: {chapter.title}</h2>
-            {chapter.image && (
-              <img src={chapter.image} alt={chapter.title} className="w-full max-w-2xl mx-auto mb-4 rounded-lg" />
+    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
+      {/* GLOBAL APPLICATION TOP BAR */}
+      <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0 select-none shadow-sm w-full">
+        {/* LEFT COMPONENT */}
+        <div className="flex items-center gap-2 shrink-0 min-w-[200px] lg:w-1/3">
+          {/* Back to library */}
+          <button 
+            onClick={() => setActiveBook(null)}
+            className="flex items-center gap-1.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors px-2 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            title={language === 'zh' ? '返回书库' : 'Back to Library'}
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">{t('my_books')}</span>
+          </button>
+          
+          <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
+
+          {/* Left panel toggle */}
+          <button
+            onClick={() => setIsOutlineSidebarOpen(!isOutlineSidebarOpen)}
+            type="button"
+            className={cn(
+              "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0",
+              isOutlineSidebarOpen ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
             )}
-            <div className="prose max-w-none">
-              <MarkdownRenderer>{chapter.content || ''}</MarkdownRenderer>
-            </div>
-            <hr className="my-8 border-gray-200" />
+            title={isOutlineSidebarOpen ? (language === 'zh' ? '折叠章节大纲' : 'Collapse chapters outline') : (language === 'zh' ? '展开章节大纲' : 'Expand chapters outline')}
+          >
+            {isOutlineSidebarOpen ? <PanelLeftClose className="w-4 h-4 text-emerald-500" /> : <PanelLeftOpen className="w-4 h-4 text-amber-500" />}
+          </button>
+
+          {/* Title breadcrumb */}
+          <button 
+            onClick={() => setIsBookInfoOpen(true)}
+            className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-850 dark:hover:bg-zinc-800 rounded-md text-xs font-serif font-semibold text-zinc-800 dark:text-zinc-200 select-none max-w-[150px] transition-colors"
+            title={language === 'zh' ? '编辑书籍信息' : 'Edit Book Info'}
+          >
+            <LayoutTemplate className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+            <span className="truncate">{book.title}</span>
+          </button>
+        </div>
+
+        {/* MIDDLE COMPONENT */}
+        <div className="flex items-center justify-center gap-3 shrink-0">
+          {/* Zoom controls */}
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-850 rounded-lg p-0.5 text-xs hidden sm:flex">
+            <button 
+              onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
+              className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+              title={language === 'zh' ? '缩小' : 'Zoom Out'}
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <span className="w-9 text-center font-semibold text-zinc-600 dark:text-zinc-300 font-mono text-[10px]">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button 
+              onClick={() => setZoom(z => Math.min(2.0, z + 0.1))}
+              className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+              title={language === 'zh' ? '放大' : 'Zoom In'}
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
           </div>
-        ))}
+
+          <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden md:block"></div>
+
+          {/* View Modes */}
+          <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 text-xs shrink-0 font-medium">
+            <button
+              onClick={() => setWorkspaceMode('story')}
+              className={cn(
+                "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
+                workspaceMode === 'story'
+                  ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+              )}
+              title={language === 'zh' ? '文本模式' : 'Text Mode'}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">{language === 'zh' ? '文本模式' : 'Text'}</span>
+            </button>
+            <button
+              onClick={() => setWorkspaceMode('split')}
+              className={cn(
+                "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
+                workspaceMode === 'split'
+                  ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+              )}
+              title={language === 'zh' ? '双栏编辑与预览' : 'Split Workspace'}
+            >
+              <Columns className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">{language === 'zh' ? '双栏模式' : 'Split'}</span>
+            </button>
+            <button
+              onClick={() => setWorkspaceMode('dtp')}
+              className={cn(
+                "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
+                workspaceMode === 'dtp'
+                  ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+              )}
+              title={language === 'zh' ? '排版预览' : 'Layout Preview'}
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">{language === 'zh' ? '排版预览' : 'Layout'}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT COMPONENT */}
+        <div className="flex items-center justify-end gap-2 shrink-0 lg:w-1/3">
+          <button
+            onClick={() => setShowGuides(!showGuides)}
+            className={cn(
+              "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0 hidden sm:flex",
+              showGuides ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            )}
+            title={showGuides ? (language === 'zh' ? '隐藏网格线' : 'Hide Guides') : (language === 'zh' ? '显示网格线' : 'Show Guides')}
+          >
+            <Grid className="w-4 h-4" />
+          </button>
+          
+          <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
+
+          <button
+            onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+            className={cn(
+              "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0",
+              isRightSidebarOpen ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+            )}
+            title={isRightSidebarOpen ? (language === 'zh' ? '折叠右侧面板' : 'Collapse right panel') : (language === 'zh' ? '展开右侧面板' : 'Expand right panel')}
+          >
+            {isRightSidebarOpen ? <PanelRightClose className="w-4 h-4 text-emerald-500" /> : <PanelRightOpen className="w-4 h-4 text-amber-500" />}
+          </button>
+        </div>
       </div>
+
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Print Container (Hidden by default, visible in print) */}
+        <div id="print-container" className="hidden">
+          <h1 className="text-3xl font-bold mb-4">{book.title}</h1>
+          <p className="text-gray-600 mb-8 italic">{book.summary}</p>
+          {chapters.map((chapter, index) => (
+            <div key={chapter.id} className="mb-8 break-inside-avoid">
+              <h2 className="text-2xl font-bold mb-4">Chapter {index + 1}: {chapter.title}</h2>
+              {chapter.image && (
+                <img src={chapter.image} alt={chapter.title} className="w-full max-w-2xl mx-auto mb-4 rounded-lg" />
+              )}
+              <div className="prose max-w-none">
+                <MarkdownRenderer>{chapter.content || ''}</MarkdownRenderer>
+              </div>
+              <hr className="my-8 border-gray-200" />
+            </div>
+          ))}
+        </div>
 
       {/* Outline Sidebar */}
       <div className={cn(
         "transition-all duration-300 ease-in-out border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col print:hidden overflow-hidden shrink-0 h-full relative",
         isOutlineSidebarOpen ? "w-72" : "w-0 border-r-0 shadow-none opacity-0 pointer-events-none"
       )}>
-        {/* ... (sidebar content) ... */}
-        <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          <button 
-            onClick={() => setActiveBook(null)}
-            className="flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors px-2 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            {t('my_books')}
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsOutlineSidebarOpen(false);
-            }}
-            type="button"
-            className="p-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 transition-colors"
-            title={language === 'zh' ? '收起大纲栏' : 'Collapse chapters panel'}
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div 
-          className="p-4 border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors group relative"
-          onClick={() => setIsBookInfoOpen(true)}
-        >
-          <div className="flex items-start justify-between gap-2">
-            <h2 className="font-serif font-bold text-lg leading-tight line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{book.title}</h2>
-            <Edit2 className="w-4 h-4 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
-          </div>
-        </div>
-        
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          <div className="flex items-center justify-between px-2 mb-2">
-            <div className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+          <div className="flex items-center justify-between px-2 mb-2 pt-2">
+            <div className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+              <LayoutTemplate className="w-3.5 h-3.5" />
               {t('chapters')}
             </div>
             <button 
@@ -540,6 +655,7 @@ export function BookEditor() {
             </div>
           </div>
         )}
+      </div>
       </div>
       {book && (
         <OutlineEditorModal 

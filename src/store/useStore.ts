@@ -32,6 +32,12 @@ interface AppState {
   setIsSidebarCollapsed: (collapsed: boolean) => void;
   isOutlineSidebarOpen: boolean;
   setIsOutlineSidebarOpen: (open: boolean) => void;
+  isRightSidebarOpen: boolean;
+  setIsRightSidebarOpen: (open: boolean) => void;
+  zoom: number;
+  setZoom: (zoom: number | ((z: number) => number)) => void;
+  showGuides: boolean;
+  setShowGuides: (show: boolean) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setLanguage: (lang: 'en' | 'zh') => void;
   setTextProvider: (provider: 'gemini' | 'openrouter') => void;
@@ -82,6 +88,12 @@ export const useStore = create<AppState>()(
       setIsSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
       isOutlineSidebarOpen: true,
       setIsOutlineSidebarOpen: (open) => set({ isOutlineSidebarOpen: open }),
+      isRightSidebarOpen: true,
+      setIsRightSidebarOpen: (open) => set({ isRightSidebarOpen: open }),
+      zoom: 0.75,
+      setZoom: (zoom) => set((state) => ({ zoom: typeof zoom === 'function' ? zoom(state.zoom) : zoom })),
+      showGuides: true,
+      setShowGuides: (show) => set({ showGuides: show }),
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setTextProvider: (provider) => set({ textProvider: provider }),
@@ -146,6 +158,9 @@ export const useStore = create<AppState>()(
         openRouterImageModel: state.openRouterImageModel,
         workspaceMode: state.workspaceMode,
         isOutlineSidebarOpen: state.isOutlineSidebarOpen,
+        isRightSidebarOpen: state.isRightSidebarOpen,
+        zoom: state.zoom,
+        showGuides: state.showGuides,
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
         activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
         draft: state.draft // Persist draft state to save progress

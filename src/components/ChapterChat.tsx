@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Send, Loader2, Sparkles, Check, X, Trash2 } from 'lucide-react';
+import { Send, Loader2, Sparkles, Check, X, Trash2, Wand2, Image as ImageIcon } from 'lucide-react';
 import { chatWithChapter } from '../lib/ai';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { db, ChatMessage } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
 import { useStore } from '../store/useStore';
 import { ConfirmModal } from './ConfirmModal';
+import { toast } from 'sonner';
 
 interface ChapterChatProps {
   content: string;
@@ -15,9 +16,28 @@ interface ChapterChatProps {
   language: string;
   onApplyContent: (newContent: string) => void;
   onClose: () => void;
+  onGenerateContent?: () => Promise<void>;
+  isGeneratingContent?: boolean;
+  onProofreadText?: () => void;
+  isProofreading?: boolean;
+  onGenerateImageOfPrompt?: (prompt: string) => Promise<string | null>;
+  onAddImageToLayout?: (url: string) => void;
 }
 
-export function ChapterChat({ content, chapterTitle, bookTitle, language, onApplyContent, onClose }: ChapterChatProps) {
+export function ChapterChat({ 
+  content, 
+  chapterTitle, 
+  bookTitle, 
+  language, 
+  onApplyContent, 
+  onClose,
+  onGenerateContent,
+  isGeneratingContent,
+  onProofreadText,
+  isProofreading,
+  onGenerateImageOfPrompt,
+  onAddImageToLayout
+}: ChapterChatProps) {
   const { t } = useTranslation();
   const activeChapterId = useStore((state) => state.activeChapterId);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -195,7 +215,59 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+      <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col gap-2">
+        {/* AI Quick Actions Row */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none [&::-webkit-scrollbar]:hidden">
+          {onGenerateContent && (
+            <button
+              onClick={onGenerateContent}
+              disabled={isGeneratingContent || isLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-400 rounded-full text-[10px] font-semibold transition-colors border border-emerald-200 dark:border-emerald-800/50 whitespace-nowrap disabled:opacity-50"
+            >
+              {isGeneratingContent ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+              {language === 'zh' ? '生成初稿' : 'Generate Draft'}
+            </button>
+          )}
+          {onProofreadText && (
+             <button
+              onClick={onProofreadText}
+              disabled={isProofreading || isLoading || !content}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-300 rounded-full text-[10px] font-semibold transition-colors border border-zinc-200 dark:border-zinc-700 whitespace-nowrap disabled:opacity-50"
+            >
+              {isProofreading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+              {language === 'zh' ? '润色文本' : 'Proofread'}
+            </button>
+          )}
+          {onGenerateImageOfPrompt && onAddImageToLayout && (
+             <button
+              onClick={async () => {
+                const promptText = window.prompt(language === 'zh' ? '请输入 AI 插图描述（如：一只赛博朋克猫）：' : 'Enter AI illustration prompt:');
+                if (!promptText) return;
+            
+                const toastId = toast.loading(language === 'zh' ? '正在渲染高保真插图...' : 'Generating image masterpiece...');
+                try {
+                  const url = await onGenerateImageOfPrompt(promptText);
+                  if (url) {
+                    onAddImageToLayout(url);
+                    toast.dismiss(toastId);
+                    toast.success(language === 'zh' ? '插图生成成功' : 'Generated successfully');
+                  } else {
+                    toast.dismiss(toastId);
+                    toast.error(language === 'zh' ? '未能生成图像' : 'Failed to generate');
+                  }
+                } catch (err: any) {
+                  toast.dismiss(toastId);
+                  toast.error(err.message || 'Generation failed');
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 dark:bg-purple-900/30 dark:hover:bg-purple-900/50 dark:text-purple-400 rounded-full text-[10px] font-semibold transition-colors border border-purple-200 dark:border-purple-800/50 whitespace-nowrap disabled:opacity-50"
+            >
+              <ImageIcon className="w-3 h-3" />
+              {language === 'zh' ? '生成配图' : 'Generate Image'}
+            </button>
+          )}
+        </div>
+
         <div className="relative">
           <textarea
             value={input}

@@ -92,7 +92,14 @@ export function TypesetLayoutEditor({
   language = 'en',
 }: TypesetLayoutEditorProps) {
   const { t, i18n } = useTranslation();
-  const { isOutlineSidebarOpen, setIsOutlineSidebarOpen, workspaceMode, setWorkspaceMode } = useStore();
+  const { 
+    isOutlineSidebarOpen, 
+    setIsOutlineSidebarOpen, 
+    isRightSidebarOpen, 
+    setIsRightSidebarOpen, 
+    workspaceMode, 
+    setWorkspaceMode 
+  } = useStore();
   
   // Load settings
   const [layout, setLayout] = useState<PageLayout & { columns?: number; paperStyle?: 'warm' | 'white' | 'dark' | 'kraft' }>(() => {
@@ -109,7 +116,6 @@ export function TypesetLayoutEditor({
   const [editingBlock, setEditingBlock] = useState<{ index: number; text: string } | null>(null);
   
   // Foldable sidebars & property sections to keep layout clean for major visual areas
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     paper: false,        // 一、书籍载体纸张风格
     trim: false,         // 二、拼版规格尺寸规格 (对标 InDesign)
@@ -241,6 +247,7 @@ export function TypesetLayoutEditor({
     setSelectedImageId(newImg.id);
     setActiveAssetTab('details');
     toast.success(currentLanguage === 'zh' ? '已向排版版面中添加插图' : 'Image placed onto layout canvas');
+    return newImg.id;
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,26 +261,6 @@ export function TypesetLayoutEditor({
     };
     reader.readAsDataURL(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  // Triggers modern AI Generation inside layout frame
-  const triggerToolbarAIGene = async () => {
-    if (!onGenerateImageOfPrompt) return;
-    const promptText = window.prompt(currentLanguage === 'zh' ? '请输入 AI 插图描述气泡：' : 'Enter AI illustration prompt:');
-    if (!promptText) return;
-
-    const toastId = toast.loading(currentLanguage === 'zh' ? '正在渲染高保真插图...' : 'Generating image masterpiece...');
-    try {
-      const url = await onGenerateImageOfPrompt(promptText);
-      if (url) {
-        insertNewFloatingImage(url);
-        toast.dismiss(toastId);
-      } else {
-        toast.error(currentLanguage === 'zh' ? '无法生成图像，请检查服务端。' : 'Unable to generate imagery', { id: toastId });
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Error', { id: toastId });
-    }
   };
 
   // Double click block on canvas opens block-focused editor overlay immediately
@@ -326,160 +313,6 @@ export function TypesetLayoutEditor({
     <div className="flex flex-row relative w-full h-full bg-zinc-100 dark:bg-zinc-950 overflow-hidden select-none">
       {/* Central Interactive Panels */}
       <div className="flex flex-col flex-1 relative overflow-hidden h-full">
-        {/* Top Professional Adobe Toolbar */}
-        <div className="h-14 border-b border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0 select-none shadow-sm overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden w-full">
-          
-          {/* LEFT SECTION */}
-          <div className="flex items-center gap-2 shrink-0 min-w-[200px] lg:w-1/3">
-            {/* Outline list toggle icon */}
-            <button
-              onClick={() => setIsOutlineSidebarOpen(!isOutlineSidebarOpen)}
-              type="button"
-              className={cn(
-                "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0",
-                isOutlineSidebarOpen ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
-              )}
-              title={isOutlineSidebarOpen ? (currentLanguage === 'zh' ? '折叠章节大纲' : 'Collapse chapters outline') : (currentLanguage === 'zh' ? '展开章节大纲' : 'Expand chapters outline')}
-            >
-              {isOutlineSidebarOpen ? <PanelLeftClose className="w-4 h-4 text-emerald-500 animate-pulse" /> : <PanelLeftOpen className="w-4 h-4 text-amber-500 animate-bounce" />}
-            </button>
-
-            <span className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-850 rounded-md text-xs font-serif font-semibold text-zinc-800 dark:text-zinc-200 select-none max-w-[150px]">
-              <LayoutTemplate className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span className="truncate">{bookTitle || 'DTP Desk'}</span>
-            </span>
-
-            {/* Layout specifications metadata labels */}
-            <span className="text-[10px] font-mono text-zinc-400 hidden xl:inline-block px-1.5 py-0.5 rounded border border-zinc-200/50 dark:border-zinc-800/50 truncate">
-              {formatData.printLabel} • {columnsCount} Col{columnsCount > 1 && 's'}
-            </span>
-          </div>
-
-          {/* MIDDLE SECTION */}
-          <div className="flex items-center justify-center gap-3 shrink-0">
-            {/* Quick Desk Zooms */}
-            <div className="flex items-center bg-zinc-100 dark:bg-zinc-850 rounded-lg p-0.5 text-xs">
-              <button 
-                onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
-                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
-                title={currentLanguage === 'zh' ? '外延缩小' : 'Zoom Out'}
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <span className="w-9 text-center font-semibold text-zinc-600 dark:text-zinc-300 font-mono text-[10px]">
-                {Math.round(zoom * 100)}%
-              </span>
-              <button 
-                onClick={() => setZoom(z => Math.min(2.0, z + 0.1))}
-                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
-                title={currentLanguage === 'zh' ? '内向放大' : 'Zoom In'}
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
-
-            {/* Split, Story & Layout segment toggle */}
-            <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 text-xs shrink-0 font-medium">
-              <button
-                onClick={() => setWorkspaceMode('story')}
-                className={cn(
-                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
-                  workspaceMode === 'story'
-                    ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
-                )}
-                title={currentLanguage === 'zh' ? '文本故事编辑器' : 'Story Editor Mode'}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{currentLanguage === 'zh' ? '文本编辑' : 'Story'}</span>
-              </button>
-              
-              <button
-                onClick={() => setWorkspaceMode('split')}
-                className={cn(
-                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
-                  workspaceMode === 'split'
-                    ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
-                )}
-                title={currentLanguage === 'zh' ? '左右分栏双模式：编辑+实时排版' : 'Interlocking Editorial Workspace'}
-              >
-                <Columns className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{currentLanguage === 'zh' ? '同步双功' : 'Live Split'}</span>
-              </button>
-
-              <button
-                onClick={() => setWorkspaceMode('dtp')}
-                className={cn(
-                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
-                  workspaceMode === 'dtp'
-                    ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
-                )}
-                title={currentLanguage === 'zh' ? '专业版页设计面' : 'Focused Canvas Typesetting'}
-              >
-                <Eye className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">{currentLanguage === 'zh' ? '版面设计' : 'Layout'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* RIGHT SECTION */}
-          <div className="flex items-center justify-end gap-2 shrink-0 lg:w-1/3">
-            {/* Guide Lines Toggle (Letter press preview mode) */}
-            <button
-              onClick={() => setShowGuides(!showGuides)}
-              className={cn(
-                "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0",
-                showGuides ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
-              )}
-              title={showGuides ? (currentLanguage === 'zh' ? '隐藏印刷参考网格线 (W)' : 'Hide Bleed & Alignment Guides') : (currentLanguage === 'zh' ? '显示印刷参考网格线 (W)' : 'Show Grid and Bleed Guides')}
-            >
-              <Grid className="w-4 h-4" />
-            </button>
-
-            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
-
-            {/* Local Desk Asset inserter */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-250 rounded-lg transition-all"
-              title={currentLanguage === 'zh' ? '添加排版本地照片' : 'Add custom image file'}
-            >
-              <ImagePlus className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="hidden xl:inline">{currentLanguage === 'zh' ? '置入插图' : 'Place Pic'}</span>
-            </button>
-            <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
-
-            {/* Live AI insert */}
-            {onGenerateImageOfPrompt && (
-              <button
-                onClick={triggerToolbarAIGene}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-zinc-100 hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:text-emerald-700 dark:bg-zinc-800 dark:text-zinc-200 rounded-lg transition-all"
-                title={currentLanguage === 'zh' ? '使用 AI 生成并直接置入' : 'AI Generate and insert directly'}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-[#a855f7]" />
-                <span className="hidden xl:inline">AI Place</span>
-              </button>
-            )}
-
-            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
-
-            {/* Properties Sidebar toggle button */}
-            <button
-              onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-              className={cn(
-                "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0",
-                isRightSidebarOpen ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
-              )}
-              title={isRightSidebarOpen ? (currentLanguage === 'zh' ? '折叠右侧面板' : 'Collapse right panel') : (currentLanguage === 'zh' ? '展开右侧面板' : 'Expand right panel')}
-            >
-              {isRightSidebarOpen ? <PanelRightClose className="w-4 h-4 text-emerald-500 animate-pulse" /> : <PanelRightOpen className="w-4 h-4 text-amber-500 animate-bounce" />}
-            </button>
-          </div>
-        </div>
 
         {/* Workspace Dual Area Wrapper */}
         <div className="flex-1 flex flex-row overflow-hidden relative bg-[#121214] border-t border-zinc-250 dark:border-zinc-800">
@@ -521,22 +354,6 @@ export function TypesetLayoutEditor({
                   </div>
                 )}
               </div>
-
-              {/* Story Prompt Toolbar Bar */}
-              {onGenerateContent && (
-                <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/45 flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between shrink-0 select-none">
-                  <div className="text-[11px] text-zinc-400 dark:text-zinc-500 font-serif leading-tight">
-                    {currentLanguage === 'zh' ? '💡 双击右侧段落，即可就地修改草稿哦！' : 'Double-click elements on right sheet to edit!'}
-                  </div>
-                  <button
-                    onClick={onGenerateContent}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-md text-xs font-semibold shadow-sm transition-all shrink-0 whitespace-nowrap"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>{currentLanguage === 'zh' ? '生成章节初稿' : 'Generate Chapter Story'}</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
@@ -1305,6 +1122,17 @@ export function TypesetLayoutEditor({
                 </span>
               </div>
 
+              {/* Local Desk Asset inserter */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-250 rounded-lg transition-all border border-zinc-200 dark:border-zinc-700"
+                title={currentLanguage === 'zh' ? '添加排版本地照片' : 'Add custom image file'}
+              >
+                <ImagePlus className="w-4 h-4 text-emerald-500" />
+                <span>{currentLanguage === 'zh' ? '上传置入本地插图' : 'Upload Local Image'}</span>
+              </button>
+              <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
+
               {/* Master chapter cover/hero image links */}
               {chapter.image && (
                 <div className="p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-500/20 rounded-xl space-y-2">
@@ -1386,6 +1214,16 @@ export function TypesetLayoutEditor({
                   onContentChange(newContent);
                 }}
                 onClose={() => setIsRightSidebarOpen(false)}
+                onGenerateContent={onGenerateContent}
+                isGeneratingContent={isGeneratingContent}
+                onProofreadText={onProofreadText}
+                isProofreading={isProofreading}
+                onGenerateImageOfPrompt={onGenerateImageOfPrompt}
+                onAddImageToLayout={(url) => {
+                   const imgId = insertNewFloatingImage(url);
+                   setSelectedImageId(imgId);
+                   setActiveAssetTab('details');
+                }}
               />
             </div>
           ) : null}
