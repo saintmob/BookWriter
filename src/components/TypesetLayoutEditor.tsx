@@ -145,9 +145,30 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
         }
 
         const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
-        if (dropTarget && textContainerRef.current) {
+        if (textContainerRef.current) {
           const allParagraphs = Array.from(textContainerRef.current.querySelectorAll('p, h1, h2, h3, h4, ul, ol, blockquote'));
-          const closestP = dropTarget.closest('p, h1, h2, h3, h4, ul, ol, blockquote');
+          let closestP = dropTarget ? dropTarget.closest('p, h1, h2, h3, h4, ul, ol, blockquote') : null;
+          
+          if (!closestP) {
+            let minDist = Infinity;
+            for (const el of allParagraphs) {
+              const rects = el.getClientRects();
+              for (let i=0; i<rects.length; i++) {
+                const rect = rects[i];
+                if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+                  closestP = el;
+                  break;
+                }
+                const dist = Math.sqrt(Math.pow(e.clientX - (rect.left + rect.width/2), 2) + Math.pow(e.clientY - (rect.top + rect.height/2), 2));
+                if (dist < minDist) {
+                  minDist = dist;
+                  closestP = el;
+                }
+              }
+              if (closestP && minDist === 0) break;
+            }
+          }
+
           if (closestP) {
             paragraphIndex = allParagraphs.indexOf(closestP as Element);
             if (paragraphIndex === -1) paragraphIndex = 0;
