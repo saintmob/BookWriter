@@ -1,6 +1,32 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Rnd } from 'react-rnd';
-import { Settings, ImagePlus, Save, LayoutTemplate, Type, ZoomIn, ZoomOut } from 'lucide-react';
+import { 
+  Settings, 
+  ImagePlus, 
+  Save, 
+  LayoutTemplate, 
+  Type, 
+  ZoomIn, 
+  ZoomOut, 
+  Columns, 
+  FileText, 
+  Sparkles, 
+  Loader2, 
+  Check, 
+  Wand2, 
+  Grid, 
+  HelpCircle, 
+  MessageSquare, 
+  Maximize2, 
+  Layers, 
+  X, 
+  Plus, 
+  BookOpen, 
+  SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  Eye
+} from 'lucide-react';
 import { Chapter, FloatingImage, PageLayout, TrimFormat, db } from '../lib/db';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,17 +37,26 @@ import { cn } from '../lib/utils';
 interface TypesetLayoutEditorProps {
   chapter: Chapter;
   content: string;
+  onContentChange: (newContent: string) => void;
   onUpdateChapter: (chapter: Chapter) => void;
+  isGeneratingContent?: boolean;
+  isGeneratingImage?: boolean;
+  isProofreading?: boolean;
+  onGenerateContent?: () => Promise<void>;
+  onGenerateImageOfPrompt?: (prompt: string) => Promise<string | null>;
+  onProofreadText?: () => void;
+  isChatOpen?: boolean;
+  onToggleChat?: () => void;
 }
 
-const FORMATS: Record<TrimFormat, { width: number; height: number; label: string }> = {
-  a4: { width: 794, height: 1123, label: 'A4 (210x297mm)' },
-  letter: { width: 816, height: 1056, label: 'US Letter (8.5x11")' },
-  trade: { width: 576, height: 864, label: 'Trade (6x9")' },
-  pocket: { width: 408, height: 660, label: 'Pocket (4.25x6.87")' },
+const FORMATS: Record<TrimFormat, { width: number; height: number; label: string; printLabel: string }> = {
+  a4: { width: 794, height: 1123, label: 'A4 (210x297mm)', printLabel: 'A4 Standard' },
+  letter: { width: 816, height: 1056, label: 'US Letter (8.5x11")', printLabel: 'US Letter' },
+  trade: { width: 576, height: 864, label: 'Trade (6x9")', printLabel: 'Digest 6" x 9"' },
+  pocket: { width: 408, height: 660, label: 'Pocket (4.25x6.87")', printLabel: 'Pocket Novel' },
 };
 
-const DEFAULT_LAYOUT: PageLayout = {
+const DEFAULT_LAYOUT: PageLayout & { columns?: number; paperStyle?: 'warm' | 'white' | 'dark' | 'kraft' } = {
   marginTop: 48,
   marginBottom: 48,
   marginLeft: 48,
@@ -29,55 +64,74 @@ const DEFAULT_LAYOUT: PageLayout = {
   format: 'a4',
   fontSize: 16,
   lineHeight: 1.6,
+  columns: 1,
+  paperStyle: 'warm',
 };
 
-const PAGE_GAP = 40; // Gap between pages in the viewer
+const PAGE_GAP = 40; // Gap between sheets on canvas
 
-export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: TypesetLayoutEditorProps) {
-  const { t } = useTranslation();
-  const [layout, setLayout] = useState<PageLayout>({ ...DEFAULT_LAYOUT, ...chapter.layout });
+export function TypesetLayoutEditor({ 
+  chapter, 
+  content, 
+  onContentChange, 
+  onUpdateChapter,
+  isGeneratingContent = false,
+  isGeneratingImage = false,
+  isProofreading = false,
+  onGenerateContent,
+  onGenerateImageOfPrompt,
+  onProofreadText,
+  isChatOpen = false,
+  onToggleChat,
+}: TypesetLayoutEditorProps) {
+  const { t, i18n } = useTranslation();
+  
+  // Workspace modes: 
+  // 'story' = Left-side Markdown editor only
+  // 'split' = Side-by-side editing and paginated canvas layout (Default / Professional)
+  // 'dtp' = Right-side paginated canvas layout only
+  const [workspaceMode, setWorkspaceMode] = useState<'story' | 'split' | 'dtp'>('split');
+  
+  // Load settings
+  const [layout, setLayout] = useState<PageLayout & { columns?: number; paperStyle?: 'warm' | 'white' | 'dark' | 'kraft' }>(() => {
+    return { ...DEFAULT_LAYOUT, ...chapter.layout };
+  });
   const [floatingImages, setFloatingImages] = useState<FloatingImage[]>(chapter.floatingImages || []);
-  const [zoom, setZoom] = useState(0.8);
+  const [zoom, setZoom] = useState(0.75);
   const [pageCount, setPageCount] = useState(1);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [showGuides, setShowGuides] = useState(true);
+  const [activeAssetTab, setActiveAssetTab] = useState<'details' | 'assets'>('details');
+  
+  // Direct Block Editing Overlay state
+  const [editingBlock, setEditingBlock] = useState<{ index: number; text: string } | null>(null);
   
   const textContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
+  const storyEditorTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const formatData = FORMATS[layout.format || 'a4'];
+  const columnsCount = layout.columns || 1;
+  const paperStyle = layout.paperStyle || 'warm';
 
-  useEffect(() => {
-    // Expose API for devtools / AI
-    (window as any).__addFloatingImage = (url: string, width: number = 200, height: number = 200) => {
-      const newImg: FloatingImage = {
-        id: uuidv4(),
-        url,
-        x: 100,
-        y: 100,
-        width,
-        height,
-        opacity: 1,
-        borderRadius: 0,
-        shadow: 'none',
-        objectFit: 'cover',
-        blendMode: 'normal',
-        layoutMode: 'wrap-left',
-        paragraphIndex: 0,
-      };
-      setFloatingImages(prev => [...prev, newImg]);
-      setSelectedImageId(newImg.id);
-    };
-    return () => {
-      delete (window as any).__addFloatingImage;
-    };
-  }, []);
+  // Paper styling sheets classes
+  const paperClasses = {
+    warm: 'bg-[#faf6ee] text-[#1c1917] border-amber-900/10',
+    white: 'bg-white text-zinc-900 border-zinc-200',
+    dark: 'bg-[#18181b] text-zinc-100 border-zinc-800',
+    kraft: 'bg-[#e6d0a7] text-[#2c1d11] border-amber-800/20'
+  };
 
+  const currentLanguage = i18n.language || 'zh';
+
+  // Keep internal states in sync with props changes
   useEffect(() => {
     setLayout({ ...DEFAULT_LAYOUT, ...chapter.layout });
     setFloatingImages(chapter.floatingImages || []);
   }, [chapter.id]);
 
+  // Synchronize layout & images changes automatically back to chapter DB with debounce
   useEffect(() => {
     const timeout = setTimeout(async () => {
       const isLayoutEqual = JSON.stringify(layout) === JSON.stringify({ ...DEFAULT_LAYOUT, ...chapter.layout });
@@ -93,12 +147,12 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
         await db.saveChapter(updatedChapter);
         onUpdateChapter(updatedChapter);
       }
-    }, 1000);
+    }, 1200);
 
     return () => clearTimeout(timeout);
   }, [layout, floatingImages, chapter, onUpdateChapter]);
 
-  // Calculate page count based on scroll width of the column container
+  // Calculate live multi-column page counts based on text wrapper container scroll dimensions
   useEffect(() => {
     const updatePageCount = () => {
       if (textContainerRef.current) {
@@ -109,8 +163,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
       }
     };
 
-    // Delay calculation slightly to allow fonts/styles to apply
-    const timeout = setTimeout(updatePageCount, 100);
+    const timeout = setTimeout(updatePageCount, 250);
     const observer = new ResizeObserver(updatePageCount);
     
     if (textContainerRef.current) {
@@ -121,8 +174,9 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
       clearTimeout(timeout);
       observer.disconnect();
     };
-  }, [content, layout, formatData.width]);
+  }, [content, layout, formatData.width, floatingImages]);
 
+  // Add dropped images to virtual workspace and anchor them near the closest text paragraph
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
@@ -130,68 +184,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
       const reader = new FileReader();
       reader.onload = (event) => {
         const url = event.target?.result as string;
-        
-        let dropX = 100;
-        let dropY = 100;
-        let paragraphIndex = 0;
-
-        if (workspaceRef.current) {
-          const rect = workspaceRef.current.getBoundingClientRect();
-          const targetX = e.clientX - rect.left;
-          const targetY = e.clientY - rect.top;
-          
-          dropX = (targetX + workspaceRef.current.scrollLeft) / zoom - 100;
-          dropY = (targetY + workspaceRef.current.scrollTop) / zoom - 100;
-        }
-
-        const dropTarget = document.elementFromPoint(e.clientX, e.clientY);
-        if (textContainerRef.current) {
-          const allParagraphs = Array.from(textContainerRef.current.querySelectorAll('p, h1, h2, h3, h4, ul, ol, blockquote'));
-          let closestP = dropTarget ? dropTarget.closest('p, h1, h2, h3, h4, ul, ol, blockquote') : null;
-          
-          if (!closestP) {
-            let minDist = Infinity;
-            for (const el of allParagraphs) {
-              const rects = el.getClientRects();
-              for (let i=0; i<rects.length; i++) {
-                const rect = rects[i];
-                if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                  closestP = el;
-                  break;
-                }
-                const dist = Math.sqrt(Math.pow(e.clientX - (rect.left + rect.width/2), 2) + Math.pow(e.clientY - (rect.top + rect.height/2), 2));
-                if (dist < minDist) {
-                  minDist = dist;
-                  closestP = el;
-                }
-              }
-              if (closestP && minDist === 0) break;
-            }
-          }
-
-          if (closestP) {
-            paragraphIndex = allParagraphs.indexOf(closestP as Element);
-            if (paragraphIndex === -1) paragraphIndex = 0;
-          }
-        }
-
-        const newImg: FloatingImage = {
-          id: uuidv4(),
-          url,
-          x: Math.max(0, dropX),
-          y: Math.max(0, dropY),
-          width: 200,
-          height: 200,
-          opacity: 1,
-          borderRadius: 0,
-          shadow: 'none',
-          objectFit: 'cover',
-          blendMode: 'normal',
-          layoutMode: 'wrap-left',
-          paragraphIndex: paragraphIndex,
-        };
-        setFloatingImages(prev => [...prev, newImg]);
-        setSelectedImageId(newImg.id);
+        insertNewFloatingImage(url);
       };
       reader.readAsDataURL(file);
     }
@@ -202,8 +195,31 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
     e.dataTransfer.dropEffect = 'copy';
   };
 
-  const handleLayoutChange = (key: keyof PageLayout, value: string | number) => {
+  const handleLayoutChange = (key: keyof PageLayout | 'columns' | 'paperStyle', value: any) => {
     setLayout(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Safe insertion of a new floating layout image attached to block flow
+  const insertNewFloatingImage = (url: string) => {
+    const newImg: FloatingImage = {
+      id: uuidv4(),
+      url,
+      x: 30,
+      y: 60,
+      width: 280,
+      height: 200,
+      opacity: 1,
+      borderRadius: 8,
+      shadow: 'md',
+      objectFit: 'cover',
+      blendMode: 'normal',
+      layoutMode: 'wrap-left', // Floats left of text as default wrapped
+      paragraphIndex: 1,      // Anchored to paragraph block #1
+    };
+    setFloatingImages(prev => [...prev, newImg]);
+    setSelectedImageId(newImg.id);
+    setActiveAssetTab('details');
+    toast.success(currentLanguage === 'zh' ? '已向排版版面中添加插图' : 'Image placed onto layout canvas');
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,564 +229,1062 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
     const reader = new FileReader();
     reader.onload = (event) => {
       const url = event.target?.result as string;
-      const newImg: FloatingImage = {
-        id: uuidv4(),
-        url,
-        x: 100,
-        y: 100,
-        width: 200,
-        height: 200,
-        opacity: 1,
-        borderRadius: 0,
-        shadow: 'none',
-        objectFit: 'cover',
-        blendMode: 'normal',
-        layoutMode: 'wrap-left',
-        paragraphIndex: 0,
-      };
-      setFloatingImages(prev => [...prev, newImg]);
-      setSelectedImageId(newImg.id);
+      insertNewFloatingImage(url);
     };
     reader.readAsDataURL(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const saveLayout = async () => {
-    const updatedChapter = { 
-      ...chapter, 
-      layout, 
-      floatingImages,
-      updatedAt: Date.now()
-    };
-    await db.saveChapter(updatedChapter);
-    onUpdateChapter(updatedChapter);
-    toast.success(t('saved'));
+  // Triggers modern AI Generation inside layout frame
+  const triggerToolbarAIGene = async () => {
+    if (!onGenerateImageOfPrompt) return;
+    const promptText = window.prompt(currentLanguage === 'zh' ? '请输入 AI 插图描述气泡：' : 'Enter AI illustration prompt:');
+    if (!promptText) return;
+
+    const toastId = toast.loading(currentLanguage === 'zh' ? '正在渲染高保真插图...' : 'Generating image masterpiece...');
+    try {
+      const url = await onGenerateImageOfPrompt(promptText);
+      if (url) {
+        insertNewFloatingImage(url);
+        toast.dismiss(toastId);
+      } else {
+        toast.error(currentLanguage === 'zh' ? '无法生成图像，请检查服务端。' : 'Unable to generate imagery', { id: toastId });
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Error', { id: toastId });
+    }
+  };
+
+  // Double click block on canvas opens block-focused editor overlay immediately
+  const handleCanvasBlockDoubleClick = (idx: number, currentText: string) => {
+    // Locate block text
+    const paragraphs = content.split(/\n\n+/);
+    if (idx >= 0 && idx < paragraphs.length) {
+      setEditingBlock({
+        index: idx,
+        text: paragraphs[idx]
+      });
+    }
+  };
+
+  // Slices updated block content back into whole Markdown source stream elegantly
+  const saveEditingBlockChanges = () => {
+    if (!editingBlock) return;
+    const paragraphs = content.split(/\n\n+/);
+    if (editingBlock.index >= 0 && editingBlock.index < paragraphs.length) {
+      paragraphs[editingBlock.index] = editingBlock.text;
+      const joined = paragraphs.join('\n\n');
+      onContentChange(joined);
+      setEditingBlock(null);
+      toast.success(currentLanguage === 'zh' ? '在版段落内容已就地更新' : 'Canvas paragraph edited');
+    }
+  };
+
+  // Helper stats
+  const wordCount = content ? content.trim().length : 0;
+  const paragraphCount = content ? content.split(/\n\n+/).filter(Boolean).length : 0;
+
+  // Sync scrolling or line highlight feedback: Click index highlights equivalent section in story editor
+  const highlightInStoryPlaceholder = (idx: number) => {
+    if (storyEditorTextareaRef.current) {
+      const value = storyEditorTextareaRef.current.value;
+      const paragraphs = value.split(/\n\n+/);
+      let charOffset = 0;
+      for (let i = 0; i < idx && i < paragraphs.length; i++) {
+        charOffset += paragraphs[i].length + 2; // account for newlines
+      }
+      
+      storyEditorTextareaRef.current.focus();
+      storyEditorTextareaRef.current.setSelectionRange(charOffset, charOffset + (paragraphs[idx]?.length || 0));
+      storyEditorTextareaRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      toast.info(currentLanguage === 'zh' ? `已在故事编辑器中定位到第 #${idx} 段` : `Focused text segment #${idx}`);
+    }
   };
 
   return (
-    <div className="flex flex-row relative w-full h-full bg-zinc-100 dark:bg-zinc-950 overflow-hidden">
-      {/* Main Designer Area */}
-      <div className="flex flex-col flex-1 relative overflow-hidden">
-        {/* Typeset Toolbar */}
-        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <LayoutTemplate className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
-              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Web Typesetter
-              </span>
+    <div className="flex flex-row relative w-full h-full bg-zinc-100 dark:bg-zinc-950 overflow-hidden select-none">
+      {/* Central Interactive Panels */}
+      <div className="flex flex-col flex-1 relative overflow-hidden h-full">
+        {/* Top Professional Adobe Toolbar */}
+        <div className="h-14 border-b border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0 select-none shadow-sm">
+          {/* Main workspace widgets */}
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-850 rounded-md text-xs font-serif font-semibold text-zinc-800 dark:text-zinc-200 select-none">
+              <LayoutTemplate className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <span>DTP Desk</span>
+            </span>
+
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
+
+            {/* Split, Story & Layout segment toggle */}
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 text-xs shrink-0 font-medium">
+              <button
+                onClick={() => setWorkspaceMode('story')}
+                className={cn(
+                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1",
+                  workspaceMode === 'story'
+                    ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                )}
+                title={currentLanguage === 'zh' ? '文本故事编辑器' : 'Story Editor Mode'}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{currentLanguage === 'zh' ? '文本编辑' : 'Story'}</span>
+              </button>
+              
+              <button
+                onClick={() => setWorkspaceMode('split')}
+                className={cn(
+                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1",
+                  workspaceMode === 'split'
+                    ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                )}
+                title={currentLanguage === 'zh' ? '左右分栏双模式：编辑+实时排版' : 'Interlocking Editorial Workspace'}
+              >
+                <Columns className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{currentLanguage === 'zh' ? '同步双功' : 'Live Split'}</span>
+              </button>
+
+              <button
+                onClick={() => setWorkspaceMode('dtp')}
+                className={cn(
+                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1",
+                  workspaceMode === 'dtp'
+                    ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                )}
+                title={currentLanguage === 'zh' ? '专业版页设计面' : 'Focused Canvas Typesetting'}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{currentLanguage === 'zh' ? '版面设计' : 'Layout'}</span>
+              </button>
             </div>
-            
-            <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
-            
-            <span className="text-xs text-zinc-500 hidden sm:block">
-              <span>{`${formatData.label} • ${pageCount} ${pageCount === 1 ? 'Page' : 'Pages'}`}</span>
+
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden md:block"></div>
+
+            {/* Layout specifications metadata labels */}
+            <span className="text-[11px] font-mono text-zinc-400 hidden xl:inline-block bg-zinc-50 dark:bg-zinc-950 px-2 py-1 rounded border border-zinc-200/50 dark:border-zinc-800/50">
+              {formatData.printLabel} • {columnsCount} Col{columnsCount > 1 && 's'} • {pageCount}p • {wordCount} Words
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Zoom Controls */}
-            <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-md p-1 mr-2">
+            {/* Guide Lines Toggle (Letter press preview mode) */}
+            <button
+              onClick={() => setShowGuides(!showGuides)}
+              className={cn(
+                "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0",
+                showGuides ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              )}
+              title={showGuides ? (currentLanguage === 'zh' ? '隐藏印刷参考网格线 (W)' : 'Hide Bleed & Alignment Guides') : (currentLanguage === 'zh' ? '显示印刷参考网格线 (W)' : 'Show Grid and Bleed Guides')}
+            >
+              <Grid className="w-4 h-4" />
+            </button>
+
+            {/* Quick Desk Zooms */}
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-850 rounded-lg p-0.5 text-xs">
               <button 
-                onClick={() => setZoom(z => Math.max(0.2, z - 0.1))}
-                className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
+                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                title={currentLanguage === 'zh' ? '外延缩小' : 'Zoom Out'}
               >
-                <ZoomOut className="w-4 h-4" />
+                <ZoomOut className="w-3.5 h-3.5" />
               </button>
-              <span className="text-xs w-10 text-center font-medium text-zinc-600 dark:text-zinc-300">
+              <span className="w-10 text-center font-semibold text-zinc-600 dark:text-zinc-300 font-mono text-[10px]">
                 {Math.round(zoom * 100)}%
               </span>
               <button 
-                onClick={() => setZoom(z => Math.min(2, z + 0.1))}
-                className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
+                onClick={() => setZoom(z => Math.min(2.0, z + 0.1))}
+                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                title={currentLanguage === 'zh' ? '内向放大' : 'Zoom In'}
               >
-                <ZoomIn className="w-4 h-4" />
+                <ZoomIn className="w-3.5 h-3.5" />
               </button>
             </div>
 
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
+
+            {/* Local Desk Asset inserter */}
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md transition-colors text-zinc-700 dark:text-zinc-200"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-250 rounded-lg transition-all"
+              title={currentLanguage === 'zh' ? '添加排版本地照片' : 'Add custom image file'}
             >
-              <ImagePlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Image</span>
+              <ImagePlus className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="hidden md:inline">{currentLanguage === 'zh' ? '置入插图' : 'Place Pic'}</span>
             </button>
             <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
-            
-            <button
-              onClick={saveLayout}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              <span className="hidden sm:inline">{t('save')}</span>
-            </button>
+
+            {/* Live AI insert */}
+            {onGenerateImageOfPrompt && (
+              <button
+                onClick={triggerToolbarAIGene}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold bg-zinc-100 hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:text-emerald-700 dark:bg-zinc-800 dark:text-zinc-200 rounded-lg transition-all"
+                title={currentLanguage === 'zh' ? '使用 AI 生成并直接置入' : 'AI Generate and insert directly'}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-[#a855f7]" />
+                <span className="hidden lg:inline">AI Place</span>
+              </button>
+            )}
+
+            {/* Chat side drawer button */}
+            {onToggleChat && (
+              <button
+                onClick={onToggleChat}
+                className={cn(
+                  "p-1.5 rounded-lg text-zinc-500 transition-colors shrink-0",
+                  isChatOpen ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40" : "hover:bg-zinc-105"
+                )}
+                title={currentLanguage === 'zh' ? '呼出 AI 写作助手侧板' : 'Call AI Assistant Drawer'}
+              >
+                <MessageSquare className="w-4 h-4 text-emerald-500" />
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Virtual Desktop Workspace */}
-        <div 
-          ref={workspaceRef}
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onClick={() => setSelectedImageId(null)}
-          className="flex-1 overflow-auto bg-zinc-200/50 dark:bg-black/40 p-8 flex isolate relative" 
-          style={{ alignContent: 'center' }}
-        >
-          <div 
-            className="relative transition-transform origin-top-left mx-auto"
-            style={{ 
-              transform: `scale(${zoom})`,
-              width: formatData.width + (pageCount - 1) * (formatData.width + PAGE_GAP), 
-              height: formatData.height 
-            }}
-          >
-            {/* Render virtual page backgrounds */}
-            {Array.from({ length: pageCount }).map((_, i) => (
-              <div 
-                key={i}
-                className="absolute bg-white dark:bg-zinc-900 shadow-xl ring-1 ring-black/5 dark:ring-white/10"
-                style={{
-                  top: 0,
-                  left: i * (formatData.width + PAGE_GAP),
-                  width: formatData.width,
-                  height: formatData.height,
-                }}
-              >
-                {/* Optional: Render Margin Guides */}
-                <div 
-                  className="absolute border border-blue-500/10 dark:border-blue-400/10 pointer-events-none"
-                  style={{
-                    top: layout.marginTop,
-                    bottom: layout.marginBottom,
-                    left: layout.marginLeft,
-                    right: layout.marginRight,
-                  }}
+        {/* Workspace Dual Area Wrapper */}
+        <div className="flex-1 flex flex-row overflow-hidden relative bg-[#121214] border-t border-zinc-250 dark:border-zinc-800">
+          
+          {/* 1. STORY MODE WRITER (Markdown panel) */}
+          {(workspaceMode === 'story' || workspaceMode === 'split') && (
+            <div 
+              className={cn(
+                "h-full overflow-hidden flex flex-col bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 transition-all duration-300 select-text",
+                workspaceMode === 'story' ? "w-full" : "w-1/2"
+              )}
+            >
+              {/* Writer Header */}
+              <div className="h-10 border-b border-zinc-150 dark:border-zinc-850 px-4 bg-zinc-50 dark:bg-zinc-950/45 flex items-center justify-between text-xs text-zinc-400 shrink-0">
+                <span className="font-serif font-medium text-zinc-700 dark:text-zinc-300">
+                  {currentLanguage === 'zh' ? '📝 故事原稿流编辑器（支援 Markdown）' : '📝 Chapter Story Editor (Markdown Source)'}
+                </span>
+                <span className="font-mono bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 p-1 rounded">
+                  {paragraphCount} Blocks • {wordCount} Chars
+                </span>
+              </div>
+
+              {/* Textarea container */}
+              <div className="flex-1 relative overflow-y-auto p-4 md:p-6 lg:p-10 select-text">
+                <textarea
+                  ref={storyEditorTextareaRef}
+                  value={content}
+                  onChange={(e) => onContentChange(e.target.value)}
+                  placeholder={currentLanguage === 'zh' ? '在此处撰写或粘贴 Markdown 章节草稿，变化将实时同步并流向右侧排版页...' : 'Draft chapter text in Markdown. Real-time paginated layout flows on the right sheet...'}
+                  className="w-full h-full min-h-[70vh] bg-transparent border-none outline-none resize-none font-sans text-base leading-relaxed text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 outline-none p-0 focus:ring-0 select-text"
                 />
-                <div 
-                  className="absolute w-full text-center text-xs text-zinc-400 font-serif select-none pointer-events-none"
-                  style={{
-                    bottom: Math.max(10, layout.marginBottom / 2 - 8),
-                  }}
-                >
-                  {i + 1}
+                
+                {isGeneratingContent && (
+                  <div className="absolute inset-0 bg-white/70 dark:bg-zinc-950/70 flex flex-col items-center justify-center p-6 space-y-3">
+                    <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+                    <p className="text-sm font-semibold text-zinc-650 animate-pulse">
+                      {currentLanguage === 'zh' ? 'AI 正在极速构起原稿文章流...' : 'AI writer composition engine working...'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Story Prompt Toolbar Bar */}
+              {onGenerateContent && (
+                <div className="p-3 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/45 flex items-center justify-between shrink-0">
+                  <div className="text-xs text-zinc-400 font-serif">
+                    {currentLanguage === 'zh' ? '💡 双击右侧的版面段落，即可就地修改或校稿哦！' : 'Double-click any paragraph on layout sheets to quick edit inline!'}
+                  </div>
+                  <button
+                    onClick={onGenerateContent}
+                    className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-xs font-semibold shadow-sm transition-colors"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{currentLanguage === 'zh' ? '生成章节初稿' : 'Generate Chapter Story'}</span>
+                  </button>
                 </div>
-              </div>
-            ))}
-
-            {/* Text Layer (Multi-column pagination) */}
-            <div 
-              ref={textContainerRef}
-              className="absolute top-0 left-0 h-full w-max text-zinc-900 dark:text-zinc-100"
-              style={{
-                columnWidth: formatData.width,
-                columnGap: PAGE_GAP,
-                columnFill: 'auto',
-                paddingTop: layout.marginTop,
-                paddingBottom: layout.marginBottom,
-              }}
-            >
-              <div 
-                style={{
-                  width: formatData.width - layout.marginLeft - layout.marginRight,
-                  marginLeft: layout.marginLeft,
-                  marginRight: layout.marginRight,
-                  fontSize: layout.fontSize,
-                  lineHeight: layout.lineHeight,
-                }}
-                className="prose prose-zinc dark:prose-invert font-serif max-w-none"
-              >
-                <MarkdownRenderer 
-                  floatingImages={floatingImages}
-                  selectedImageId={selectedImageId}
-                  onImageClick={setSelectedImageId}
-                >
-                  {content || `*${t('no_content_yet')}*`}
-                </MarkdownRenderer>
-              </div>
+              )}
             </div>
+          )}
 
-            {/* Floating Object Layer */}
+          {/* 2. LIVE DTP PAGINATED CANVAS PANEL */}
+          {(workspaceMode === 'dtp' || workspaceMode === 'split') && (
             <div 
-              className="absolute top-0 left-0 w-full h-full pointer-events-none"
+              ref={workspaceRef}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onClick={() => setSelectedImageId(null)}
+              className={cn(
+                "h-full overflow-auto bg-[#1a1a1e] p-8 flex isolate relative select-none justify-center items-start custom-scroll-dtp",
+                workspaceMode === 'dtp' ? "w-full" : "w-1/2"
+              )}
             >
-              {floatingImages.filter(img => !img.layoutMode || img.layoutMode === 'absolute').map((img, i) => (
-                <Rnd
-                  key={img.id}
-                  default={{
-                    x: img.x,
-                    y: img.y,
-                    width: img.width,
-                    height: img.height,
-                  }}
-                  bounds="parent"
+              {/* Virtual DTP Drawing board frame - styled with standard desktop backing */}
+              <div 
+                className="relative transition-transform origin-top-left mx-auto my-6"
+                style={{ 
+                  transform: `scale(${zoom})`,
+                  width: formatData.width + (pageCount - 1) * (formatData.width + PAGE_GAP), 
+                  height: formatData.height 
+                }}
+              >
+                {/* Virtual A4 or Trade sheets behind the typesetting columns */}
+                {Array.from({ length: pageCount }).map((_, i) => (
+                  <div 
+                    key={i}
+                    className={cn(
+                      "absolute shadow-2xl transition-colors duration-450 border flex flex-col",
+                      paperClasses[paperStyle]
+                    )}
+                    style={{
+                      top: 0,
+                      left: i * (formatData.width + PAGE_GAP),
+                      width: formatData.width,
+                      height: formatData.height,
+                    }}
+                  >
+                    {/* Visual Bleed Guides & Margins lines typically found in Adobe InDesign */}
+                    {showGuides && (
+                      <>
+                        {/* Trim margin board bounds overlay */}
+                        <div 
+                          className="absolute border border-blue-400/25 dark:border-blue-500/20 pointer-events-none"
+                          style={{
+                            top: layout.marginTop,
+                            bottom: layout.marginBottom,
+                            left: layout.marginLeft,
+                            right: layout.marginRight,
+                          }}
+                        />
+                        {/* Bleed outline card corners */}
+                        <div className="absolute -top-3 -left-3 w-6 h-px bg-red-400/55 pointer-events-none"></div>
+                        <div className="absolute -top-3 -left-3 w-px h-6 bg-red-400/55 pointer-events-none"></div>
+                        <div className="absolute -bottom-3 -right-3 w-6 h-px bg-red-400/55 pointer-events-none"></div>
+                        <div className="absolute -bottom-3 -right-3 w-px h-6 bg-red-400/55 pointer-events-none"></div>
+                      </>
+                    )}
+
+                    {/* Auto layout page counters */}
+                    <div 
+                      className="absolute w-full text-center font-serif text-[11px] tracking-widest uppercase opacity-45 pointer-events-none select-none"
+                      style={{
+                        bottom: Math.max(12, layout.marginBottom / 2.2),
+                      }}
+                    >
+                      {i + 1}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Main multi-column content pagination flow. Uses CSS multi-column for fully integrated live reflow */}
+                <div 
+                  ref={textContainerRef}
                   className={cn(
-                    "group float-rnd pointer-events-auto",
-                    selectedImageId === img.id ? "z-20 ring-2 ring-emerald-500 ring-offset-1" : "z-10"
+                    "absolute top-0 left-0 h-full w-max cursor-text select-text",
+                    paperStyle === 'dark' ? 'text-zinc-100' : 'text-zinc-900'
                   )}
-                  onDragStart={() => setSelectedImageId(img.id)}
-                  onDragStop={(e, d) => {
-                    const newImgs = [...floatingImages];
-                    newImgs[i] = { ...img, x: d.x, y: d.y };
-                    setFloatingImages(newImgs);
-                  }}
-                  onResizeStart={() => setSelectedImageId(img.id)}
-                  onResizeStop={(e, direction, ref, delta, position) => {
-                    const newImgs = [...floatingImages];
-                    newImgs[i] = {
-                      ...img,
-                      width: parseInt(ref.style.width, 10),
-                      height: parseInt(ref.style.height, 10),
-                      ...position
-                    };
-                    setFloatingImages(newImgs);
+                  style={{
+                    columnWidth: formatData.width,
+                    columnGap: `${PAGE_GAP}px`,
+                    columnFill: 'auto',
+                    paddingTop: layout.marginTop,
+                    paddingBottom: layout.marginBottom,
+                    width: formatData.width + (pageCount - 1) * (formatData.width + PAGE_GAP),
                   }}
                 >
                   <div 
-                    className="relative w-full h-full border border-transparent hover:border-emerald-500/50 transition-colors bg-black/5"
                     style={{
-                      opacity: img.opacity ?? 1,
-                      mixBlendMode: (img.blendMode as any) || 'normal',
-                      borderRadius: img.borderRadius ?? 0,
-                      boxShadow: img.shadow === 'sm' ? '0 1px 2px 0 rgb(0 0 0 / 0.05)' :
-                                 img.shadow === 'md' ? '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' :
-                                 img.shadow === 'lg' ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' :
-                                 img.shadow === 'xl' ? '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)' : 'none',
-                      overflow: 'hidden'
+                      width: formatData.width - layout.marginLeft - layout.marginRight,
+                      marginLeft: layout.marginLeft,
+                      marginRight: layout.marginRight,
+                      fontSize: `${layout.fontSize || 16}px`,
+                      lineHeight: layout.lineHeight || 1.6,
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedImageId(img.id);
-                    }}
+                    className={cn(
+                      "prose max-w-none text-justify",
+                      paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
+                      // Inject professional font pairing options matching classical book editions
+                      "font-serif font-normal"
+                    )}
                   >
-                    <img src={img.url} className="w-full h-full pointer-events-none" style={{ objectFit: (img.objectFit as any) || 'cover' }} alt="" />
-                    {selectedImageId === img.id && (
-                      <button
+                    <MarkdownRenderer 
+                      floatingImages={floatingImages}
+                      selectedImageId={selectedImageId}
+                      onImageClick={setSelectedImageId}
+                      showBlockIndices={true}
+                    >
+                      {content || ''}
+                    </MarkdownRenderer>
+                  </div>
+                </div>
+
+                {/* Direct Canvas Double-Click Detection Cover overlay */}
+                {/* Installs click tracking to map point to Markdown text line index for professional linking */}
+                <div 
+                  className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                >
+                  {Array.from({ length: pageCount }).map((_, pageIdx) => {
+                    const pageLeftOffset = pageIdx * (formatData.width + PAGE_GAP);
+                    
+                    return (
+                      <div
+                        key={pageIdx}
+                        className="absolute pointer-events-auto"
+                        style={{
+                          top: layout.marginTop,
+                          left: pageLeftOffset + layout.marginLeft,
+                          width: formatData.width - layout.marginLeft - layout.marginRight,
+                          height: formatData.height - layout.marginTop - layout.marginBottom,
+                        }}
+                        onDoubleClick={(e) => {
+                          // Standard DTP logic: detect the paragraph block elements that were double-clicked
+                          // To trigger quick inline editor
+                          const target = e.target as HTMLElement;
+                          const blockEl = target.closest('p, h1, h2, h3, h4, ul, ol, blockquote');
+                          if (blockEl) {
+                            const blocks = Array.from(textContainerRef.current?.querySelectorAll('p, h1, h2, h3, h4, ul, ol, blockquote') || []);
+                            const idx = blocks.indexOf(blockEl);
+                            if (idx !== -1) {
+                              const blockText = blockEl.textContent || '';
+                              handleCanvasBlockDoubleClick(idx, blockText);
+                            }
+                          }
+                        }}
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          const blockEl = target.closest('p, h1, h2, h3, h4, ul, ol, blockquote');
+                          if (blockEl) {
+                            const blocks = Array.from(textContainerRef.current?.querySelectorAll('p, h1, h2, h3, h4, ul, ol, blockquote') || []);
+                            const idx = blocks.indexOf(blockEl);
+                            if (idx !== -1) {
+                              highlightInStoryPlaceholder(idx);
+                            }
+                          }
+                        }}
+                        title={currentLanguage === 'zh' ? "💡 双击就地修改文字，单击可在 Markdown 中定位聚焦" : "💡 Double-click to edit inline, click to focus in Markdown Editor"}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* Floating Absolute Images Layer - users can drag these freely inside pages bounds */}
+                <div 
+                  className="absolute top-0 left-0 w-full h-full pointer-events-none z-10"
+                >
+                  {floatingImages.filter(img => !img.layoutMode || img.layoutMode === 'absolute').map((img, idx) => (
+                    <Rnd
+                      key={img.id}
+                      size={{ width: img.width, height: img.height }}
+                      position={{ x: img.x, y: img.y }}
+                      bounds="parent"
+                      className={cn(
+                        "group pointer-events-auto",
+                        selectedImageId === img.id ? "z-30 ring-2 ring-emerald-500 ring-offset-2 scale-[1.01]" : "z-20 hover:scale-[1.005]"
+                      )}
+                      onDragStart={() => setSelectedImageId(img.id)}
+                      onDragStop={(e, d) => {
+                        setFloatingImages(prev => prev.map(f => f.id === img.id ? { ...f, x: d.x, y: d.y } : f));
+                      }}
+                      onResizeStart={() => setSelectedImageId(img.id)}
+                      onResizeStop={(e, direction, ref, delta, position) => {
+                        setFloatingImages(prev => prev.map(f => f.id === img.id ? { 
+                          ...f, 
+                          width: parseInt(ref.style.width, 10), 
+                          height: parseInt(ref.style.height, 10),
+                          ...position 
+                        } : f));
+                      }}
+                    >
+                      <div 
+                        className="relative w-full h-full group"
+                        style={{
+                          opacity: img.opacity ?? 1,
+                          mixBlendMode: (img.blendMode as any) || 'normal',
+                          borderRadius: `${img.borderRadius ?? 8}px`,
+                          overflow: 'hidden'
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setFloatingImages(floatingImages.filter(f => f.id !== img.id));
-                          setSelectedImageId(null);
+                          setSelectedImageId(img.id);
                         }}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 shadow-md z-30"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                      </button>
-                    )}
-                  </div>
-                </Rnd>
-              ))}
+                        <img 
+                          src={img.url} 
+                          className="w-full h-full pointer-events-none select-none" 
+                          referrerPolicy="no-referrer"
+                          style={{ objectFit: (img.objectFit as any) || 'cover' }} 
+                        />
+                        {/* Bleed guid corners */}
+                        {showGuides && (
+                          <div className="absolute inset-0 border border-emerald-400/50 pointer-events-none"></div>
+                        )}
+                      </div>
+                    </Rnd>
+                  ))}
+                </div>
+
+              </div>
             </div>
-          </div>
+          )}
+
         </div>
       </div>
 
-      {/* Right Properties Sidebar */}
-      <div className="w-72 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 h-full overflow-y-auto">
-        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-5 shrink-0 bg-zinc-50 dark:bg-zinc-950/50">
-          {selectedImageId ? (
-            <>
-              <ImagePlus className="w-4 h-4 text-emerald-600 mr-2" />
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Image Properties</h3>
-            </>
-          ) : (
-            <>
-              <Settings className="w-4 h-4 text-zinc-500 mr-2" />
-              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Layout Properties</h3>
-            </>
-          )}
-        </div>
+      {/* Right properties workspace sidebar */}
+      <div className="w-80 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 h-full overflow-hidden shadow-xl z-20">
         
-        <div className="p-5 space-y-8">
-          {selectedImageId ? (() => {
-            const img = floatingImages.find(f => f.id === selectedImageId);
-            if (!img) return null;
-            
-            const updateImg = (updates: Partial<FloatingImage>) => {
-              setFloatingImages(prev => prev.map(f => f.id === img.id ? { ...f, ...updates } : f));
-            };
+        {/* Properties Selector Header Tabs */}
+        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center bg-zinc-50 dark:bg-zinc-950/50 p-2 gap-1 shrink-0">
+          <button
+            onClick={() => setActiveAssetTab('details')}
+            className={cn(
+              "flex-1 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5",
+              activeAssetTab === 'details'
+                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm border border-zinc-200/50 dark:border-zinc-750"
+                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+            )}
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>{selectedImageId ? (currentLanguage === 'zh' ? '照片属性' : 'Image Properties') : (currentLanguage === 'zh' ? '版面样式' : 'Layout Properties')}</span>
+          </button>
+          
+          <button
+            onClick={() => setActiveAssetTab('assets')}
+            className={cn(
+              "flex-1 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5",
+              activeAssetTab === 'assets'
+                ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm border border-zinc-200/50 dark:border-zinc-750"
+                : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+            )}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>{currentLanguage === 'zh' ? '插图媒介库' : 'Asset shelf'}</span>
+          </button>
+        </div>
 
-            return (
-              <div className="space-y-6">
-                <div>
-                   <label className="text-xs font-medium text-zinc-500 block mb-1.5">Size & Position (px)</label>
-                   <div className="grid grid-cols-2 gap-2 text-sm text-zinc-700 dark:text-zinc-300">
-                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded flex items-center">
-                       <span className="text-zinc-400 mr-2">W</span>
-                       <input 
-                         type="number" 
-                         value={img.width} 
-                         onChange={e => updateImg({ width: Number(e.target.value) })}
-                         className="bg-transparent w-full outline-none"
-                       />
-                     </div>
-                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded flex items-center">
-                       <span className="text-zinc-400 mr-2">H</span>
-                       <input 
-                         type="number" 
-                         value={img.height} 
-                         onChange={e => updateImg({ height: Number(e.target.value) })}
-                         className="bg-transparent w-full outline-none"
-                       />
-                     </div>
-                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">X: {Math.round(img.x)}</div>
-                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">Y: {Math.round(img.y)}</div>
-                   </div>
-                   <p className="text-[10px] text-zinc-400 mt-2">Adjust dimensions manually here or drag edges.</p>
+        <div className="flex-1 overflow-y-auto p-4 space-y-6 select-none">
+          {/* TAB A: DETAILED ATTRIBUTE MODIFIERS */}
+          {activeAssetTab === 'details' ? (
+            selectedImageId ? (() => {
+              const img = floatingImages.find(f => f.id === selectedImageId);
+              if (!img) return null;
+
+              const updateImg = (updates: Partial<FloatingImage>) => {
+                setFloatingImages(prev => prev.map(f => f.id === img.id ? { ...f, ...updates } : f));
+              };
+
+              return (
+                <div className="space-y-5 animate-fade-in">
+                  
+                  {/* Photo dimensions block */}
+                  <div>
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-2">{currentLanguage === 'zh' ? '一、插图尺寸与绝对坐标' : 'Size & Absolute Frame Metrics'}</span>
+                    <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                      <div className="bg-zinc-150 dark:bg-zinc-850 p-2 rounded flex items-center shadow-inner">
+                        <span className="text-zinc-400 mr-1.5 select-none text-[10px]">W:</span>
+                        <input 
+                          type="number"
+                          value={img.width}
+                          onChange={e => updateImg({ width: Math.max(20, Number(e.target.value)) })}
+                          className="bg-transparent w-full outline-none font-bold text-zinc-850 dark:text-zinc-150 focus:ring-0"
+                        />
+                      </div>
+                      
+                      <div className="bg-zinc-150 dark:bg-zinc-850 p-2 rounded flex items-center shadow-inner">
+                        <span className="text-zinc-400 mr-1.5 select-none text-[10px]">H:</span>
+                        <input 
+                          type="number"
+                          value={img.height}
+                          onChange={e => updateImg({ height: Math.max(20, Number(e.target.value)) })}
+                          className="bg-transparent w-full outline-none font-bold text-zinc-850 dark:text-zinc-150 focus:ring-0"
+                        />
+                      </div>
+
+                      <div className="bg-zinc-100 dark:bg-zinc-950 p-2 rounded text-zinc-500">X: {Math.round(img.x)} px</div>
+                      <div className="bg-zinc-100 dark:bg-zinc-950 p-2 rounded text-zinc-500 font-serif">Fixed Card Y: {Math.round(img.y)} px</div>
+                    </div>
+                  </div>
+
+                  <hr className="border-zinc-250 dark:border-zinc-800" />
+
+                  {/* Text Wrapping alignment presets */}
+                  <div>
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-3">{currentLanguage === 'zh' ? '二、对齐与图文绕排模式' : 'Text Wrap & Grid Presets'}</span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[
+                        { id: 'absolute', label: currentLanguage === 'zh' ? '页面绝对浮动' : 'Absolute Stamp', desc: currentLanguage === 'zh' ? '置于文字上方自由拖拽' : 'Stamp over pages' },
+                        { id: 'wrap-left', label: currentLanguage === 'zh' ? '文字环绕靠左' : 'Left Wrap', desc: currentLanguage === 'zh' ? '靠左，文字向右环绕' : 'Align left flow' },
+                        { id: 'wrap-right', label: currentLanguage === 'zh' ? '文字环绕靠右' : 'Right Wrap', desc: currentLanguage === 'zh' ? '靠右，文字向左环绕' : 'Align right flow' },
+                        { id: 'wrap-center', label: currentLanguage === 'zh' ? '中央上下绕排' : 'Centered Wrap', desc: currentLanguage === 'zh' ? '单独居中，防止穿插' : 'Independent block' },
+                        { id: 'full-width', label: currentLanguage === 'zh' ? '通栏铺满列宽' : 'Full Width', desc: currentLanguage === 'zh' ? '适配整个编辑版心' : 'Spans grid' }
+                      ].map(mode => (
+                        <button
+                          key={mode.id}
+                          onClick={() => updateImg({ layoutMode: mode.id as any })}
+                          className={cn(
+                            "text-left p-2 rounded-lg border transition-all duration-150",
+                            (img.layoutMode || 'absolute') === mode.id
+                              ? "bg-emerald-50 border-emerald-550 text-emerald-950 dark:bg-emerald-950/20 dark:border-emerald-500 dark:text-emerald-350"
+                              : "bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-650 hover:border-zinc-300 dark:text-zinc-400"
+                          )}
+                        >
+                          <div className="text-[11px] font-semibold">{mode.label}</div>
+                          <div className="text-[9px] opacity-70 mt-0.5 line-clamp-1">{mode.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {img.layoutMode && img.layoutMode !== 'absolute' && (
+                      <div className="mt-4 p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200/50 dark:border-zinc-850">
+                        <label className="text-[10px] uppercase font-bold text-zinc-405 block mb-1.5">{currentLanguage === 'zh' ? '锚接依附段落编号' : 'Paragraph Anchor Bond'}</label>
+                        <div className="flex items-center gap-1">
+                          <button 
+                            onClick={() => updateImg({ paragraphIndex: Math.max(0, (img.paragraphIndex || 0) - 1) })}
+                            className="p-1 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-250 dark:border-zinc-700 rounded-md text-xs font-semibold hover:bg-zinc-50"
+                          >
+                            Prev
+                          </button>
+                          <input 
+                            type="number"
+                            value={img.paragraphIndex || 0}
+                            onChange={e => updateImg({ paragraphIndex: Math.max(0, Number(e.target.value)) })}
+                            className="w-full text-center text-xs font-mono font-bold bg-transparent outline-none ring-0 border-none"
+                          />
+                          <button 
+                            onClick={() => updateImg({ paragraphIndex: (img.paragraphIndex || 0) + 1 })}
+                            className="p-1 px-2.5 bg-white dark:bg-zinc-800 border border-zinc-250 dark:border-zinc-700 rounded-md text-xs font-semibold hover:bg-zinc-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                        <p className="text-[9px] text-zinc-450 mt-1.5 text-center">
+                          {currentLanguage === 'zh' ? '调整编号可使图像在文档不同段落间上下流转' : 'Slide anchor count to shift illustration sequence'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <hr className="border-zinc-250 dark:border-zinc-800" />
+
+                  {/* Fine Frame details */}
+                  <div className="space-y-4">
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">{currentLanguage === 'zh' ? '三、滤镜混合与相框羽化' : 'Filters, Blending & Opacity'}</span>
+                    
+                    {/* Opacity range slider */}
+                    <div>
+                      <div className="text-[10px] text-zinc-400 flex justify-between font-mono mb-1">
+                        <span>Opacity</span>
+                        <span>{Math.round((img.opacity ?? 1) * 100)}%</span>
+                      </div>
+                      <input 
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={img.opacity ?? 1}
+                        onChange={e => updateImg({ opacity: Number(e.target.value) })}
+                        className="w-full accent-emerald-555 h-1 bg-zinc-200 dark:bg-zinc-800 rounded-lg cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Blend Mode selector */}
+                    <div>
+                      <label className="text-[10px] font-medium text-zinc-450 block mb-1">{currentLanguage === 'zh' ? '图片重叠混合层模式' : 'Blend Mode filter'}</label>
+                      <select 
+                        value={img.blendMode || 'normal'}
+                        onChange={e => updateImg({ blendMode: e.target.value })}
+                        className="w-full text-xs p-2 bg-zinc-50 dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 pointer-events-auto"
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="multiply">Multiply (叠加深色)</option>
+                        <option value="screen">Screen (剔除黑色)</option>
+                        <option value="overlay">Overlay (高反温和)</option>
+                        <option value="darken">Darken</option>
+                        <option value="lighten">Lighten</option>
+                        <option value="color-dodge">Color Dodge</option>
+                        <option value="color-burn">Color Burn</option>
+                      </select>
+                    </div>
+
+                    {/* Crop aspect fill selector */}
+                    <div>
+                      <label className="text-[10px] font-medium text-zinc-450 block mb-1">{currentLanguage === 'zh' ? '图片相框拉伸裁切' : 'Object Frame Crop'}</label>
+                      <select 
+                        value={img.objectFit || 'cover'}
+                        onChange={e => updateImg({ objectFit: e.target.value as any })}
+                        className="w-full text-xs p-2 bg-zinc-50 dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 pointer-events-auto"
+                      >
+                        <option value="cover">Cover (智能居中裁切填充)</option>
+                        <option value="contain">Contain (保持原始长宽比缩放)</option>
+                        <option value="fill">Fill (拉伸填满)</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] font-medium text-zinc-450 block mb-1">{currentLanguage === 'zh' ? '相框圆角化 (px)' : 'Border radius'}</label>
+                        <input 
+                          type="number"
+                          value={img.borderRadius ?? 8}
+                          onChange={e => updateImg({ borderRadius: Math.max(0, Number(e.target.value)) })}
+                          className="w-full text-xs p-2 bg-zinc-50 dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-medium text-zinc-450 block mb-1">{currentLanguage === 'zh' ? '阴影立体感' : 'Shadow strength'}</label>
+                        <select 
+                          value={img.shadow || 'none'}
+                          onChange={e => updateImg({ shadow: e.target.value })}
+                          className="w-full text-xs p-2 bg-zinc-50 dark:bg-[#111113] rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 pointer-events-auto"
+                        >
+                          <option value="none">None</option>
+                          <option value="sm">Small</option>
+                          <option value="md">Paper Depth</option>
+                          <option value="lg">Elevated</option>
+                          <option value="xl">Classic Poster</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <hr className="border-zinc-250 dark:border-zinc-800" />
+
+                  {/* Remove and Deselect */}
+                  <div className="pt-2 text-center flex flex-col gap-2">
+                    <button
+                      onClick={() => setSelectedImageId(null)}
+                      className="w-full py-1.5 hover:bg-zinc-150 border border-zinc-200 dark:border-zinc-800 dark:hover:bg-zinc-800/80 rounded-md text-xs font-semibold text-zinc-650 dark:text-zinc-400 transition-colors pointer-events-auto shadow-sm"
+                    >
+                      {currentLanguage === 'zh' ? '取消选择该插图 (ESC)' : 'Deselect Illustration'}
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setFloatingImages(prev => prev.filter(f => f.id !== selectedImageId));
+                        setSelectedImageId(null);
+                        toast.error(currentLanguage === 'zh' ? '插图已从版面移除' : 'Removed asset');
+                      }}
+                      className="w-full py-1.5 hover:bg-red-50 text-red-600 dark:hover:bg-red-950/20 rounded-md text-xs font-bold transition-all pointer-events-auto"
+                    >
+                      {currentLanguage === 'zh' ? '⚠️ 从章节中删除该插图' : '🗑️ Delete Image From Paper'}
+                    </button>
+                  </div>
+
                 </div>
-
-                <hr className="border-zinc-200 dark:border-zinc-800" />
-
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Layout Mode</h4>
+              );
+            })() : (
+              // DEFAULT SCREEN IF NO IMAGE SELECTED: PAGE/TRIM METRICS EDITING (MIMICKING ADOBE PROPERTIES PANEL)
+              <div className="space-y-6 animate-fade-in">
+                
+                {/* Visual Preset Selection (Antique vs Dark Velvet etc) */}
+                <div>
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block mb-2">{currentLanguage === 'zh' ? '一、书籍载体纸张风格' : 'Paper Aesthetics Preset'}</span>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { id: 'absolute', label: 'Absolute', desc: 'Free drag overlay' },
-                      { id: 'wrap-left', label: 'Float Left', desc: 'Text wraps right' },
-                      { id: 'wrap-right', label: 'Float Right', desc: 'Text wraps left' },
-                      { id: 'wrap-center', label: 'Center', desc: 'Block break' },
-                      { id: 'full-width', label: 'Full Width', desc: 'Spans column' }
-                    ].map(mode => (
+                      { id: 'warm', label: currentLanguage === 'zh' ? '墨香雅黄' : 'Antique Warm', desc: 'Cream paper [#faf6ee]' },
+                      { id: 'white', label: currentLanguage === 'zh' ? '现代冷白' : 'Office White', desc: 'Crisp sheet [#ffffff]' },
+                      { id: 'dark', label: currentLanguage === 'zh' ? '玄色沉浸' : 'Ink Noir', desc: 'Dark board [#18181b]' },
+                      { id: 'kraft', label: currentLanguage === 'zh' ? '原生牛皮纸' : 'Kraft Board', desc: 'Paper pulp [#e6a7e5]' }
+                    ].map(theme => (
                       <button
-                        key={mode.id}
-                        onClick={() => updateImg({ layoutMode: mode.id as any })}
+                        key={theme.id}
+                        onClick={() => handleLayoutChange('paperStyle', theme.id)}
                         className={cn(
-                          "text-left p-2 text-xs rounded-md border transition-all",
-                          (img.layoutMode || 'absolute') === mode.id
-                            ? "bg-emerald-50 border-emerald-500 text-emerald-900 dark:bg-emerald-900/30"
-                            : "bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-zinc-300 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400"
+                          "p-2.5 rounded-lg border text-left transition-all",
+                          paperStyle === theme.id
+                            ? "bg-emerald-50/50 border-emerald-500 text-emerald-950 dark:bg-emerald-950/10 dark:border-emerald-500 dark:text-zinc-100 shadow-sm"
+                            : "bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 text-zinc-650 hover:border-zinc-300 dark:text-zinc-400"
                         )}
                       >
-                        <div className="font-medium">{mode.label}</div>
-                        <div className="text-[10px] opacity-70 truncate">{mode.desc}</div>
+                        <div className="text-[11px] font-bold">{theme.label}</div>
+                        <div className="text-[9px] opacity-70 mt-0.5 mt-1">{theme.desc}</div>
                       </button>
                     ))}
                   </div>
-
-                  {(img.layoutMode && img.layoutMode !== 'absolute') && (
-                    <div className="mt-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                      <label className="text-xs font-medium text-zinc-500 block mb-2">Block Attachment Index</label>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => updateImg({ paragraphIndex: Math.max(0, (img.paragraphIndex || 0) - 1) })}
-                          className="px-2 py-1 bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded shadow-sm text-xs hover:bg-zinc-50"
-                        >
-                          Prev
-                        </button>
-                        <input 
-                          type="number"
-                          value={img.paragraphIndex || 0}
-                          onChange={e => updateImg({ paragraphIndex: Math.max(0, Number(e.target.value)) })}
-                          className="w-full text-center text-sm p-1 bg-transparent border-none outline-none"
-                        />
-                        <button 
-                          onClick={() => updateImg({ paragraphIndex: (img.paragraphIndex || 0) + 1 })}
-                          className="px-2 py-1 bg-white dark:bg-zinc-700 border border-zinc-200 dark:border-zinc-600 rounded shadow-sm text-xs hover:bg-zinc-50"
-                        >
-                          Next
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-zinc-400 mt-2 text-center">Move the image to previous or next text block</p>
-                    </div>
-                  )}
                 </div>
 
-                <hr className="border-zinc-200 dark:border-zinc-800" />
+                <hr className="border-zinc-250 dark:border-zinc-800" />
+                
+                {/* Trim Dimensions selection */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">{currentLanguage === 'zh' ? '二、拼版规格尺寸规格 (对标 InDesign)' : 'Editorial Trim Slices'}</span>
+                    <span title="Corresponds to standard printing book page dimensions.">
+                      <HelpCircle className="w-3.5 h-3.5 text-zinc-400 cursor-pointer hover:text-zinc-650" />
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-zinc-800 dark:text-zinc-250">
+                    {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => handleLayoutChange('format', f)}
+                        className={cn(
+                          "w-full text-left p-2.5 rounded-md border transition-all flex justify-between items-center",
+                          layout.format === f 
+                            ? "bg-zinc-100 dark:bg-zinc-800 border-zinc-400 dark:border-zinc-700 ring-1 ring-zinc-550 shadow-sm"
+                            : "bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-gray-800 hover:border-zinc-300 dark:hover:border-zinc-750"
+                        )}
+                      >
+                        <div>
+                          <div className="font-bold text-zinc-900 dark:text-zinc-100">{FORMATS[f].label}</div>
+                          <div className="text-[10px] text-zinc-400 mt-0.5">{f === 'pocket' ? 'Standard Novel size' : 'Classic Publishing canvas'}</div>
+                        </div>
+                        <span className="font-mono text-[10px] opacity-70 bg-zinc-200 dark:bg-zinc-900 p-1 rounded">
+                          {FORMATS[f].width} × {FORMATS[f].height} px
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
+                <hr className="border-zinc-250 dark:border-zinc-800" />
+
+                {/* Typography specs (Print grade) */}
                 <div className="space-y-3">
-                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Style</h4>
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">{currentLanguage === 'zh' ? '三、字形与文本多栏分段' : 'DTP Typography & Layout Columns'}</span>
                   
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5 flex justify-between">
-                      Opacity <span>{Math.round((img.opacity ?? 1) * 100)}%</span>
-                    </label>
-                    <input 
-                      type="range" 
-                      min="0" max="1" step="0.05"
-                      value={img.opacity ?? 1}
-                      onChange={e => updateImg({ opacity: Number(e.target.value) })}
-                      className="w-full accent-emerald-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Blend Mode</label>
-                    <select 
-                      value={img.blendMode || 'normal'}
-                      onChange={e => updateImg({ blendMode: e.target.value })}
-                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="multiply">Multiply</option>
-                      <option value="screen">Screen</option>
-                      <option value="overlay">Overlay</option>
-                      <option value="darken">Darken</option>
-                      <option value="lighten">Lighten</option>
-                      <option value="color-dodge">Color Dodge</option>
-                      <option value="color-burn">Color Burn</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Object Fit</label>
-                    <select 
-                      value={img.objectFit || 'cover'}
-                      onChange={e => updateImg({ objectFit: e.target.value as any })}
-                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
-                    >
-                      <option value="cover">Cover (Fill bounds)</option>
-                      <option value="contain">Contain (Show all)</option>
-                      <option value="fill">Fill (Stretch)</option>
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
                     <div>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1.5">Corner Radius</label>
+                      <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '基础字号 (px)' : 'Base Font Size'}</label>
                       <input 
-                        type="number" 
-                        value={img.borderRadius ?? 0}
-                        onChange={e => updateImg({ borderRadius: Number(e.target.value) })}
-                        className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border-transparent outline-none"
+                        type="number"
+                        value={layout.fontSize || 16}
+                        onChange={e => handleLayoutChange('fontSize', Math.max(10, Number(e.target.value)))}
+                        className="w-full p-2 bg-zinc-50 dark:bg-zinc-950 rounded-md border border-zinc-150 dark:border-zinc-850"
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1.5">Shadow</label>
-                      <select 
-                        value={img.shadow || 'none'}
-                        onChange={e => updateImg({ shadow: e.target.value })}
-                        className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border-transparent outline-none"
-                      >
-                        <option value="none">None</option>
-                        <option value="sm">Small</option>
-                        <option value="md">Medium</option>
-                        <option value="lg">Large</option>
-                        <option value="xl">Extra Large</option>
-                      </select>
+                      <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '行间距比例' : 'Line Spacing'}</label>
+                      <input 
+                        type="number"
+                        step="0.1"
+                        value={layout.lineHeight || 1.6}
+                        onChange={e => handleLayoutChange('lineHeight', Math.max(1.0, Number(e.target.value)))}
+                        className="w-full p-2 bg-zinc-50 dark:bg-zinc-950 rounded-md border border-zinc-150 dark:border-zinc-850"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Columns Presets - fully professional */}
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1.5 flex justify-between">
+                      <span>{currentLanguage === 'zh' ? '画板分栏数' : 'Page Columns Count'}</span>
+                      <span className="font-mono text-emerald-500 font-bold">{columnsCount} Col{columnsCount > 1 && 's'}</span>
+                    </label>
+                    <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-100 dark:bg-zinc-950 rounded-lg">
+                      {[1, 2, 3].map(col => (
+                        <button
+                          key={col}
+                          onClick={() => handleLayoutChange('columns', col)}
+                          className={cn(
+                            "py-1 text-xs font-semibold rounded-md transition-all duration-150",
+                            columnsCount === col
+                              ? "bg-white dark:bg-zinc-805 text-zinc-900 dark:text-zinc-50 shadow-sm"
+                              : "text-zinc-500 hover:text-zinc-800"
+                          )}
+                        >
+                          {col === 1 ? '1 Col' : col === 2 ? '2 Cols' : '3 Cols'}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[9px] text-zinc-450 mt-1.5">
+                      {currentLanguage === 'zh' ? '调整分栏后，文字将自动跨页分流拼版，极具视觉冲击力！' : 'Text streams flow seamlessly into columns across page gutters'}
+                    </p>
+                  </div>
+                </div>
+
+                <hr className="border-zinc-250 dark:border-zinc-800" />
+
+                {/* Bleed padding and margins inputs */}
+                <div className="space-y-2">
+                  <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">{currentLanguage === 'zh' ? '四、印刷版心四周留白' : 'Page Margins Slices (px)'}</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <label className="text-[10px] text-zinc-400 mr-1">Top:</label>
+                      <input 
+                        type="number"
+                        value={layout.marginTop}
+                        min="0"
+                        onChange={e => handleLayoutChange('marginTop', Number(e.target.value))}
+                        className="w-full text-xs p-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="text-[10px] text-zinc-400 mr-1">Bottom:</label>
+                      <input 
+                        type="number"
+                        value={layout.marginBottom}
+                        min="0"
+                        onChange={e => handleLayoutChange('marginBottom', Number(e.target.value))}
+                        className="w-full text-xs p-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-zinc-400 mr-1">Left:</label>
+                      <input 
+                        type="number"
+                        value={layout.marginLeft}
+                        min="0"
+                        onChange={e => handleLayoutChange('marginLeft', Number(e.target.value))}
+                        className="w-full text-xs p-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] text-zinc-400 mr-1">Right:</label>
+                      <input 
+                        type="number"
+                        value={layout.marginRight}
+                        min="0"
+                        onChange={e => handleLayoutChange('marginRight', Number(e.target.value))}
+                        className="w-full text-xs p-1.5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded"
+                      />
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-4 mt-4 border-t border-zinc-200 dark:border-zinc-800">
-                  <button 
-                    onClick={() => {
-                      setFloatingImages(prev => prev.filter(f => f.id !== selectedImageId));
-                      setSelectedImageId(null);
-                    }}
-                    className="w-full py-2 hover:bg-red-50 text-red-600 dark:hover:bg-red-900/30 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Delete Image
-                  </button>
+                <div className="p-3 bg-zinc-50 dark:bg-zinc-950 rounded-xl text-[10px] text-zinc-500 font-serif leading-normal border border-zinc-200/50 dark:border-zinc-850/50">
+                  {currentLanguage === 'zh'
+                    ? "💡 想要极致的图文混排？拖拽本地图片到中央画板，或点击「插图栏」为它们设置 Float (文字环绕) 或 Absolute 自由盖贴即可！"
+                    : "💡 To arrange floating illustrations, drag any picture file in, select it and apply float wrapping and custom margin anchor positions."}
                 </div>
+
               </div>
-            );
-          })() : (
-            <>
-              {/* Format Settings */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                  <LayoutTemplate className="w-4 h-4 text-zinc-400" /> <span>Trim Size</span>
-                </h4>
-                <div className="grid grid-cols-1 gap-2">
-                  {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
+            )
+          ) : (
+            // TAB B: ASSET STORAGE RACK (COHERENCE CONTROL PANEL)
+            <div className="space-y-5 animate-fade-in text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">{currentLanguage === 'zh' ? '章节配图一览' : 'Chapter Images Shelf'}</span>
+                <span className="font-mono text-[9px] bg-zinc-100 dark:bg-zinc-950 p-1 px-2 rounded-full text-zinc-500">
+                  {floatingImages.length} {floatingImages.length === 1 ? 'Asset' : 'Assets'}
+                </span>
+              </div>
+
+              {/* Master chapter cover/hero image links */}
+              {chapter.image && (
+                <div className="p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-500/20 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="font-serif font-bold text-emerald-800 dark:text-emerald-400 text-[11px]">Cover Illustration (Linked)</span>
+                    <span className="bg-emerald-600 text-white rounded px-1.5 text-[8px] font-bold uppercase tracking-wider">Chapter Cover</span>
+                  </div>
+                  <div className="aspect-video relative rounded-lg overflow-hidden border border-emerald-500/30">
+                    <img src={chapter.image} className="w-full h-full object-cover select-none" referrerPolicy="no-referrer" />
+                  </div>
+                  
+                  {/* Verify link state */}
+                  {floatingImages.some(img => img.url === chapter.image) ? (
+                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-serif flex items-center gap-1 bg-white/20 dark:bg-black/20 p-2 rounded">
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      <span>{currentLanguage === 'zh' ? '已链接同步并置于画板上流式环绕' : 'Synced & rendering on virtual sheets.'}</span>
+                    </div>
+                  ) : (
                     <button
-                      key={f}
-                      onClick={() => handleLayoutChange('format', f)}
-                      className={cn(
-                        "text-left p-3 text-sm rounded-lg border transition-all",
-                        layout.format === f 
-                          ? "bg-emerald-50 border-emerald-500 text-emerald-900 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-100 ring-1 ring-emerald-500"
-                          : "bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-zinc-300 dark:bg-zinc-800/50 dark:border-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                      )}
+                      onClick={() => insertNewFloatingImage(chapter.image!)}
+                      className="w-full py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg transition-transform text-[10px]"
                     >
-                      <div className="font-semibold">{FORMATS[f].label}</div>
-                      <div className="text-xs opacity-70 mt-0.5">{FORMATS[f].width} × {FORMATS[f].height}px</div>
+                      {currentLanguage === 'zh' ? '置入本书推荐图到 DTP 画板流中' : 'Import image onto typeset paper'}
                     </button>
-                  ))}
+                  )}
                 </div>
-              </div>
+              )}
 
-              <hr className="border-zinc-200 dark:border-zinc-800" />
-
-              {/* Typography Settings */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                  <Type className="w-4 h-4 text-zinc-400" /> <span>Typography</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Font Size (px)</label>
-                    <input 
-                      type="number" 
-                      value={layout.fontSize || 16} 
-                      onChange={e => handleLayoutChange('fontSize', Number(e.target.value))}
-                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Line Height</label>
-                    <input 
-                      type="number" 
-                      step="0.1"
-                      value={layout.lineHeight || 1.6} 
-                      onChange={e => handleLayoutChange('lineHeight', Number(e.target.value))}
-                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                    />
-                  </div>
+              {/* Asset grid lists */}
+              {floatingImages.length === 0 ? (
+                <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-8 text-center text-zinc-400">
+                  <ImagePlus className="w-8 h-8 text-zinc-300 mx-auto mb-2" />
+                  <p className="text-[10px]">{currentLanguage === 'zh' ? '此章节尚无媒体图像数据。点击上方的插图按钮来丰富内容吧！' : 'No photo assets placed in this chapter yet.'}</p>
                 </div>
-              </div>
-
-              <hr className="border-zinc-200 dark:border-zinc-800" />
-
-              {/* Margins */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                  <div className="w-4 h-4 border-2 border-zinc-400 rounded-sm" /> <span>Page Margins (px)</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Top</label>
-                    <input 
-                      type="number" 
-                      value={layout.marginTop} 
-                      onChange={e => handleLayoutChange('marginTop', Number(e.target.value))}
-                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Bottom</label>
-                    <input 
-                      type="number" 
-                      value={layout.marginBottom} 
-                      onChange={e => handleLayoutChange('marginBottom', Number(e.target.value))}
-                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Left</label>
-                    <input 
-                      type="number" 
-                      value={layout.marginLeft} 
-                      onChange={e => handleLayoutChange('marginLeft', Number(e.target.value))}
-                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Right</label>
-                    <input 
-                      type="number" 
-                      value={layout.marginRight} 
-                      onChange={e => handleLayoutChange('marginRight', Number(e.target.value))}
-                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                    />
+              ) : (
+                <div className="space-y-3">
+                  <span className="text-[10px] uppercase tracking-wider text-zinc-400 font-semibold block">{currentLanguage === 'zh' ? '当前章节画板元素树' : 'Placed Illustrations'}</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {floatingImages.map((img, idx) => {
+                      const isSelected = selectedImageId === img.id;
+                      
+                      return (
+                        <div 
+                          key={img.id}
+                          onClick={() => {
+                            setSelectedImageId(img.id);
+                            setActiveAssetTab('details');
+                          }}
+                          className={cn(
+                            "cursor-pointer group p-2 rounded-lg border text-left transition-all relative overflow-hidden bg-zinc-50 dark:bg-zinc-950",
+                            isSelected
+                              ? "border-emerald-500 bg-emerald-100/10 dark:bg-[#111812]"
+                              : "border-zinc-200 dark:border-zinc-800 hover:border-zinc-350"
+                          )}
+                        >
+                          <div className="aspect-video relative rounded overflow-hidden mb-1 border border-zinc-200 dark:border-zinc-800 bg-black/10">
+                            <img src={img.url} className="w-full h-full object-cover select-none" referrerPolicy="no-referrer" />
+                          </div>
+                          
+                          <div className="text-[10px] font-bold text-zinc-700 dark:text-zinc-300 truncate">
+                            {img.layoutMode === 'absolute' ? 'Absolute Overlay' : `Flow Anchor #${img.paragraphIndex || 0}`}
+                          </div>
+                          <div className="text-[8px] text-zinc-400 mt-0.5 font-mono line-clamp-1">{img.layoutMode || 'absolute'}</div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-                <p className="text-xs text-zinc-500 mt-2">
-                  Drag images onto the page from your desktop to place floating media.
-                </p>
-              </div>
-            </>
+              )}
+            </div>
           )}
+
         </div>
       </div>
+
+      {/* QUICK FLOATING TEXT EDIT DIALOG (MAGIC DESK DIRECT EDIT COGNOSCENTI STYLE) */}
+      {editingBlock && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 antialiased select-text">
+          <div className="bg-white dark:bg-zinc-900 rounded-xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800 animate-scale-up select-text">
+            
+            <div className="p-4 border-b border-zinc-150 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950/40 select-none">
+              <div className="flex items-center gap-2">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                <span className="text-xs font-bold font-serif text-zinc-700 dark:text-zinc-200">
+                  {currentLanguage === 'zh' ? `就地极速排版编辑：第 #${editingBlock.index} 文本段落` : `Direct Canvas Edit: Paragraph #${editingBlock.index}`}
+                </span>
+              </div>
+              <button 
+                onClick={() => setEditingBlock(null)}
+                className="text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-200"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 flex-1 select-text">
+              <textarea
+                value={editingBlock.text}
+                onChange={e => setEditingBlock(prev => prev ? { ...prev, text: e.target.value } : null)}
+                className="w-full min-h-[160px] p-3 text-base font-serif bg-zinc-50 dark:bg-zinc-950 rounded-lg outline-none resize-none border border-zinc-200 focus:border-emerald-500 dark:border-zinc-800 dark:focus:border-emerald-600 transition-colors select-text"
+              />
+              <p className="text-[10px] text-zinc-400 mt-2">
+                {currentLanguage === 'zh' ? "💡 完美支持所有标准 Markdown 文本及 LaTeX 语法，修改保存后书籍画板将实时进行多列拼版！" : "Any syntax layout updates will automatically recalculate wraps and page distribution on saving."}
+              </p>
+            </div>
+
+            <div className="p-3 border-t border-zinc-150 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/40 flex justify-end gap-2 select-none">
+              <button
+                onClick={() => setEditingBlock(null)}
+                className="px-4 py-1.5 text-xs font-semibold text-zinc-650 hover:bg-zinc-150 rounded"
+              >
+                {currentLanguage === 'zh' ? '取消' : 'Cancel'}
+              </button>
+              
+              <button
+                onClick={saveEditingBlockChanges}
+                className="px-4 py-1.5 text-xs font-semibold bg-emerald-600 text-white rounded hover:bg-emerald-700 shadow-sm transition-colors"
+              >
+                {currentLanguage === 'zh' ? '应用段落实时变化' : 'Apply Block Changes'}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

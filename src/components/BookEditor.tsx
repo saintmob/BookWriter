@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { db, Chapter, Book } from '../lib/db';
+import { db, Chapter, Book, FloatingImage } from '../lib/db';
 import { generateChapterContent, generateImage, proofreadChapter, applyProofreadChanges, ProofreadFeedback } from '../lib/ai';
 import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2 } from 'lucide-react';
 import { cn } from '../lib/utils';
@@ -11,11 +11,13 @@ import { ChapterChat } from './ChapterChat';
 import { BookInfoModal } from './BookInfoModal';
 import { ConfirmModal } from './ConfirmModal';
 import { BookSamplePreview } from './BookSamplePreview';
+import { TypesetLayoutEditor } from './TypesetLayoutEditor';
+import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 
 export function BookEditor() {
   const { t } = useTranslation();
-  const { activeBookId, activeChapterId, setActiveChapter, deleteBook, language } = useStore();
+  const { activeBookId, activeChapterId, setActiveChapter, deleteBook, language, appMode, setAppMode } = useStore();
   
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -30,7 +32,7 @@ export function BookEditor() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   const [content, setContent] = useState('');
-  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
+  const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'typeset'>(appMode === 'typeset' ? 'typeset' : 'edit');
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
   const [isBookInfoOpen, setIsBookInfoOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -41,6 +43,33 @@ export function BookEditor() {
   const exportMenuRef = useRef<HTMLDivElement>(null);
   const aiMenuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Helper to synchronize chapter.image with floatingImages for perfect layout integration
+  const addHeroImageToFloating = (chap: Chapter, url: string): Chapter => {
+    const currentList = chap.floatingImages || [];
+    const exists = currentList.some(img => img.url === url);
+    if (exists || !url) return chap;
+    
+    const newFloatingImg: FloatingImage = {
+      id: uuidv4(),
+      url: url,
+      x: 30,
+      y: 30,
+      width: 320,
+      height: 240,
+      opacity: 1,
+      borderRadius: 12,
+      shadow: 'md',
+      objectFit: 'cover',
+      blendMode: 'normal',
+      layoutMode: 'wrap-center', // Default to beautiful centered wrapper flow
+      paragraphIndex: 1, // Anchor near top but below the title text block
+    };
+    return {
+      ...chap,
+      floatingImages: [...currentList, newFloatingImg]
+    };
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -64,13 +93,32 @@ export function BookEditor() {
   useEffect(() => {
     if (activeChapterId && chapters.length > 0) {
       const chapter = chapters.find(c => c.id === activeChapterId) || null;
-      setActiveChapterState(chapter);
-      setContent(chapter?.content || '');
+      if (chapter && chapter.image && (!chapter.floatingImages || !chapter.floatingImages.some(img => img.url === chapter.image))) {
+        // Auto-synchronize cover illustration on discovered missing
+        const synced = addHeroImageToFloating(chapter, chapter.image);
+        db.saveChapter(synced).then(() => {
+          setChapters(prev => prev.map(c => c.id === synced.id ? synced : c));
+          setActiveChapterState(synced);
+          setContent(synced.content || '');
+        });
+      } else {
+        setActiveChapterState(chapter);
+        setContent(chapter?.content || '');
+      }
     } else {
       setActiveChapterState(null);
       setContent('');
     }
   }, [activeChapterId, chapters]);
+
+  // Sync internal viewMode with main sidebar appMode
+  useEffect(() => {
+    if (appMode === 'typeset') {
+      setViewMode('typeset');
+    } else if (viewMode === 'typeset') {
+      setViewMode('edit');
+    }
+  }, [appMode]);
 
   useEffect(() => {
     if (viewMode === 'edit' && textareaRef.current) {
@@ -180,7 +228,8 @@ export function BookEditor() {
       const imageUrl = await generateImage(prompt);
       
       if (imageUrl) {
-        const updatedChapter = { ...activeChapter, image: imageUrl, updatedAt: Date.now() };
+        const baseUpdated = { ...activeChapter, image: imageUrl, updatedAt: Date.now() };
+        const updatedChapter = addHeroImageToFloating(baseUpdated, imageUrl);
         await db.saveChapter(updatedChapter);
         setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
         setActiveChapterState(updatedChapter);
@@ -191,6 +240,17 @@ export function BookEditor() {
       toast.error(error.message || t('generate_image_error') || 'Failed to generate image');
     } finally {
       setIsGeneratingImage(false);
+    }
+  };
+
+  const handleGenerateImageOfPrompt = async (promptText: string): Promise<string | null> => {
+    try {
+      const imageUrl = await generateImage(promptText);
+      return imageUrl || null;
+    } catch (error: any) {
+      console.error('Failed to generate flow image', error);
+      toast.error(error.message || 'Image generation failed');
+      return null;
     }
   };
 
@@ -424,243 +484,30 @@ export function BookEditor() {
       {/* Main Editor */}
       <div className="flex-1 flex flex-col overflow-hidden relative print:hidden">
         {activeChapter ? (
-          <>
-            {/* Toolbar */}
-            <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 grid grid-cols-3 items-center px-4 md:px-6 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-sm z-10">
-              {/* Left: Chapter Title */}
-              <div className="flex items-center min-w-0">
-                <h3 className="font-serif font-semibold text-lg truncate" title={activeChapter.title}>
-                  {activeChapter.title}
-                </h3>
-              </div>
-              
-              {/* Center: Edit/Preview/Typeset Toggle */}
-              <div className="flex justify-center">
-                <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1">
-                  <button
-                    onClick={() => setViewMode('edit')}
-                    className={cn(
-                      "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                      viewMode === 'edit'
-                        ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" 
-                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                    )}
-                  >
-                    {t('edit')}
-                  </button>
-                  <button
-                    onClick={() => setViewMode('preview')}
-                    className={cn(
-                      "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                      viewMode === 'preview'
-                        ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" 
-                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
-                    )}
-                  >
-                    {t('preview')}
-                  </button>
-                </div>
-              </div>
-
-              {/* Right: AI Tools & Chat */}
-              <div className="flex items-center justify-end gap-3">
-                {/* AI Tools Dropdown (Renamed to Generate) */}
-                <div className="relative" ref={aiMenuRef}>
-                  <button
-                    onClick={() => setShowAIMenu(!showAIMenu)}
-                    className="flex items-center gap-2 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-lg text-sm font-medium transition-colors whitespace-nowrap"
-                    title={t('generate')}
-                  >
-                    <Sparkles className="w-4 h-4 text-emerald-500" />
-                    <span className="hidden lg:inline">{t('generate')}</span>
-                    <ChevronDown className="w-3 h-3 opacity-50" />
-                  </button>
-
-                  {showAIMenu && (
-                    <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-zinc-200 dark:border-zinc-700 py-1 z-50">
-                      <button
-                        onClick={() => {
-                          handleGenerateContent();
-                          setShowAIMenu(false);
-                        }}
-                        disabled={isGeneratingContent}
-                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 disabled:opacity-50"
-                      >
-                        {isGeneratingContent ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-                        {t('generate_content')}
-                      </button>
-                      <button
-                        onClick={() => {
-                          handleGenerateImage();
-                          setShowAIMenu(false);
-                        }}
-                        disabled={isGeneratingImage || !content}
-                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 disabled:opacity-50"
-                      >
-                        {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                        {t('generate_image')}
-                      </button>
-                      <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1"></div>
-                      <button
-                        onClick={() => {
-                          handleProofread();
-                          setShowAIMenu(false);
-                        }}
-                        disabled={isProofreading || !content}
-                        className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2 disabled:opacity-50"
-                      >
-                        {isProofreading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4 text-purple-500" />}
-                        {t('ai_proofread')}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div className="w-px h-6 bg-zinc-200 dark:bg-zinc-800 mx-1 hidden sm:block"></div>
-
-                <button
-                  onClick={() => setIsChatOpen(!isChatOpen)}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all duration-200 whitespace-nowrap shadow-sm",
-                    isChatOpen 
-                      ? "bg-emerald-700 text-white ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-zinc-950" 
-                      : "bg-emerald-600 hover:bg-emerald-700 text-white"
-                  )}
-                  title={t('ai_assistant')}
-                >
-                  <MessageSquare className="w-4 h-4" />
-                  <span className="hidden lg:inline">{t('ai_chat')}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Editor Area */}
-            <div className="flex-1 flex overflow-hidden relative">
-              <div 
-                className={cn("flex-1 overflow-y-auto p-8 md:p-12 lg:px-24", viewMode === 'edit' && "cursor-text")}
-                onClick={(e) => {
-                  if (e.target === e.currentTarget && viewMode === 'edit') {
-                    textareaRef.current?.focus();
-                    // Place cursor at the end
-                    const length = textareaRef.current?.value.length || 0;
-                    textareaRef.current?.setSelectionRange(length, length);
-                  }
-                }}
-              >
-                <div 
-                  className={cn("max-w-3xl mx-auto space-y-8 pb-32", viewMode !== 'edit' && "cursor-default")}
-                  onClick={(e) => {
-                    if (e.target === e.currentTarget && viewMode === 'edit') {
-                      textareaRef.current?.focus();
-                      const length = textareaRef.current?.value.length || 0;
-                      textareaRef.current?.setSelectionRange(length, length);
-                    }
-                  }}
-                >
-                  {/* Image Area with Loading State */}
-                  {(activeChapter.image || isGeneratingImage) && (
-                    <div className="relative group rounded-2xl overflow-hidden border border-zinc-200 dark:border-zinc-800 shadow-sm bg-zinc-100 dark:bg-zinc-900 aspect-video">
-                      {isGeneratingImage ? (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-50 dark:bg-zinc-900/50 animate-pulse">
-                          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-                          <p className="text-sm font-medium text-zinc-500">{t('generating_image_placeholder')}</p>
-                        </div>
-                      ) : (
-                        <>
-                          <img src={activeChapter.image} alt={activeChapter.title} className="w-full h-auto object-cover aspect-video" referrerPolicy="no-referrer" />
-                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button 
-                              onClick={handleGenerateImage}
-                              className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-4 py-2 rounded-lg font-medium flex items-center gap-2 transition-colors"
-                            >
-                              <Sparkles className="w-4 h-4" /> {t('regenerate_image')}
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Content Area with Loading State */}
-                  <div className="relative">
-                    {viewMode === 'preview' ? (
-                      <div className="prose prose-zinc dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
-                        {isGeneratingContent && !content ? (
-                          <div className="space-y-4 animate-pulse">
-                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4"></div>
-                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-full"></div>
-                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-5/6"></div>
-                            <div className="h-4 bg-zinc-200 dark:bg-zinc-800 rounded w-2/3"></div>
-                            <p className="text-sm text-emerald-500 font-medium mt-4">{t('generating_content_placeholder')}</p>
-                          </div>
-                        ) : (
-                          <>
-                            <MarkdownRenderer>{content || `*${t('no_content_yet')}*`}</MarkdownRenderer>
-                            {isGeneratingContent && (
-                              <div className="mt-6 flex items-center gap-2 text-emerald-500 font-medium animate-pulse">
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                <span>{t('generating_content_placeholder')}</span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <textarea
-                          ref={textareaRef}
-                          value={content}
-                          onChange={(e) => {
-                            setContent(e.target.value);
-                            e.target.style.height = 'auto';
-                            e.target.style.height = `${e.target.scrollHeight}px`;
-                          }}
-                          placeholder={t('chapter_content_placeholder')}
-                          className={cn(
-                            "w-full min-h-[calc(100vh-300px)] bg-transparent border-none outline-none resize-none font-serif text-lg leading-relaxed text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400 dark:placeholder:text-zinc-600 overflow-hidden",
-                            isGeneratingContent && !content && "opacity-50"
-                          )}
-                          disabled={isGeneratingContent}
-                        />
-                        {isGeneratingContent && (
-                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/50 dark:bg-zinc-950/50 backdrop-blur-[1px] rounded-xl pointer-events-none">
-                            <div className="flex flex-col items-center gap-3 p-6 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800">
-                              <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-                              <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">{t('generating_content_placeholder')}</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {isChatOpen && (
-                <ChapterChat
-                  content={content}
-                  chapterTitle={activeChapter.title}
-                  bookTitle={book.title}
-                  language={language}
-                  onApplyContent={(newContent) => {
-                    setContent(newContent);
-                    // Trigger auto-save immediately
-                    const updatedChapter = { ...activeChapter, content: newContent, updatedAt: Date.now() };
-                    db.saveChapter(updatedChapter).then(() => {
-                      setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
-                      setActiveChapterState(updatedChapter);
-                      setSaveSuccess(true);
-                      setTimeout(() => setSaveSuccess(false), 2000);
-                    });
-                  }}
-                  onClose={() => setIsChatOpen(false)}
-                />
-              )}
-            </div>
-          </>
+          <TypesetLayoutEditor 
+            key={activeChapter.id}
+            chapter={activeChapter}
+            content={content}
+            onContentChange={setContent}
+            onUpdateChapter={(updated) => {
+              setChapters(chapters.map(c => c.id === updated.id ? updated : c));
+              setActiveChapterState(updated);
+            }}
+            isGeneratingContent={isGeneratingContent}
+            isGeneratingImage={isGeneratingImage}
+            isProofreading={isProofreading}
+            onGenerateContent={handleGenerateContent}
+            onGenerateImageOfPrompt={handleGenerateImageOfPrompt}
+            onProofreadText={handleProofread}
+            isChatOpen={isChatOpen}
+            onToggleChat={() => setIsChatOpen(!isChatOpen)}
+          />
         ) : (
-          <div className="flex-1 flex items-center justify-center text-zinc-400 dark:text-zinc-600">
-            {t('select_chapter_hint')}
+          <div className="flex-1 flex items-center justify-center text-zinc-400 dark:text-zinc-650 bg-zinc-50 dark:bg-zinc-950">
+            <div className="text-center space-y-3 font-serif">
+              <BookOpen className="w-12 h-12 text-zinc-300 dark:text-zinc-700 mx-auto animate-pulse" />
+              <p className="text-sm font-medium">{t('select_chapter_hint')}</p>
+            </div>
           </div>
         )}
       </div>

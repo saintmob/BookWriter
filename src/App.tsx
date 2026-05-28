@@ -50,11 +50,7 @@ export default function App() {
       {activeBookId === null ? (
         <Dashboard />
       ) : activeBook ? (
-        appMode === 'typeset' ? (
-          <BookTypesetter />
-        ) : (
-          <BookEditor />
-        )
+        <BookEditor />
       ) : (
         <BookCreator />
       )}

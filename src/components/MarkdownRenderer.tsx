@@ -5,19 +5,22 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { Mermaid } from './Mermaid';
 import { FloatingImage } from '../lib/db';
+import { cn } from '../lib/utils';
 
 interface MarkdownRendererProps {
   children: string;
   floatingImages?: FloatingImage[];
   selectedImageId?: string | null;
   onImageClick?: (id: string) => void;
+  showBlockIndices?: boolean;
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ 
   children, 
   floatingImages = [], 
   selectedImageId,
-  onImageClick
+  onImageClick,
+  showBlockIndices = false,
 }) => {
   let elementIndex = 0;
 
@@ -28,12 +31,43 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     const idx = elementIndex++;
     const imgs = floatingImages.filter(img => img.paragraphIndex === idx && img.layoutMode && img.layoutMode !== 'absolute');
     
+    // Aesthetic paragraph index indicator for precise anchoring (pretext style)
+    const blockIndexIndicator = showBlockIndices ? (
+      <span 
+        className="absolute -left-10 top-1.5 text-[9px] font-mono select-none px-1 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border border-zinc-200/50 dark:border-zinc-700/50 opacity-0 group-hover:opacity-100 hover:text-emerald-600 dark:hover:text-emerald-500 hover:border-emerald-500/50 transition-all cursor-pointer z-10 pointer-events-auto shadow-sm"
+        title={`Paragraph / Block ID: #${idx}`}
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        #{idx}
+      </span>
+    ) : null;
+
     if (imgs.length === 0) {
-      return <Tag {...props} />;
+      return (
+        <Tag 
+          {...props} 
+          className={cn(
+            props.className, 
+            showBlockIndices && "relative group pl-2 border-l border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors"
+          )}
+        >
+          {blockIndexIndicator}
+          {props.children}
+        </Tag>
+      );
     }
 
     return (
-      <Tag {...props}>
+      <Tag 
+        {...props} 
+        className={cn(
+          props.className, 
+          showBlockIndices && "relative group pl-2 border-l border-transparent hover:border-zinc-200 dark:hover:border-zinc-800 transition-colors"
+        )}
+      >
+        {blockIndexIndicator}
         {imgs.map(img => {
           const floatStyle = 
             img.layoutMode === 'wrap-left' ? 'left' : 
@@ -51,28 +85,45 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 e.stopPropagation();
                 if (onImageClick) onImageClick(img.id);
               }}
-              className={isSelected ? "ring-2 ring-emerald-500 ring-offset-1" : ""}
+              className={cn(
+                "inline-block transition-all duration-200 select-none",
+                isSelected 
+                  ? "ring-2 ring-emerald-500 ring-offset-4 dark:ring-offset-zinc-900 scale-[1.01] shadow-md z-30" 
+                  : "hover:ring-1 hover:ring-zinc-400/50 dark:hover:ring-zinc-500/50 hover:scale-[1.005] z-10"
+              )}
               style={{
-                float: floatStyle,
+                float: floatStyle as any,
                 display: (isCenter || isFullWidth) ? 'block' : 'inline-block',
-                margin: (isCenter || isFullWidth) ? '1rem auto' : img.layoutMode === 'wrap-left' ? '0.25rem 1rem 0.5rem 0' : '0.25rem 0 0.5rem 1rem',
-                width: isFullWidth ? '100%' : img.width,
-                height: isFullWidth ? 'auto' : img.height,
+                margin: (isCenter || isFullWidth) 
+                  ? '1.5rem auto' 
+                  : img.layoutMode === 'wrap-left' 
+                    ? '0.35rem 1.75rem 0.65rem 0' 
+                    : '0.35rem 0 0.65rem 1.75rem',
+                width: isFullWidth ? '100%' : `${img.width}px`,
+                height: isFullWidth ? 'auto' : `${img.height}px`,
                 opacity: img.opacity ?? 1,
                 mixBlendMode: (img.blendMode as any) || 'normal',
-                borderRadius: img.borderRadius ?? 0,
+                borderRadius: `${img.borderRadius ?? 0}px`,
                 boxShadow: img.shadow === 'sm' ? '0 1px 2px 0 rgb(0 0 0 / 0.05)' :
                            img.shadow === 'md' ? '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' :
                            img.shadow === 'lg' ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' :
                            img.shadow === 'xl' ? '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)' : 'none',
                 overflow: 'hidden',
                 position: 'relative',
-                zIndex: img.zIndex ?? 10,
                 cursor: 'pointer',
                 clear: (isCenter || isFullWidth) ? 'both' : 'none',
               }}
             >
-              <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: (img.objectFit as any) || 'cover', display: 'block' }} />
+              <img 
+                src={img.url} 
+                alt="" 
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: (img.objectFit as any) || 'cover', 
+                  display: 'block' 
+                }} 
+              />
             </span>
           );
         })}

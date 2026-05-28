@@ -61,7 +61,12 @@ export function BookTypesetter() {
             <TypesetLayoutEditor 
                key={activeChapter.id}
                chapter={activeChapter}
-               content={activeChapter.content}
+               content={activeChapter.content || ''}
+               onContentChange={async (newContent) => {
+                  const updated = { ...activeChapter, content: newContent, updatedAt: Date.now() };
+                  await db.saveChapter(updated);
+                  setChapters(chapters.map(c => c.id === updated.id ? updated : c));
+               }}
                onUpdateChapter={(updated) => {
                   setChapters(chapters.map(c => c.id === updated.id ? updated : c));
                }}
