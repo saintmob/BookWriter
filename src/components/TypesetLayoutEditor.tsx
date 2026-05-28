@@ -37,14 +37,32 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
   const { t } = useTranslation();
   const [layout, setLayout] = useState<PageLayout>({ ...DEFAULT_LAYOUT, ...chapter.layout });
   const [floatingImages, setFloatingImages] = useState<FloatingImage[]>(chapter.floatingImages || []);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [zoom, setZoom] = useState(0.8);
   const [pageCount, setPageCount] = useState(1);
   
   const textContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
 
   const formatData = FORMATS[layout.format || 'a4'];
+
+  useEffect(() => {
+    // Expose API for devtools / AI
+    (window as any).__addFloatingImage = (url: string, width: number = 200, height: number = 200) => {
+      const newImg: FloatingImage = {
+        id: uuidv4(),
+        url,
+        x: 100,
+        y: 100,
+        width,
+        height,
+      };
+      setFloatingImages(prev => [...prev, newImg]);
+    };
+    return () => {
+      delete (window as any).__addFloatingImage;
+    };
+  }, []);
 
   useEffect(() => {
     setLayout({ ...DEFAULT_LAYOUT, ...chapter.layout });
@@ -75,6 +93,44 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
       observer.disconnect();
     };
   }, [content, layout, formatData.width]);
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const url = event.target?.result as string;
+        
+        let dropX = 100;
+        let dropY = 100;
+
+        if (workspaceRef.current) {
+          const rect = workspaceRef.current.getBoundingClientRect();
+          const targetX = e.clientX - rect.left;
+          const targetY = e.clientY - rect.top;
+          
+          dropX = (targetX + workspaceRef.current.scrollLeft) / zoom - 100;
+          dropY = (targetY + workspaceRef.current.scrollTop) / zoom - 100;
+        }
+
+        const newImg: FloatingImage = {
+          id: uuidv4(),
+          url,
+          x: Math.max(0, dropX),
+          y: Math.max(0, dropY),
+          width: 200,
+          height: 200,
+        };
+        setFloatingImages(prev => [...prev, newImg]);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
 
   const handleLayoutChange = (key: keyof PageLayout, value: string | number) => {
     setLayout(prev => ({ ...prev, [key]: value }));
@@ -114,97 +170,209 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
   };
 
   return (
-    <div className="flex flex-col relative w-full h-full bg-zinc-100 dark:bg-zinc-950 overflow-hidden">
-      {/* Typeset Toolbar */}
-      <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <LayoutTemplate className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
-            <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-              Web Typesetter
+    <div className="flex flex-row relative w-full h-full bg-zinc-100 dark:bg-zinc-950 overflow-hidden">
+      {/* Main Designer Area */}
+      <div className="flex flex-col flex-1 relative overflow-hidden">
+        {/* Typeset Toolbar */}
+        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <LayoutTemplate className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
+              <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                Web Typesetter
+              </span>
+            </div>
+            
+            <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
+            
+            <span className="text-xs text-zinc-500 hidden sm:block">
+              {formatData.label} • {pageCount} {pageCount === 1 ? 'Page' : 'Pages'}
             </span>
           </div>
-          
-          <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
-          
-          <span className="text-xs text-zinc-500 hidden sm:block">
-            {formatData.label} • {pageCount} {pageCount === 1 ? 'Page' : 'Pages'}
-          </span>
+
+          <div className="flex items-center gap-2">
+            {/* Zoom Controls */}
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-md p-1 mr-2">
+              <button 
+                onClick={() => setZoom(z => Math.max(0.2, z - 0.1))}
+                className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="text-xs w-10 text-center font-medium text-zinc-600 dark:text-zinc-300">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button 
+                onClick={() => setZoom(z => Math.min(2, z + 0.1))}
+                className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+            </div>
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md transition-colors text-zinc-700 dark:text-zinc-200"
+            >
+              <ImagePlus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Image</span>
+            </button>
+            <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
+            
+            <button
+              onClick={saveLayout}
+              className="flex items-center gap-2 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors"
+            >
+              <Save className="w-4 h-4" />
+              <span className="hidden sm:inline">{t('save')}</span>
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Zoom Controls */}
-          <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-md p-1 mr-2">
-            <button 
-              onClick={() => setZoom(z => Math.max(0.2, z - 0.1))}
-              className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <span className="text-xs w-10 text-center font-medium text-zinc-600 dark:text-zinc-300">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button 
-              onClick={() => setZoom(z => Math.min(2, z + 0.1))}
-              className="p-1 text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors rounded hover:bg-zinc-200 dark:hover:bg-zinc-700"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-          </div>
+        {/* Virtual Desktop Workspace */}
+        <div 
+          ref={workspaceRef}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          className="flex-1 overflow-auto bg-zinc-200/50 dark:bg-black/40 p-8 flex isolate relative" 
+          style={{ alignContent: 'center' }}
+        >
+          <div 
+            className="relative transition-transform origin-top-left mx-auto"
+            style={{ 
+              transform: `scale(${zoom})`,
+              width: formatData.width + (pageCount - 1) * (formatData.width + PAGE_GAP), 
+              height: formatData.height 
+            }}
+          >
+            {/* Render virtual page backgrounds */}
+            {Array.from({ length: pageCount }).map((_, i) => (
+              <div 
+                key={i}
+                className="absolute bg-white dark:bg-zinc-900 shadow-xl ring-1 ring-black/5 dark:ring-white/10"
+                style={{
+                  top: 0,
+                  left: i * (formatData.width + PAGE_GAP),
+                  width: formatData.width,
+                  height: formatData.height,
+                }}
+              >
+                {/* Optional: Render Margin Guides */}
+                <div 
+                  className="absolute border border-blue-500/10 dark:border-blue-400/10 pointer-events-none"
+                  style={{
+                    top: layout.marginTop,
+                    bottom: layout.marginBottom,
+                    left: layout.marginLeft,
+                    right: layout.marginRight,
+                  }}
+                />
+              </div>
+            ))}
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-md transition-colors text-zinc-700 dark:text-zinc-200"
-          >
-            <ImagePlus className="w-4 h-4" />
-            <span className="hidden sm:inline">Image</span>
-          </button>
-          <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
-          
-          <button
-            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors",
-              isSettingsOpen 
-                ? "bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100" 
-                : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200"
-            )}
-          >
-            <Settings className="w-4 h-4" />
-            <span className="hidden sm:inline">Settings</span>
-          </button>
-          
-          <button
-            onClick={saveLayout}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition-colors"
-          >
-            <Save className="w-4 h-4" />
-            <span className="hidden sm:inline">{t('save')}</span>
-          </button>
+            {/* Text Layer (Multi-column pagination) */}
+            <div 
+              ref={textContainerRef}
+              className="absolute top-0 left-0 h-full w-max text-zinc-900 dark:text-zinc-100"
+              style={{
+                columnWidth: formatData.width,
+                columnGap: PAGE_GAP,
+                columnFill: 'auto',
+                paddingTop: layout.marginTop,
+                paddingBottom: layout.marginBottom,
+              }}
+            >
+              <div 
+                style={{
+                  width: formatData.width - layout.marginLeft - layout.marginRight,
+                  marginLeft: layout.marginLeft,
+                  marginRight: layout.marginRight,
+                  fontSize: layout.fontSize,
+                  lineHeight: layout.lineHeight,
+                }}
+                className="prose prose-zinc dark:prose-invert font-serif max-w-none"
+              >
+                <MarkdownRenderer>{content || `*${t('no_content_yet')}*`}</MarkdownRenderer>
+              </div>
+            </div>
+
+            {/* Floating Object Layer */}
+            <div 
+              className="absolute top-0 left-0 w-full h-full pointer-events-none"
+            >
+              {floatingImages.map((img, i) => (
+                <Rnd
+                  key={img.id}
+                  default={{
+                    x: img.x,
+                    y: img.y,
+                    width: img.width,
+                    height: img.height,
+                  }}
+                  bounds="parent"
+                  className="group float-rnd z-10 pointer-events-auto"
+                  onDragStop={(e, d) => {
+                    const newImgs = [...floatingImages];
+                    newImgs[i] = { ...img, x: d.x, y: d.y };
+                    setFloatingImages(newImgs);
+                  }}
+                  onResizeStop={(e, direction, ref, delta, position) => {
+                    const newImgs = [...floatingImages];
+                    newImgs[i] = {
+                      ...img,
+                      width: parseInt(ref.style.width, 10),
+                      height: parseInt(ref.style.height, 10),
+                      ...position
+                    };
+                    setFloatingImages(newImgs);
+                  }}
+                >
+                  <div className="relative w-full h-full border-2 border-transparent hover:border-emerald-500 border-dashed transition-colors group-hover:bg-black/5 shadow-md bg-white">
+                    <img src={img.url} className="w-full h-full object-cover pointer-events-none" alt="" />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFloatingImages(floatingImages.filter(f => f.id !== img.id));
+                      }}
+                      className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                  </div>
+                </Rnd>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      {isSettingsOpen && (
-        <div className="absolute top-14 right-4 w-80 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 shadow-xl p-5 rounded-xl z-30 space-y-6 max-h-[80vh] overflow-y-auto">
+      {/* Right Properties Sidebar */}
+      <div className="w-72 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 h-full overflow-y-auto">
+        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-5 shrink-0 bg-zinc-50 dark:bg-zinc-950/50">
+          <Settings className="w-4 h-4 text-zinc-500 mr-2" />
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Layout Properties</h3>
+        </div>
+        
+        <div className="p-5 space-y-8">
           {/* Format Settings */}
           <div className="space-y-3">
             <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-              <LayoutTemplate className="w-4 h-4" /> Trim Size
+              <LayoutTemplate className="w-4 h-4 text-zinc-400" /> Trim Size
             </h4>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
               {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
                 <button
                   key={f}
                   onClick={() => handleLayoutChange('format', f)}
                   className={cn(
-                    "text-left p-2 text-xs rounded border transition-colors",
+                    "text-left p-3 text-sm rounded-lg border transition-all",
                     layout.format === f 
-                      ? "bg-emerald-50 border-emerald-500 text-emerald-900 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-100"
-                      : "bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-zinc-300 dark:bg-zinc-800/50 dark:border-zinc-700 dark:text-zinc-300"
+                      ? "bg-emerald-50 border-emerald-500 text-emerald-900 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-100 ring-1 ring-emerald-500"
+                      : "bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-zinc-300 dark:bg-zinc-800/50 dark:border-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   )}
                 >
                   <div className="font-semibold">{FORMATS[f].label}</div>
-                  <div className="text-[10px] opacity-70">{FORMATS[f].width}x{FORMATS[f].height}px</div>
+                  <div className="text-xs opacity-70 mt-0.5">{FORMATS[f].width} × {FORMATS[f].height}px</div>
                 </button>
               ))}
             </div>
@@ -215,26 +383,26 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
           {/* Typography Settings */}
           <div className="space-y-3">
             <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-              <Type className="w-4 h-4" /> Typography
+              <Type className="w-4 h-4 text-zinc-400" /> Typography
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Base Font Size (px)</label>
+                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Font Size (px)</label>
                 <input 
                   type="number" 
                   value={layout.fontSize || 16} 
                   onChange={e => handleLayoutChange('fontSize', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
+                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Line Height</label>
+                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Line Height</label>
                 <input 
                   type="number" 
                   step="0.1"
                   value={layout.lineHeight || 1.6} 
                   onChange={e => handleLayoutChange('lineHeight', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
+                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
                 />
               </div>
             </div>
@@ -244,158 +412,50 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
 
           {/* Margins */}
           <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Page Margins (px)</h4>
+            <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+               <div className="w-4 h-4 border-2 border-zinc-400 rounded-sm" /> Page Margins (px)
+            </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Top</label>
+                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Top</label>
                 <input 
                   type="number" 
                   value={layout.marginTop} 
                   onChange={e => handleLayoutChange('marginTop', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
+                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Bottom</label>
+                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Bottom</label>
                 <input 
                   type="number" 
                   value={layout.marginBottom} 
                   onChange={e => handleLayoutChange('marginBottom', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
+                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Left</label>
+                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Left</label>
                 <input 
                   type="number" 
                   value={layout.marginLeft} 
                   onChange={e => handleLayoutChange('marginLeft', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
+                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
                 />
               </div>
               <div>
-                <label className="text-xs text-zinc-500 block mb-1">Right</label>
+                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Right</label>
                 <input 
                   type="number" 
                   value={layout.marginRight} 
                   onChange={e => handleLayoutChange('marginRight', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
+                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
                 />
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Virtual Desktop Workspace */}
-      <div className="flex-1 overflow-auto bg-zinc-200/50 dark:bg-black/40 p-8 flex isolate relative" style={{ alignContent: 'center' }}>
-        <div 
-          className="relative transition-transform origin-top-left mx-auto"
-          style={{ 
-            transform: `scale(${zoom})`,
-            width: formatData.width + (pageCount - 1) * (formatData.width + PAGE_GAP), 
-            height: formatData.height 
-          }}
-        >
-          {/* Render virtual page backgrounds */}
-          {Array.from({ length: pageCount }).map((_, i) => (
-            <div 
-              key={i}
-              className="absolute bg-white dark:bg-zinc-900 shadow-xl ring-1 ring-black/5 dark:ring-white/10"
-              style={{
-                top: 0,
-                left: i * (formatData.width + PAGE_GAP),
-                width: formatData.width,
-                height: formatData.height,
-              }}
-            >
-              {/* Optional: Render Margin Guides */}
-              <div 
-                className="absolute border border-blue-500/10 dark:border-blue-400/10 pointer-events-none"
-                style={{
-                  top: layout.marginTop,
-                  bottom: layout.marginBottom,
-                  left: layout.marginLeft,
-                  right: layout.marginRight,
-                }}
-              />
-            </div>
-          ))}
-
-          {/* Text Layer (Multi-column pagination) */}
-          <div 
-            ref={textContainerRef}
-            className="absolute top-0 left-0 h-full w-max text-zinc-900 dark:text-zinc-100"
-            style={{
-              columnWidth: formatData.width,
-              columnGap: PAGE_GAP,
-              columnFill: 'auto',
-              paddingTop: layout.marginTop,
-              paddingBottom: layout.marginBottom,
-              // To handle left margin within column context, we set padding left/right
-              // But column-width needs to account for this.
-              // Since CSS columns divide the container, it's easiest to set margins on the child content.
-            }}
-          >
-            <div 
-              style={{
-                width: formatData.width - layout.marginLeft - layout.marginRight,
-                marginLeft: layout.marginLeft,
-                marginRight: layout.marginRight,
-                fontSize: layout.fontSize,
-                lineHeight: layout.lineHeight,
-              }}
-              className="prose prose-zinc dark:prose-invert font-serif max-w-none"
-            >
-              <MarkdownRenderer>{content || `*${t('no_content_yet')}*`}</MarkdownRenderer>
-            </div>
-          </div>
-
-          {/* Floating Object Layer */}
-          <div 
-            className="absolute top-0 left-0 w-full h-full pointer-events-none"
-          >
-            {floatingImages.map((img, i) => (
-              <Rnd
-                key={img.id}
-                default={{
-                  x: img.x,
-                  y: img.y,
-                  width: img.width,
-                  height: img.height,
-                }}
-                bounds="parent"
-                className="group float-rnd z-10 pointer-events-auto"
-                onDragStop={(e, d) => {
-                  const newImgs = [...floatingImages];
-                  newImgs[i] = { ...img, x: d.x, y: d.y };
-                  setFloatingImages(newImgs);
-                }}
-                onResizeStop={(e, direction, ref, delta, position) => {
-                  const newImgs = [...floatingImages];
-                  newImgs[i] = {
-                    ...img,
-                    width: parseInt(ref.style.width, 10),
-                    height: parseInt(ref.style.height, 10),
-                    ...position
-                  };
-                  setFloatingImages(newImgs);
-                }}
-              >
-                <div className="relative w-full h-full border-2 border-transparent hover:border-emerald-500 border-dashed transition-colors group-hover:bg-black/5 shadow-md bg-white">
-                  <img src={img.url} className="w-full h-full object-cover pointer-events-none" alt="" />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFloatingImages(floatingImages.filter(f => f.id !== img.id));
-                    }}
-                    className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                  </button>
-                </div>
-              </Rnd>
-            ))}
+            <p className="text-xs text-zinc-500 mt-2">
+              Drag images onto the page from your desktop to place floating media.
+            </p>
           </div>
         </div>
       </div>
