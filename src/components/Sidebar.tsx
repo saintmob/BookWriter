@@ -1,13 +1,26 @@
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { BookPlus, Feather, Settings, PanelLeftClose, PanelLeftOpen, Book, PenLine, LayoutTemplate } from 'lucide-react';
+import { BookPlus, Feather, Settings, PanelLeftClose, PanelLeftOpen, Book, PenLine, LayoutTemplate, BookOpen } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useEffect, useState } from 'react';
 import { SettingsModal } from './SettingsModal';
 
 export function Sidebar() {
   const { t, i18n } = useTranslation();
-  const { books, activeBookId, setActiveBook, theme, language, isSidebarCollapsed, setIsSidebarCollapsed, resetDraft, appMode, setAppMode } = useStore();
+  const { 
+    books, 
+    activeBookId, 
+    setActiveBook, 
+    theme, 
+    language, 
+    isSidebarCollapsed, 
+    setIsSidebarCollapsed, 
+    isOutlineSidebarOpen,
+    setIsOutlineSidebarOpen,
+    resetDraft, 
+    appMode, 
+    setAppMode 
+  } = useStore();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleNewBook = () => {
@@ -69,6 +82,21 @@ export function Sidebar() {
               <LayoutTemplate className="w-5 h-5 shrink-0" />
               {!isSidebarCollapsed && <span>{t('typeset_mode', 'Layout')}</span>}
             </button>
+            
+            {activeBookId && activeBookId !== 'new' && (
+              <button 
+                onClick={() => setIsOutlineSidebarOpen(!isOutlineSidebarOpen)}
+                title={isSidebarCollapsed ? (language === 'zh' ? '显示/隐藏章节大纲' : 'Toggle Chapters List') : undefined}
+                className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-medium flex items-center transition-colors", 
+                  isSidebarCollapsed ? "justify-center" : "gap-2",
+                  isOutlineSidebarOpen 
+                    ? 'bg-emerald-50 text-emerald-750 dark:bg-emerald-950/20 dark:text-emerald-400 ring-1 ring-emerald-500/20' 
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50')}
+              >
+                <BookOpen className="w-5 h-5 shrink-0 text-amber-500" />
+                {!isSidebarCollapsed && <span>{language === 'zh' ? '章节大纲' : 'Chapters List'}</span>}
+              </button>
+            )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2 border-t border-zinc-200 dark:border-zinc-800">

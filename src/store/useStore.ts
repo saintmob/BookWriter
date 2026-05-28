@@ -30,6 +30,8 @@ interface AppState {
   setAppMode: (mode: 'write' | 'typeset') => void;
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (collapsed: boolean) => void;
+  isOutlineSidebarOpen: boolean;
+  setIsOutlineSidebarOpen: (open: boolean) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setLanguage: (lang: 'en' | 'zh') => void;
   setTextProvider: (provider: 'gemini' | 'openrouter') => void;
@@ -78,6 +80,8 @@ export const useStore = create<AppState>()(
       setAppMode: (mode) => set({ appMode: mode }),
       isSidebarCollapsed: false,
       setIsSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
+      isOutlineSidebarOpen: true,
+      setIsOutlineSidebarOpen: (open) => set({ isOutlineSidebarOpen: open }),
       setTheme: (theme) => set({ theme }),
       setLanguage: (language) => set({ language }),
       setTextProvider: (provider) => set({ textProvider: provider }),
@@ -141,6 +145,7 @@ export const useStore = create<AppState>()(
         openRouterTextModel: state.openRouterTextModel,
         openRouterImageModel: state.openRouterImageModel,
         appMode: state.appMode,
+        isOutlineSidebarOpen: state.isOutlineSidebarOpen,
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
         activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
         draft: state.draft // Persist draft state to save progress

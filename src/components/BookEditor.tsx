@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book, FloatingImage } from '../lib/db';
 import { generateChapterContent, generateImage, proofreadChapter, applyProofreadChanges, ProofreadFeedback } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2 } from 'lucide-react';
+import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { OutlineEditorModal } from './OutlineEditorModal';
@@ -17,7 +17,17 @@ import { toast } from 'sonner';
 
 export function BookEditor() {
   const { t } = useTranslation();
-  const { activeBookId, activeChapterId, setActiveChapter, deleteBook, language, appMode, setAppMode } = useStore();
+  const { 
+    activeBookId, 
+    activeChapterId, 
+    setActiveChapter, 
+    deleteBook, 
+    language, 
+    appMode, 
+    setAppMode,
+    isOutlineSidebarOpen,
+    setIsOutlineSidebarOpen
+  } = useStore();
   
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -377,7 +387,10 @@ export function BookEditor() {
       </div>
 
       {/* Outline Sidebar */}
-      <div className="w-72 border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col print:hidden">
+      <div className={cn(
+        "transition-all duration-300 ease-in-out border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col print:hidden overflow-hidden shrink-0 h-full relative",
+        isOutlineSidebarOpen ? "w-72" : "w-0 border-r-0 shadow-none opacity-0 pointer-events-none"
+      )}>
         {/* ... (sidebar content) ... */}
         <div 
           className="p-4 border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors group"
@@ -385,6 +398,17 @@ export function BookEditor() {
         >
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-serif font-bold text-lg truncate flex-1" title={book.title}>{book.title}</h2>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOutlineSidebarOpen(false);
+              }}
+              type="button"
+              className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 transition-colors"
+              title={language === 'zh' ? '收起大纲栏' : 'Collapse chapters panel'}
+            >
+              <ChevronLeft className="w-4 h-4 text-emerald-500" />
+            </button>
             <Edit2 className="w-3 h-3 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">{book.summary}</p>
@@ -483,6 +507,16 @@ export function BookEditor() {
 
       {/* Main Editor */}
       <div className="flex-1 flex flex-col overflow-hidden relative print:hidden">
+        {!isOutlineSidebarOpen && (
+          <button
+            onClick={() => setIsOutlineSidebarOpen(true)}
+            type="button"
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-12 bg-white dark:bg-zinc-900 border-y border-r border-zinc-200 dark:border-zinc-800 rounded-r-md shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center z-40 group transition-all"
+            title={language === 'zh' ? '展开章节大纲' : 'Expand chapters outline'}
+          >
+            <ChevronRight className="w-4 h-4 text-emerald-500 hover:text-emerald-700 dark:text-emerald-400" />
+          </button>
+        )}
         {activeChapter ? (
           <TypesetLayoutEditor 
             key={activeChapter.id}
