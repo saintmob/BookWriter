@@ -401,27 +401,31 @@ export function BookEditor() {
         {/* MIDDLE COMPONENT */}
         <div className="flex items-center justify-center gap-3 shrink-0">
           {/* Zoom controls */}
-          <div className="flex items-center bg-zinc-100 dark:bg-zinc-850 rounded-lg p-0.5 text-xs hidden sm:flex">
-            <button 
-              onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
-              className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
-              title={language === 'zh' ? '缩小' : 'Zoom Out'}
-            >
-              <ZoomOut className="w-3.5 h-3.5" />
-            </button>
-            <span className="w-9 text-center font-semibold text-zinc-600 dark:text-zinc-300 font-mono text-[10px]">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button 
-              onClick={() => setZoom(z => Math.min(2.0, z + 0.1))}
-              className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
-              title={language === 'zh' ? '放大' : 'Zoom In'}
-            >
-              <ZoomIn className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          {(workspaceMode === 'split' || workspaceMode === 'dtp') && (
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-850 rounded-lg p-0.5 text-xs hidden sm:flex animate-fade-in">
+              <button 
+                onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
+                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                title={language === 'zh' ? '缩小' : 'Zoom Out'}
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="w-9 text-center font-semibold text-zinc-600 dark:text-zinc-300 font-mono text-[10px]">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button 
+                onClick={() => setZoom(z => Math.min(2.0, z + 0.1))}
+                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                title={language === 'zh' ? '放大' : 'Zoom In'}
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
-          <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden md:block"></div>
+          {(workspaceMode === 'split' || workspaceMode === 'dtp') && (
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden md:block"></div>
+          )}
 
           {/* View Modes */}
           <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 text-xs shrink-0 font-medium">
@@ -431,7 +435,7 @@ export function BookEditor() {
                 "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
                 workspaceMode === 'story'
                   ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                  : "text-zinc-500 hover:text-zinc-805 dark:hover:text-zinc-300"
               )}
               title={language === 'zh' ? '文本模式' : 'Text Mode'}
             >
@@ -444,7 +448,7 @@ export function BookEditor() {
                 "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
                 workspaceMode === 'split'
                   ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                  : "text-zinc-500 hover:text-zinc-805 dark:hover:text-zinc-300"
               )}
               title={language === 'zh' ? '双栏编辑与预览' : 'Split Workspace'}
             >
@@ -457,31 +461,31 @@ export function BookEditor() {
                 "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
                 workspaceMode === 'dtp'
                   ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
-                  : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
+                  : "text-zinc-500 hover:text-zinc-805 dark:hover:text-zinc-300"
               )}
               title={language === 'zh' ? '排版预览' : 'Layout Preview'}
             >
               <Eye className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">{language === 'zh' ? '排版预览' : 'Layout'}</span>
+              <span className="hidden md:inline">{language === 'zh' ? '排版模式' : 'Layout'}</span>
+            </button>
+            <button
+              onClick={() => setIsSamplePreviewOpen(true)}
+              className={cn(
+                "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
+                isSamplePreviewOpen
+                  ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-805 dark:hover:text-zinc-300"
+              )}
+              title={language === 'zh' ? '书籍样张预览' : 'Sample Book Preview'}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
+              <span className="hidden md:inline">{language === 'zh' ? '样张预览' : 'Sample'}</span>
             </button>
           </div>
         </div>
 
         {/* RIGHT COMPONENT */}
         <div className="flex items-center justify-end gap-2 shrink-0 lg:w-1/3">
-          <button
-            onClick={() => setShowGuides(!showGuides)}
-            className={cn(
-              "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0 hidden sm:flex",
-              showGuides ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20" : "hover:bg-zinc-100 dark:hover:bg-zinc-800"
-            )}
-            title={showGuides ? (language === 'zh' ? '隐藏网格线' : 'Hide Guides') : (language === 'zh' ? '显示网格线' : 'Show Guides')}
-          >
-            <Grid className="w-4 h-4" />
-          </button>
-          
-          <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
-
           <button
             onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
             className={cn(
@@ -598,17 +602,6 @@ export function BookEditor() {
                 >
                   <Download className="w-4 h-4 text-emerald-500" />
                   {t('export_json')}
-                </button>
-                <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1"></div>
-                <button
-                  onClick={() => {
-                    setIsSamplePreviewOpen(true);
-                    setShowExportMenu(false);
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
-                >
-                  <BookOpen className="w-4 h-4 text-purple-500" />
-                  {t('generate_sample')}
                 </button>
               </div>
             )}

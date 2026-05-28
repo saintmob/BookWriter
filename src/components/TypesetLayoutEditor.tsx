@@ -98,7 +98,9 @@ export function TypesetLayoutEditor({
     isRightSidebarOpen, 
     setIsRightSidebarOpen, 
     workspaceMode, 
-    setWorkspaceMode 
+    setWorkspaceMode,
+    zoom,
+    setZoom
   } = useStore();
   
   // Load settings
@@ -106,11 +108,10 @@ export function TypesetLayoutEditor({
     return { ...DEFAULT_LAYOUT, ...chapter.layout };
   });
   const [floatingImages, setFloatingImages] = useState<FloatingImage[]>(chapter.floatingImages || []);
-  const [zoom, setZoom] = useState(0.75);
   const [pageCount, setPageCount] = useState(1);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showGuides, setShowGuides] = useState(true);
-  const [activeAssetTab, setActiveAssetTab] = useState<'details' | 'assets' | 'ai'>('details');
+  const [activeAssetTab, setActiveAssetTab] = useState<'details' | 'assets' | 'ai'>('ai');
   
   // Direct Block Editing Overlay state
   const [editingBlock, setEditingBlock] = useState<{ index: number; text: string } | null>(null);
@@ -121,6 +122,7 @@ export function TypesetLayoutEditor({
     trim: false,         // 二、拼版规格尺寸规格 (对标 InDesign)
     typography: false,   // 三、字形与文本多栏分段
     bleed: false,        // 四、印刷版心四周留白
+    guides: false,       // 五、排版辅助显示
     imgMetrics: false,   // 一、插图尺寸与绝对坐标
     imgAlignment: false, // 二、对齐与图文绕排模式
     imgFilters: false,   // 三、滤镜混合与相框羽化
@@ -157,6 +159,14 @@ export function TypesetLayoutEditor({
     setLayout({ ...DEFAULT_LAYOUT, ...chapter.layout });
     setFloatingImages(chapter.floatingImages || []);
   }, [chapter.id]);
+
+  // Whenever an image is selected, open right sidebar and show image properties tab
+  useEffect(() => {
+    if (selectedImageId) {
+      setIsRightSidebarOpen(true);
+      setActiveAssetTab('details');
+    }
+  }, [selectedImageId, setIsRightSidebarOpen]);
 
   // Synchronize layout & images changes automatically back to chapter DB with debounce
   useEffect(() => {
@@ -594,12 +604,26 @@ export function TypesetLayoutEditor({
 
       {/* Right properties workspace sidebar */}
       <div className={cn(
-        "transition-all duration-300 ease-in-out border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 h-full overflow-hidden shadow-xl z-20 relative",
-        isRightSidebarOpen ? "w-80" : "w-0 border-l-0 shadow-none animate-fade-out"
+        "transition-all duration-300 ease-in-out bg-white dark:bg-zinc-900 flex flex-col h-full overflow-hidden shadow-xl z-20 relative",
+        isRightSidebarOpen ? "w-80 shrink-0 border-l border-zinc-200 dark:border-zinc-800 opacity-100" : "w-0 border-l-0 shadow-none opacity-0 invisible pointer-events-none"
       )}>
         
         {/* Properties Selector Header Tabs */}
         <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center bg-zinc-50 dark:bg-zinc-950/50 p-1.5 gap-1 shrink-0 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
+          <button
+            onClick={() => setActiveAssetTab('ai')}
+            className={cn(
+              "flex-1 min-w-[70px] py-1.5 px-1 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 shrink-0",
+              activeAssetTab === 'ai'
+                ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 shadow-sm border border-emerald-200/50 dark:border-emerald-800/50"
+                : "text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+            )}
+            title={currentLanguage === 'zh' ? 'AI 智能写作与协助' : 'AI Assistant'}
+          >
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{currentLanguage === 'zh' ? 'AI助手' : 'AI Assistant'}</span>
+          </button>
+
           <button
             onClick={() => setActiveAssetTab('details')}
             className={cn(
@@ -610,7 +634,7 @@ export function TypesetLayoutEditor({
             )}
           >
             <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">{selectedImageId ? (currentLanguage === 'zh' ? '照片属性' : 'Image Props') : (currentLanguage === 'zh' ? '版面样式' : 'Layout')}</span>
+            <span className="truncate">{selectedImageId ? (currentLanguage === 'zh' ? '图像属性' : 'Image Props') : (currentLanguage === 'zh' ? '版面样式' : 'Layout')}</span>
           </button>
           
           <button
@@ -624,28 +648,6 @@ export function TypesetLayoutEditor({
           >
             <Layers className="w-3.5 h-3.5 shrink-0" />
             <span className="truncate">{currentLanguage === 'zh' ? '媒介图库' : 'Assets'}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveAssetTab('ai')}
-            className={cn(
-              "flex-1 min-w-[70px] py-1.5 px-1 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 shrink-0",
-              activeAssetTab === 'ai'
-                ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 shadow-sm border border-emerald-200/50 dark:border-emerald-800/50"
-                : "text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
-            )}
-            title={currentLanguage === 'zh' ? 'AI 智能写作与协助' : 'AI Assistant'}
-          >
-            <Sparkles className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">AI Assistant</span>
-          </button>
-
-          <button
-            onClick={() => setIsRightSidebarOpen(false)}
-            className="p-1.5 px-1.5 ml-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 transition-colors shrink-0"
-            title={currentLanguage === 'zh' ? '收起右侧面板' : 'Collapse right panel'}
-          >
-            <PanelRightClose className="w-4 h-4 text-emerald-500" />
           </button>
         </div>
 
@@ -878,10 +880,23 @@ export function TypesetLayoutEditor({
                       {currentLanguage === 'zh' ? '取消选择该插图 (ESC)' : 'Deselect Illustration'}
                     </button>
                     <button 
-                      onClick={() => {
+                      onClick={async () => {
+                        const targetUrl = img.url;
                         setFloatingImages(prev => prev.filter(f => f.id !== selectedImageId));
                         setSelectedImageId(null);
-                        toast.error(currentLanguage === 'zh' ? '插图已从版面移除' : 'Removed asset');
+                        
+                        // Check if this image matches chapter.image and clear it to ensure consistency across live preview and DB
+                        if (chapter.image === targetUrl) {
+                          const updatedChapter = {
+                            ...chapter,
+                            image: undefined,
+                            updatedAt: Date.now()
+                          };
+                          await db.saveChapter(updatedChapter);
+                          onUpdateChapter(updatedChapter);
+                        }
+                        
+                        toast.error(currentLanguage === 'zh' ? '该插图已从章节及其版面完全移除' : 'Removed asset completely');
                       }}
                       className="w-full py-1.5 hover:bg-red-50 text-red-600 dark:hover:bg-red-950/20 rounded-md text-xs font-bold transition-all pointer-events-auto"
                     >
@@ -1098,6 +1113,33 @@ export function TypesetLayoutEditor({
                           />
                         </div>
                       </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Guides and Helpers display option */}
+                <div className="border border-zinc-150 dark:border-zinc-800 rounded-lg overflow-hidden bg-zinc-50/50 dark:bg-zinc-950/20">
+                  <button
+                    onClick={() => toggleSection('guides')}
+                    type="button"
+                    className="w-full h-9 px-3 flex items-center justify-between text-[11px] font-bold text-zinc-500 hover:text-zinc-855 dark:hover:text-zinc-200 uppercase tracking-wider bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-150 dark:border-zinc-800 transition-colors"
+                  >
+                    <span>{currentLanguage === 'zh' ? '五、排版辅助显示' : 'DTP Guideline Helpers'}</span>
+                    {collapsedSections.guides ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                  {!collapsedSections.guides && (
+                    <div className="p-3 space-y-2 animate-fade-in">
+                      <label className="flex items-center justify-between p-2 rounded-lg bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-colors">
+                        <span className="font-medium text-zinc-750 dark:text-zinc-300">
+                          {currentLanguage === 'zh' ? '显示排版网格和基准辅助线' : 'Display Columns & Gridlines'}
+                        </span>
+                        <input
+                          type="checkbox"
+                          checked={showGuides}
+                          onChange={(e) => setShowGuides(e.target.checked)}
+                          className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305 dark:bg-zinc-900 dark:border-zinc-750"
+                        />
+                      </label>
                     </div>
                   )}
                 </div>
