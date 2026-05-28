@@ -89,13 +89,7 @@ export function TypesetLayoutEditor({
   onToggleChat,
 }: TypesetLayoutEditorProps) {
   const { t, i18n } = useTranslation();
-  const { isOutlineSidebarOpen, setIsOutlineSidebarOpen } = useStore();
-  
-  // Workspace modes: 
-  // 'story' = Left-side Markdown editor only
-  // 'split' = Side-by-side editing and paginated canvas layout (Default / Professional)
-  // 'dtp' = Right-side paginated canvas layout only
-  const [workspaceMode, setWorkspaceMode] = useState<'story' | 'split' | 'dtp'>('split');
+  const { isOutlineSidebarOpen, setIsOutlineSidebarOpen, workspaceMode, setWorkspaceMode } = useStore();
   
   // Load settings
   const [layout, setLayout] = useState<PageLayout & { columns?: number; paperStyle?: 'warm' | 'white' | 'dark' | 'kraft' }>(() => {

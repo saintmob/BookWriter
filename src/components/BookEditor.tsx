@@ -3,13 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book, FloatingImage } from '../lib/db';
 import { generateChapterContent, generateImage, proofreadChapter, applyProofreadChanges, ProofreadFeedback } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2, ChevronLeft, ChevronRight, ArrowLeft, PenLine, LayoutTemplate, Settings as SettingsIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { OutlineEditorModal } from './OutlineEditorModal';
 import { ChapterChat } from './ChapterChat';
 import { BookInfoModal } from './BookInfoModal';
 import { ConfirmModal } from './ConfirmModal';
+import { SettingsModal } from './SettingsModal';
 import { BookSamplePreview } from './BookSamplePreview';
 import { TypesetLayoutEditor } from './TypesetLayoutEditor';
 import { v4 as uuidv4 } from 'uuid';
@@ -20,11 +21,10 @@ export function BookEditor() {
   const { 
     activeBookId, 
     activeChapterId, 
-    setActiveChapter, 
+    setActiveChapter,
+    setActiveBook,
     deleteBook, 
     language, 
-    appMode, 
-    setAppMode,
     isOutlineSidebarOpen,
     setIsOutlineSidebarOpen
   } = useStore();
@@ -42,11 +42,11 @@ export function BookEditor() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   const [content, setContent] = useState('');
-  const [viewMode, setViewMode] = useState<'edit' | 'preview' | 'typeset'>(appMode === 'typeset' ? 'typeset' : 'edit');
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
   const [isBookInfoOpen, setIsBookInfoOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSamplePreviewOpen, setIsSamplePreviewOpen] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
@@ -120,22 +120,6 @@ export function BookEditor() {
       setContent('');
     }
   }, [activeChapterId, chapters]);
-
-  // Sync internal viewMode with main sidebar appMode
-  useEffect(() => {
-    if (appMode === 'typeset') {
-      setViewMode('typeset');
-    } else if (viewMode === 'typeset') {
-      setViewMode('edit');
-    }
-  }, [appMode]);
-
-  useEffect(() => {
-    if (viewMode === 'edit' && textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [content, viewMode, activeChapterId]);
 
   const loadBookData = async () => {
     if (!activeBookId) return;
@@ -392,26 +376,35 @@ export function BookEditor() {
         isOutlineSidebarOpen ? "w-72" : "w-0 border-r-0 shadow-none opacity-0 pointer-events-none"
       )}>
         {/* ... (sidebar content) ... */}
+        <div className="p-3 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
+          <button 
+            onClick={() => setActiveBook(null)}
+            className="flex items-center gap-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors px-2 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {t('my_books')}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOutlineSidebarOpen(false);
+            }}
+            type="button"
+            className="p-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 transition-colors"
+            title={language === 'zh' ? '收起大纲栏' : 'Collapse chapters panel'}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        </div>
+
         <div 
-          className="p-4 border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-colors group"
+          className="p-4 border-b border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors group relative"
           onClick={() => setIsBookInfoOpen(true)}
         >
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="font-serif font-bold text-lg truncate flex-1" title={book.title}>{book.title}</h2>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOutlineSidebarOpen(false);
-              }}
-              type="button"
-              className="p-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 transition-colors"
-              title={language === 'zh' ? '收起大纲栏' : 'Collapse chapters panel'}
-            >
-              <ChevronLeft className="w-4 h-4 text-emerald-500" />
-            </button>
-            <Edit2 className="w-3 h-3 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="font-serif font-bold text-lg leading-tight line-clamp-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{book.title}</h2>
+            <Edit2 className="w-4 h-4 text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
           </div>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">{book.summary}</p>
         </div>
         
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
@@ -445,27 +438,32 @@ export function BookEditor() {
           ))}
         </div>
 
-        <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between p-2 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200 rounded-lg transition-colors flex-1 flex justify-center"
+            title={t('settings')}
+          >
+            <SettingsIcon className="w-4 h-4" />
+          </button>
           <button
             onClick={() => setIsDeleteModalOpen(true)}
-            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+            className="p-2 text-zinc-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors flex-1 flex justify-center"
             title={t('delete_book')}
           >
-            <Trash2 className="w-5 h-5" />
+            <Trash2 className="w-4 h-4" />
           </button>
-
           <div className="relative flex-1" ref={exportMenuRef}>
             <button
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded-lg text-sm font-medium transition-colors"
+              className="w-full flex items-center justify-center p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800/80 text-zinc-400 dark:hover:text-zinc-200 rounded-lg transition-colors"
+              title={t('export')}
             >
               <Download className="w-4 h-4" />
-              {t('export')}
-              <ChevronDown className="w-3 h-3 opacity-50" />
             </button>
 
             {showExportMenu && (
-              <div className="absolute bottom-full left-0 mb-2 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-700 py-1 z-50">
+              <div className="absolute bottom-full right-0 mb-2 w-48 bg-white dark:bg-zinc-800 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-700 py-1 z-50">
                 <button
                   onClick={handleExportMarkdown}
                   className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
@@ -671,6 +669,10 @@ export function BookEditor() {
             </div>
           </div>
         </div>
+      )}
+
+      {isSettingsOpen && (
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       )}
     </div>
   );

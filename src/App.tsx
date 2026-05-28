@@ -9,7 +9,7 @@ import { Toaster } from 'sonner';
 import './i18n';
 
 export default function App() {
-  const { loadBooks, activeBookId, books, theme, appMode } = useStore();
+  const { loadBooks, activeBookId, books, theme } = useStore();
 
   useEffect(() => {
     loadBooks();
@@ -45,7 +45,7 @@ export default function App() {
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 font-sans antialiased selection:bg-emerald-200 selection:text-emerald-900 dark:selection:bg-emerald-900/50 dark:selection:text-emerald-100">
       <Toaster position="top-center" richColors />
-      <Sidebar />
+      {(!activeBookId || !activeBook) && <Sidebar />}
       
       {activeBookId === null ? (
         <Dashboard />
