@@ -18,6 +18,12 @@ export interface FloatingImage {
   width: number;
   height: number;
   pageIndex?: number; // Which page this image belongs to
+  zIndex?: number;
+  opacity?: number;
+  borderRadius?: number;
+  shadow?: string;
+  objectFit?: 'cover' | 'contain' | 'fill';
+  blendMode?: string;
 }
 
 export type TrimFormat = 'a4' | 'letter' | 'trade' | 'pocket';

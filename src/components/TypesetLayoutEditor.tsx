@@ -39,6 +39,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
   const [floatingImages, setFloatingImages] = useState<FloatingImage[]>(chapter.floatingImages || []);
   const [zoom, setZoom] = useState(0.8);
   const [pageCount, setPageCount] = useState(1);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   
   const textContainerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,8 +122,14 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
           y: Math.max(0, dropY),
           width: 200,
           height: 200,
+          opacity: 1,
+          borderRadius: 0,
+          shadow: 'none',
+          objectFit: 'cover',
+          blendMode: 'normal',
         };
         setFloatingImages(prev => [...prev, newImg]);
+        setSelectedImageId(newImg.id);
       };
       reader.readAsDataURL(file);
     }
@@ -151,8 +158,14 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
         y: 100,
         width: 200,
         height: 200,
+        opacity: 1,
+        borderRadius: 0,
+        shadow: 'none',
+        objectFit: 'cover',
+        blendMode: 'normal',
       };
       setFloatingImages(prev => [...prev, newImg]);
+      setSelectedImageId(newImg.id);
     };
     reader.readAsDataURL(file);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -235,6 +248,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
           ref={workspaceRef}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
+          onClick={() => setSelectedImageId(null)}
           className="flex-1 overflow-auto bg-zinc-200/50 dark:bg-black/40 p-8 flex isolate relative" 
           style={{ alignContent: 'center' }}
         >
@@ -311,12 +325,17 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
                     height: img.height,
                   }}
                   bounds="parent"
-                  className="group float-rnd z-10 pointer-events-auto"
+                  className={cn(
+                    "group float-rnd pointer-events-auto",
+                    selectedImageId === img.id ? "z-20 ring-2 ring-emerald-500 ring-offset-1" : "z-10"
+                  )}
+                  onDragStart={() => setSelectedImageId(img.id)}
                   onDragStop={(e, d) => {
                     const newImgs = [...floatingImages];
                     newImgs[i] = { ...img, x: d.x, y: d.y };
                     setFloatingImages(newImgs);
                   }}
+                  onResizeStart={() => setSelectedImageId(img.id)}
                   onResizeStop={(e, direction, ref, delta, position) => {
                     const newImgs = [...floatingImages];
                     newImgs[i] = {
@@ -328,17 +347,36 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
                     setFloatingImages(newImgs);
                   }}
                 >
-                  <div className="relative w-full h-full border-2 border-transparent hover:border-emerald-500 border-dashed transition-colors group-hover:bg-black/5 shadow-md bg-white">
-                    <img src={img.url} className="w-full h-full object-cover pointer-events-none" alt="" />
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFloatingImages(floatingImages.filter(f => f.id !== img.id));
-                      }}
-                      className="absolute -top-3 -right-3 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                    </button>
+                  <div 
+                    className="relative w-full h-full border border-transparent hover:border-emerald-500/50 transition-colors bg-black/5"
+                    style={{
+                      opacity: img.opacity ?? 1,
+                      mixBlendMode: (img.blendMode as any) || 'normal',
+                      borderRadius: img.borderRadius ?? 0,
+                      boxShadow: img.shadow === 'sm' ? '0 1px 2px 0 rgb(0 0 0 / 0.05)' :
+                                 img.shadow === 'md' ? '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' :
+                                 img.shadow === 'lg' ? '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' :
+                                 img.shadow === 'xl' ? '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)' : 'none',
+                      overflow: 'hidden'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedImageId(img.id);
+                    }}
+                  >
+                    <img src={img.url} className="w-full h-full pointer-events-none" style={{ objectFit: (img.objectFit as any) || 'cover' }} alt="" />
+                    {selectedImageId === img.id && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFloatingImages(floatingImages.filter(f => f.id !== img.id));
+                          setSelectedImageId(null);
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 shadow-md z-30"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                      </button>
+                    )}
                   </div>
                 </Rnd>
               ))}
@@ -350,114 +388,225 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
       {/* Right Properties Sidebar */}
       <div className="w-72 border-l border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex flex-col shrink-0 h-full overflow-y-auto">
         <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center px-5 shrink-0 bg-zinc-50 dark:bg-zinc-950/50">
-          <Settings className="w-4 h-4 text-zinc-500 mr-2" />
-          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Layout Properties</h3>
+          {selectedImageId ? (
+            <>
+              <ImagePlus className="w-4 h-4 text-emerald-600 mr-2" />
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Image Properties</h3>
+            </>
+          ) : (
+            <>
+              <Settings className="w-4 h-4 text-zinc-500 mr-2" />
+              <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Layout Properties</h3>
+            </>
+          )}
         </div>
         
         <div className="p-5 space-y-8">
-          {/* Format Settings */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-              <LayoutTemplate className="w-4 h-4 text-zinc-400" /> <span>Trim Size</span>
-            </h4>
-            <div className="grid grid-cols-1 gap-2">
-              {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => handleLayoutChange('format', f)}
-                  className={cn(
-                    "text-left p-3 text-sm rounded-lg border transition-all",
-                    layout.format === f 
-                      ? "bg-emerald-50 border-emerald-500 text-emerald-900 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-100 ring-1 ring-emerald-500"
-                      : "bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-zinc-300 dark:bg-zinc-800/50 dark:border-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                  )}
-                >
-                  <div className="font-semibold">{FORMATS[f].label}</div>
-                  <div className="text-xs opacity-70 mt-0.5">{FORMATS[f].width} × {FORMATS[f].height}px</div>
-                </button>
-              ))}
-            </div>
-          </div>
+          {selectedImageId ? (() => {
+            const img = floatingImages.find(f => f.id === selectedImageId);
+            if (!img) return null;
+            
+            const updateImg = (updates: Partial<FloatingImage>) => {
+              setFloatingImages(prev => prev.map(f => f.id === img.id ? { ...f, ...updates } : f));
+            };
 
-          <hr className="border-zinc-200 dark:border-zinc-800" />
+            return (
+              <div className="space-y-6">
+                <div>
+                   <label className="text-xs font-medium text-zinc-500 block mb-1.5">Size & Position (px)</label>
+                   <div className="grid grid-cols-2 gap-2 text-sm text-zinc-700 dark:text-zinc-300">
+                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">W: {img.width}</div>
+                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">H: {img.height}</div>
+                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">X: {Math.round(img.x)}</div>
+                     <div className="bg-zinc-100 dark:bg-zinc-800 p-2 rounded">Y: {Math.round(img.y)}</div>
+                   </div>
+                   <p className="text-[10px] text-zinc-400 mt-2">Drag image on canvas to move. Drag edges to resize.</p>
+                </div>
 
-          {/* Typography Settings */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-              <Type className="w-4 h-4 text-zinc-400" /> <span>Typography</span>
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Font Size (px)</label>
-                <input 
-                  type="number" 
-                  value={layout.fontSize || 16} 
-                  onChange={e => handleLayoutChange('fontSize', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Line Height</label>
-                <input 
-                  type="number" 
-                  step="0.1"
-                  value={layout.lineHeight || 1.6} 
-                  onChange={e => handleLayoutChange('lineHeight', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                />
-              </div>
-            </div>
-          </div>
+                <hr className="border-zinc-200 dark:border-zinc-800" />
 
-          <hr className="border-zinc-200 dark:border-zinc-800" />
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Style</h4>
+                  
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5 flex justify-between">
+                      Opacity <span>{Math.round((img.opacity ?? 1) * 100)}%</span>
+                    </label>
+                    <input 
+                      type="range" 
+                      min="0" max="1" step="0.05"
+                      value={img.opacity ?? 1}
+                      onChange={e => updateImg({ opacity: Number(e.target.value) })}
+                      className="w-full accent-emerald-500"
+                    />
+                  </div>
 
-          {/* Margins */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-               <div className="w-4 h-4 border-2 border-zinc-400 rounded-sm" /> <span>Page Margins (px)</span>
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Top</label>
-                <input 
-                  type="number" 
-                  value={layout.marginTop} 
-                  onChange={e => handleLayoutChange('marginTop', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                />
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Blend Mode</label>
+                    <select 
+                      value={img.blendMode || 'normal'}
+                      onChange={e => updateImg({ blendMode: e.target.value })}
+                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="multiply">Multiply</option>
+                      <option value="screen">Screen</option>
+                      <option value="overlay">Overlay</option>
+                      <option value="darken">Darken</option>
+                      <option value="lighten">Lighten</option>
+                      <option value="color-dodge">Color Dodge</option>
+                      <option value="color-burn">Color Burn</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Object Fit</label>
+                    <select 
+                      value={img.objectFit || 'cover'}
+                      onChange={e => updateImg({ objectFit: e.target.value as any })}
+                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 outline-none"
+                    >
+                      <option value="cover">Cover (Fill bounds)</option>
+                      <option value="contain">Contain (Show all)</option>
+                      <option value="fill">Fill (Stretch)</option>
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500 block mb-1.5">Corner Radius</label>
+                      <input 
+                        type="number" 
+                        value={img.borderRadius ?? 0}
+                        onChange={e => updateImg({ borderRadius: Number(e.target.value) })}
+                        className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border-transparent outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-zinc-500 block mb-1.5">Shadow</label>
+                      <select 
+                        value={img.shadow || 'none'}
+                        onChange={e => updateImg({ shadow: e.target.value })}
+                        className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border-transparent outline-none"
+                      >
+                        <option value="none">None</option>
+                        <option value="sm">Small</option>
+                        <option value="md">Medium</option>
+                        <option value="lg">Large</option>
+                        <option value="xl">Extra Large</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Bottom</label>
-                <input 
-                  type="number" 
-                  value={layout.marginBottom} 
-                  onChange={e => handleLayoutChange('marginBottom', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                />
+            );
+          })() : (
+            <>
+              {/* Format Settings */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                  <LayoutTemplate className="w-4 h-4 text-zinc-400" /> <span>Trim Size</span>
+                </h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => handleLayoutChange('format', f)}
+                      className={cn(
+                        "text-left p-3 text-sm rounded-lg border transition-all",
+                        layout.format === f 
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-900 dark:bg-emerald-900/30 dark:border-emerald-500 dark:text-emerald-100 ring-1 ring-emerald-500"
+                          : "bg-zinc-50 border-zinc-200 text-zinc-700 hover:border-zinc-300 dark:bg-zinc-800/50 dark:border-zinc-700 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                      )}
+                    >
+                      <div className="font-semibold">{FORMATS[f].label}</div>
+                      <div className="text-xs opacity-70 mt-0.5">{FORMATS[f].width} × {FORMATS[f].height}px</div>
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Left</label>
-                <input 
-                  type="number" 
-                  value={layout.marginLeft} 
-                  onChange={e => handleLayoutChange('marginLeft', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                />
+
+              <hr className="border-zinc-200 dark:border-zinc-800" />
+
+              {/* Typography Settings */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                  <Type className="w-4 h-4 text-zinc-400" /> <span>Typography</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Font Size (px)</label>
+                    <input 
+                      type="number" 
+                      value={layout.fontSize || 16} 
+                      onChange={e => handleLayoutChange('fontSize', Number(e.target.value))}
+                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Line Height</label>
+                    <input 
+                      type="number" 
+                      step="0.1"
+                      value={layout.lineHeight || 1.6} 
+                      onChange={e => handleLayoutChange('lineHeight', Number(e.target.value))}
+                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
+                    />
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1.5">Right</label>
-                <input 
-                  type="number" 
-                  value={layout.marginRight} 
-                  onChange={e => handleLayoutChange('marginRight', Number(e.target.value))}
-                  className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
-                />
+
+              <hr className="border-zinc-200 dark:border-zinc-800" />
+
+              {/* Margins */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                  <div className="w-4 h-4 border-2 border-zinc-400 rounded-sm" /> <span>Page Margins (px)</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Top</label>
+                    <input 
+                      type="number" 
+                      value={layout.marginTop} 
+                      onChange={e => handleLayoutChange('marginTop', Number(e.target.value))}
+                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Bottom</label>
+                    <input 
+                      type="number" 
+                      value={layout.marginBottom} 
+                      onChange={e => handleLayoutChange('marginBottom', Number(e.target.value))}
+                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Left</label>
+                    <input 
+                      type="number" 
+                      value={layout.marginLeft} 
+                      onChange={e => handleLayoutChange('marginLeft', Number(e.target.value))}
+                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-zinc-500 block mb-1.5">Right</label>
+                    <input 
+                      type="number" 
+                      value={layout.marginRight} 
+                      onChange={e => handleLayoutChange('marginRight', Number(e.target.value))}
+                      className="w-full text-sm p-2 bg-zinc-100 dark:bg-zinc-800 rounded-md border border-transparent focus:border-emerald-500 focus:bg-white dark:focus:bg-zinc-900 outline-none transition-colors"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-500 mt-2">
+                  Drag images onto the page from your desktop to place floating media.
+                </p>
               </div>
-            </div>
-            <p className="text-xs text-zinc-500 mt-2">
-              Drag images onto the page from your desktop to place floating media.
-            </p>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </div>
