@@ -255,7 +255,7 @@ export function BookEditor() {
     a.download = `${book.title.replace(/\s+/g, '_')}.md`;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    if (a.parentNode) a.parentNode.removeChild(a);
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
   };
@@ -280,7 +280,7 @@ export function BookEditor() {
     a.download = `${book.title.replace(/\s+/g, '_')}_backup.json`;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    if (a.parentNode) a.parentNode.removeChild(a);
     URL.revokeObjectURL(url);
     setShowExportMenu(false);
   };

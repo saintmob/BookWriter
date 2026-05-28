@@ -57,8 +57,14 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
         y: 100,
         width,
         height,
+        opacity: 1,
+        borderRadius: 0,
+        shadow: 'none',
+        objectFit: 'cover',
+        blendMode: 'normal',
       };
       setFloatingImages(prev => [...prev, newImg]);
+      setSelectedImageId(newImg.id);
     };
     return () => {
       delete (window as any).__addFloatingImage;
@@ -69,6 +75,26 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
     setLayout({ ...DEFAULT_LAYOUT, ...chapter.layout });
     setFloatingImages(chapter.floatingImages || []);
   }, [chapter.id]);
+
+  useEffect(() => {
+    const timeout = setTimeout(async () => {
+      const isLayoutEqual = JSON.stringify(layout) === JSON.stringify({ ...DEFAULT_LAYOUT, ...chapter.layout });
+      const isImagesEqual = JSON.stringify(floatingImages) === JSON.stringify(chapter.floatingImages || []);
+      
+      if (!isLayoutEqual || !isImagesEqual) {
+        const updatedChapter = { 
+          ...chapter, 
+          layout, 
+          floatingImages,
+          updatedAt: Date.now()
+        };
+        await db.saveChapter(updatedChapter);
+        onUpdateChapter(updatedChapter);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timeout);
+  }, [layout, floatingImages, chapter, onUpdateChapter]);
 
   // Calculate page count based on scroll width of the column container
   useEffect(() => {
