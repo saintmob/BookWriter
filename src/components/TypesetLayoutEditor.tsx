@@ -28,7 +28,9 @@ import {
   ChevronDown,
   Eye,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen
 } from 'lucide-react';
 import { Chapter, FloatingImage, PageLayout, TrimFormat, db } from '../lib/db';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -37,6 +39,7 @@ import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { cn } from '../lib/utils';
 import { useStore } from '../store/useStore';
+import { ChapterChat } from './ChapterChat';
 
 interface TypesetLayoutEditorProps {
   chapter: Chapter;
@@ -49,8 +52,8 @@ interface TypesetLayoutEditorProps {
   onGenerateContent?: () => Promise<void>;
   onGenerateImageOfPrompt?: (prompt: string) => Promise<string | null>;
   onProofreadText?: () => void;
-  isChatOpen?: boolean;
-  onToggleChat?: () => void;
+  bookTitle?: string;
+  language?: string;
 }
 
 const FORMATS: Record<TrimFormat, { width: number; height: number; label: string; printLabel: string }> = {
@@ -85,8 +88,8 @@ export function TypesetLayoutEditor({
   onGenerateContent,
   onGenerateImageOfPrompt,
   onProofreadText,
-  isChatOpen = false,
-  onToggleChat,
+  bookTitle = '',
+  language = 'en',
 }: TypesetLayoutEditorProps) {
   const { t, i18n } = useTranslation();
   const { isOutlineSidebarOpen, setIsOutlineSidebarOpen, workspaceMode, setWorkspaceMode } = useStore();
@@ -100,7 +103,7 @@ export function TypesetLayoutEditor({
   const [pageCount, setPageCount] = useState(1);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [showGuides, setShowGuides] = useState(true);
-  const [activeAssetTab, setActiveAssetTab] = useState<'details' | 'assets'>('details');
+  const [activeAssetTab, setActiveAssetTab] = useState<'details' | 'assets' | 'ai'>('details');
   
   // Direct Block Editing Overlay state
   const [editingBlock, setEditingBlock] = useState<{ index: number; text: string } | null>(null);
@@ -324,9 +327,10 @@ export function TypesetLayoutEditor({
       {/* Central Interactive Panels */}
       <div className="flex flex-col flex-1 relative overflow-hidden h-full">
         {/* Top Professional Adobe Toolbar */}
-        <div className="h-14 border-b border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0 select-none shadow-sm">
-          {/* Main workspace widgets */}
-          <div className="flex items-center gap-2">
+        <div className="h-14 border-b border-zinc-250 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0 select-none shadow-sm overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden w-full">
+          
+          {/* LEFT SECTION */}
+          <div className="flex items-center gap-2 shrink-0 min-w-[200px] lg:w-1/3">
             {/* Outline list toggle icon */}
             <button
               onClick={() => setIsOutlineSidebarOpen(!isOutlineSidebarOpen)}
@@ -340,19 +344,48 @@ export function TypesetLayoutEditor({
               {isOutlineSidebarOpen ? <PanelLeftClose className="w-4 h-4 text-emerald-500 animate-pulse" /> : <PanelLeftOpen className="w-4 h-4 text-amber-500 animate-bounce" />}
             </button>
 
-            <span className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-850 rounded-md text-xs font-serif font-semibold text-zinc-800 dark:text-zinc-200 select-none">
+            <span className="flex items-center gap-1.5 px-2 py-1 bg-zinc-100 dark:bg-zinc-850 rounded-md text-xs font-serif font-semibold text-zinc-800 dark:text-zinc-200 select-none max-w-[150px]">
               <LayoutTemplate className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-              <span>DTP Desk</span>
+              <span className="truncate">{bookTitle || 'DTP Desk'}</span>
             </span>
 
-            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
+            {/* Layout specifications metadata labels */}
+            <span className="text-[10px] font-mono text-zinc-400 hidden xl:inline-block px-1.5 py-0.5 rounded border border-zinc-200/50 dark:border-zinc-800/50 truncate">
+              {formatData.printLabel} • {columnsCount} Col{columnsCount > 1 && 's'}
+            </span>
+          </div>
+
+          {/* MIDDLE SECTION */}
+          <div className="flex items-center justify-center gap-3 shrink-0">
+            {/* Quick Desk Zooms */}
+            <div className="flex items-center bg-zinc-100 dark:bg-zinc-850 rounded-lg p-0.5 text-xs">
+              <button 
+                onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
+                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                title={currentLanguage === 'zh' ? '外延缩小' : 'Zoom Out'}
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="w-9 text-center font-semibold text-zinc-600 dark:text-zinc-300 font-mono text-[10px]">
+                {Math.round(zoom * 100)}%
+              </span>
+              <button 
+                onClick={() => setZoom(z => Math.min(2.0, z + 0.1))}
+                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
+                title={currentLanguage === 'zh' ? '内向放大' : 'Zoom In'}
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
 
             {/* Split, Story & Layout segment toggle */}
             <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1 text-xs shrink-0 font-medium">
               <button
                 onClick={() => setWorkspaceMode('story')}
                 className={cn(
-                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1",
+                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
                   workspaceMode === 'story'
                     ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
                     : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
@@ -360,13 +393,13 @@ export function TypesetLayoutEditor({
                 title={currentLanguage === 'zh' ? '文本故事编辑器' : 'Story Editor Mode'}
               >
                 <FileText className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{currentLanguage === 'zh' ? '文本编辑' : 'Story'}</span>
+                <span className="hidden md:inline">{currentLanguage === 'zh' ? '文本编辑' : 'Story'}</span>
               </button>
               
               <button
                 onClick={() => setWorkspaceMode('split')}
                 className={cn(
-                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1",
+                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
                   workspaceMode === 'split'
                     ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
                     : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
@@ -374,13 +407,13 @@ export function TypesetLayoutEditor({
                 title={currentLanguage === 'zh' ? '左右分栏双模式：编辑+实时排版' : 'Interlocking Editorial Workspace'}
               >
                 <Columns className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{currentLanguage === 'zh' ? '同步双功' : 'Live Split'}</span>
+                <span className="hidden md:inline">{currentLanguage === 'zh' ? '同步双功' : 'Live Split'}</span>
               </button>
 
               <button
                 onClick={() => setWorkspaceMode('dtp')}
                 className={cn(
-                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1",
+                  "px-3 py-1 rounded-md transition-all duration-150 flex items-center gap-1.5",
                   workspaceMode === 'dtp'
                     ? "bg-white dark:bg-zinc-700 text-zinc-950 dark:text-zinc-50 shadow-sm"
                     : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
@@ -388,19 +421,13 @@ export function TypesetLayoutEditor({
                 title={currentLanguage === 'zh' ? '专业版页设计面' : 'Focused Canvas Typesetting'}
               >
                 <Eye className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{currentLanguage === 'zh' ? '版面设计' : 'Layout'}</span>
+                <span className="hidden md:inline">{currentLanguage === 'zh' ? '版面设计' : 'Layout'}</span>
               </button>
             </div>
-
-            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden md:block"></div>
-
-            {/* Layout specifications metadata labels */}
-            <span className="text-[11px] font-mono text-zinc-400 hidden xl:inline-block bg-zinc-50 dark:bg-zinc-950 px-2 py-1 rounded border border-zinc-200/50 dark:border-zinc-800/50">
-              {formatData.printLabel} • {columnsCount} Col{columnsCount > 1 && 's'} • {pageCount}p • {wordCount} Words
-            </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* RIGHT SECTION */}
+          <div className="flex items-center justify-end gap-2 shrink-0 lg:w-1/3">
             {/* Guide Lines Toggle (Letter press preview mode) */}
             <button
               onClick={() => setShowGuides(!showGuides)}
@@ -413,28 +440,7 @@ export function TypesetLayoutEditor({
               <Grid className="w-4 h-4" />
             </button>
 
-            {/* Quick Desk Zooms */}
-            <div className="flex items-center bg-zinc-100 dark:bg-zinc-850 rounded-lg p-0.5 text-xs">
-              <button 
-                onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}
-                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
-                title={currentLanguage === 'zh' ? '外延缩小' : 'Zoom Out'}
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <span className="w-10 text-center font-semibold text-zinc-600 dark:text-zinc-300 font-mono text-[10px]">
-                {Math.round(zoom * 100)}%
-              </span>
-              <button 
-                onClick={() => setZoom(z => Math.min(2.0, z + 0.1))}
-                className="p-1 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded transition-colors"
-                title={currentLanguage === 'zh' ? '内向放大' : 'Zoom In'}
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-            </div>
-
-            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800"></div>
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
 
             {/* Local Desk Asset inserter */}
             <button
@@ -443,7 +449,7 @@ export function TypesetLayoutEditor({
               title={currentLanguage === 'zh' ? '添加排版本地照片' : 'Add custom image file'}
             >
               <ImagePlus className="w-3.5 h-3.5 text-emerald-500" />
-              <span className="hidden md:inline">{currentLanguage === 'zh' ? '置入插图' : 'Place Pic'}</span>
+              <span className="hidden xl:inline">{currentLanguage === 'zh' ? '置入插图' : 'Place Pic'}</span>
             </button>
             <input type="file" accept="image/*" ref={fileInputRef} className="hidden" onChange={handleImageUpload} />
 
@@ -455,34 +461,22 @@ export function TypesetLayoutEditor({
                 title={currentLanguage === 'zh' ? '使用 AI 生成并直接置入' : 'AI Generate and insert directly'}
               >
                 <Sparkles className="w-3.5 h-3.5 text-[#a855f7]" />
-                <span className="hidden lg:inline">AI Place</span>
+                <span className="hidden xl:inline">AI Place</span>
               </button>
             )}
 
-            {/* Chat side drawer button */}
-            {onToggleChat && (
-              <button
-                onClick={onToggleChat}
-                className={cn(
-                  "p-1.5 rounded-lg text-zinc-500 transition-colors shrink-0",
-                  isChatOpen ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40" : "hover:bg-zinc-105"
-                )}
-                title={currentLanguage === 'zh' ? '呼出 AI 写作助手侧板' : 'Call AI Assistant Drawer'}
-              >
-                <MessageSquare className="w-4 h-4 text-emerald-500" />
-              </button>
-            )}
+            <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
 
             {/* Properties Sidebar toggle button */}
             <button
               onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
               className={cn(
-                "p-1.5 rounded-lg text-zinc-500 transition-colors shrink-0",
-                isRightSidebarOpen ? "bg-zinc-150 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
+                "p-1.5 rounded-md text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors shrink-0",
+                isRightSidebarOpen ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200" : "hover:bg-zinc-100 dark:hover:bg-zinc-800/50"
               )}
-              title={isRightSidebarOpen ? (currentLanguage === 'zh' ? '折叠右侧属性栏' : 'Collapse properties panel') : (currentLanguage === 'zh' ? '展开右侧属性栏' : 'Expand properties panel')}
+              title={isRightSidebarOpen ? (currentLanguage === 'zh' ? '折叠右侧面板' : 'Collapse right panel') : (currentLanguage === 'zh' ? '展开右侧面板' : 'Expand right panel')}
             >
-              <Settings className="w-4 h-4 text-emerald-500" />
+              {isRightSidebarOpen ? <PanelRightClose className="w-4 h-4 text-emerald-500 animate-pulse" /> : <PanelRightOpen className="w-4 h-4 text-amber-500 animate-bounce" />}
             </button>
           </div>
         </div>
@@ -788,46 +782,61 @@ export function TypesetLayoutEditor({
       )}>
         
         {/* Properties Selector Header Tabs */}
-        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center bg-zinc-50 dark:bg-zinc-950/50 p-2 gap-1 shrink-0">
+        <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 flex items-center bg-zinc-50 dark:bg-zinc-950/50 p-1.5 gap-1 shrink-0 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
           <button
             onClick={() => setActiveAssetTab('details')}
             className={cn(
-              "flex-1 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5",
+              "flex-1 min-w-[70px] py-1.5 px-1 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 shrink-0",
               activeAssetTab === 'details'
                 ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm border border-zinc-200/50 dark:border-zinc-750"
                 : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
             )}
           >
-            <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>{selectedImageId ? (currentLanguage === 'zh' ? '照片属性' : 'Image Properties') : (currentLanguage === 'zh' ? '版面样式' : 'Layout Properties')}</span>
+            <SlidersHorizontal className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{selectedImageId ? (currentLanguage === 'zh' ? '照片属性' : 'Image Props') : (currentLanguage === 'zh' ? '版面样式' : 'Layout')}</span>
           </button>
           
           <button
             onClick={() => setActiveAssetTab('assets')}
             className={cn(
-              "flex-1 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center justify-center gap-1.5",
+              "flex-1 min-w-[70px] py-1.5 px-1 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 shrink-0",
               activeAssetTab === 'assets'
                 ? "bg-white dark:bg-zinc-800 text-zinc-950 dark:text-zinc-50 shadow-sm border border-zinc-200/50 dark:border-zinc-750"
                 : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-300"
             )}
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span>{currentLanguage === 'zh' ? '插图媒介库' : 'Asset shelf'}</span>
+            <Layers className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{currentLanguage === 'zh' ? '媒介图库' : 'Assets'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveAssetTab('ai')}
+            className={cn(
+              "flex-1 min-w-[70px] py-1.5 px-1 rounded-md text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 shrink-0",
+              activeAssetTab === 'ai'
+                ? "bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 shadow-sm border border-emerald-200/50 dark:border-emerald-800/50"
+                : "text-zinc-500 hover:text-emerald-600 dark:hover:text-emerald-400"
+            )}
+            title={currentLanguage === 'zh' ? 'AI 智能写作与协助' : 'AI Assistant'}
+          >
+            <Sparkles className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">AI Assistant</span>
           </button>
 
           <button
             onClick={() => setIsRightSidebarOpen(false)}
-            className="p-1 px-1.5 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 transition-colors shrink-0"
-            title={currentLanguage === 'zh' ? '折叠右侧属性栏' : 'Collapse properties panel'}
+            className="p-1.5 px-1.5 ml-1 rounded hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 transition-colors shrink-0"
+            title={currentLanguage === 'zh' ? '收起右侧面板' : 'Collapse right panel'}
           >
-            <ChevronRight className="w-4 h-4 text-emerald-500" />
+            <PanelRightClose className="w-4 h-4 text-emerald-500" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-6 select-none">
+        <div className="flex-1 flex flex-col overflow-hidden select-none relative">
           {/* TAB A: DETAILED ATTRIBUTE MODIFIERS */}
           {activeAssetTab === 'details' ? (
-            selectedImageId ? (() => {
+            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+              {selectedImageId ? (() => {
               const img = floatingImages.find(f => f.id === selectedImageId);
               if (!img) return null;
 
@@ -1284,9 +1293,11 @@ export function TypesetLayoutEditor({
 
               </div>
             )
-          ) : (
+            }
+            </div>
+          ) : activeAssetTab === 'assets' ? (
             // TAB B: ASSET STORAGE RACK (COHERENCE CONTROL PANEL)
-            <div className="space-y-5 animate-fade-in text-xs">
+            <div className="flex-1 overflow-y-auto p-4 space-y-5 animate-fade-in text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest block">{currentLanguage === 'zh' ? '章节配图一览' : 'Chapter Images Shelf'}</span>
                 <span className="font-mono text-[9px] bg-zinc-100 dark:bg-zinc-950 p-1 px-2 rounded-full text-zinc-500">
@@ -1364,7 +1375,20 @@ export function TypesetLayoutEditor({
                 </div>
               )}
             </div>
-          )}
+          ) : activeAssetTab === 'ai' ? (
+            <div className="flex-1 flex flex-col h-full overflow-hidden">
+              <ChapterChat
+                content={content}
+                chapterTitle={chapter.title}
+                bookTitle={bookTitle}
+                language={language}
+                onApplyContent={(newContent) => {
+                  onContentChange(newContent);
+                }}
+                onClose={() => setIsRightSidebarOpen(false)}
+              />
+            </div>
+          ) : null}
 
         </div>
       </div>

@@ -7,7 +7,6 @@ import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListP
 import { cn } from '../lib/utils';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { OutlineEditorModal } from './OutlineEditorModal';
-import { ChapterChat } from './ChapterChat';
 import { BookInfoModal } from './BookInfoModal';
 import { ConfirmModal } from './ConfirmModal';
 import { SettingsModal } from './SettingsModal';
@@ -44,7 +43,6 @@ export function BookEditor() {
   const [content, setContent] = useState('');
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
   const [isBookInfoOpen, setIsBookInfoOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSamplePreviewOpen, setIsSamplePreviewOpen] = useState(false);
@@ -531,8 +529,8 @@ export function BookEditor() {
             onGenerateContent={handleGenerateContent}
             onGenerateImageOfPrompt={handleGenerateImageOfPrompt}
             onProofreadText={handleProofread}
-            isChatOpen={isChatOpen}
-            onToggleChat={() => setIsChatOpen(!isChatOpen)}
+            bookTitle={book.title}
+            language={language}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-zinc-400 dark:text-zinc-650 bg-zinc-50 dark:bg-zinc-950">

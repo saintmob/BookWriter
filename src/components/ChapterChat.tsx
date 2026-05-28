@@ -108,8 +108,8 @@ export function ChapterChat({ content, chapterTitle, bookTitle, language, onAppl
   };
 
   return (
-    <div className="flex flex-col h-full bg-zinc-50 dark:bg-zinc-900 border-l border-zinc-200 dark:border-zinc-800 w-80 lg:w-96 shadow-xl z-20 absolute right-0 top-0 bottom-0">
-      <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+    <div className="flex flex-col h-full bg-zinc-50 dark:bg-zinc-900 overflow-hidden relative">
+      <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shrink-0">
         <h3 className="font-semibold flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-emerald-500" />
           {t('ai_assistant')}
