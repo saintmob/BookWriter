@@ -26,6 +26,8 @@ interface AppState {
   openRouterTextModel: string;
   openRouterImageModel: string;
   draft: DraftState;
+  appMode: 'write' | 'typeset';
+  setAppMode: (mode: 'write' | 'typeset') => void;
   isSidebarCollapsed: boolean;
   setIsSidebarCollapsed: (collapsed: boolean) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
@@ -72,6 +74,8 @@ export const useStore = create<AppState>()(
       openRouterTextModel: 'google/gemma-4-31b-it:free',
       openRouterImageModel: 'google/gemini-3.1-flash-image-preview',
       draft: initialDraft,
+      appMode: 'write',
+      setAppMode: (mode) => set({ appMode: mode }),
       isSidebarCollapsed: false,
       setIsSidebarCollapsed: (collapsed) => set({ isSidebarCollapsed: collapsed }),
       setTheme: (theme) => set({ theme }),
@@ -136,6 +140,7 @@ export const useStore = create<AppState>()(
         openRouterApiKey: state.openRouterApiKey,
         openRouterTextModel: state.openRouterTextModel,
         openRouterImageModel: state.openRouterImageModel,
+        appMode: state.appMode,
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
         activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
         draft: state.draft // Persist draft state to save progress

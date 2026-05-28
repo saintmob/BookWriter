@@ -30,7 +30,7 @@ export function BookEditor() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   
   const [content, setContent] = useState('');
-  const [isPreview, setIsPreview] = useState(false);
+  const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
   const [isBookInfoOpen, setIsBookInfoOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -73,11 +73,11 @@ export function BookEditor() {
   }, [activeChapterId, chapters]);
 
   useEffect(() => {
-    if (!isPreview && textareaRef.current) {
+    if (viewMode === 'edit' && textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
-  }, [content, isPreview, activeChapterId]);
+  }, [content, viewMode, activeChapterId]);
 
   const loadBookData = async () => {
     if (!activeBookId) return;
@@ -425,14 +425,14 @@ export function BookEditor() {
                 </h3>
               </div>
               
-              {/* Center: Edit/Preview Toggle */}
+              {/* Center: Edit/Preview/Typeset Toggle */}
               <div className="flex justify-center">
                 <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 rounded-lg p-1">
                   <button
-                    onClick={() => setIsPreview(false)}
+                    onClick={() => setViewMode('edit')}
                     className={cn(
                       "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                      !isPreview 
+                      viewMode === 'edit'
                         ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" 
                         : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                     )}
@@ -440,10 +440,10 @@ export function BookEditor() {
                     {t('edit')}
                   </button>
                   <button
-                    onClick={() => setIsPreview(true)}
+                    onClick={() => setViewMode('preview')}
                     className={cn(
                       "px-4 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                      isPreview 
+                      viewMode === 'preview'
                         ? "bg-white dark:bg-zinc-700 shadow-sm text-zinc-900 dark:text-zinc-100" 
                         : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                     )}
@@ -528,9 +528,9 @@ export function BookEditor() {
             {/* Editor Area */}
             <div className="flex-1 flex overflow-hidden relative">
               <div 
-                className={cn("flex-1 overflow-y-auto p-8 md:p-12 lg:px-24", !isPreview && "cursor-text")}
+                className={cn("flex-1 overflow-y-auto p-8 md:p-12 lg:px-24", viewMode === 'edit' && "cursor-text")}
                 onClick={(e) => {
-                  if (e.target === e.currentTarget && !isPreview) {
+                  if (e.target === e.currentTarget && viewMode === 'edit') {
                     textareaRef.current?.focus();
                     // Place cursor at the end
                     const length = textareaRef.current?.value.length || 0;
@@ -539,9 +539,9 @@ export function BookEditor() {
                 }}
               >
                 <div 
-                  className={cn("max-w-3xl mx-auto space-y-8 pb-32", !isPreview && "cursor-default")}
+                  className={cn("max-w-3xl mx-auto space-y-8 pb-32", viewMode !== 'edit' && "cursor-default")}
                   onClick={(e) => {
-                    if (e.target === e.currentTarget && !isPreview) {
+                    if (e.target === e.currentTarget && viewMode === 'edit') {
                       textareaRef.current?.focus();
                       const length = textareaRef.current?.value.length || 0;
                       textareaRef.current?.setSelectionRange(length, length);
@@ -574,7 +574,7 @@ export function BookEditor() {
 
                   {/* Content Area with Loading State */}
                   <div className="relative">
-                    {isPreview ? (
+                    {viewMode === 'preview' ? (
                       <div className="prose prose-zinc dark:prose-invert max-w-none font-serif text-lg leading-relaxed">
                         {isGeneratingContent && !content ? (
                           <div className="space-y-4 animate-pulse">

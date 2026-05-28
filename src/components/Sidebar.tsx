@@ -1,18 +1,19 @@
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { BookPlus, Feather, Settings, PanelLeftClose, PanelLeftOpen, Book } from 'lucide-react';
+import { BookPlus, Feather, Settings, PanelLeftClose, PanelLeftOpen, Book, PenLine, LayoutTemplate } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useEffect, useState } from 'react';
 import { SettingsModal } from './SettingsModal';
 
 export function Sidebar() {
   const { t, i18n } = useTranslation();
-  const { books, activeBookId, setActiveBook, theme, language, isSidebarCollapsed, setIsSidebarCollapsed, resetDraft } = useStore();
+  const { books, activeBookId, setActiveBook, theme, language, isSidebarCollapsed, setIsSidebarCollapsed, resetDraft, appMode, setAppMode } = useStore();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const handleNewBook = () => {
     resetDraft();
     setActiveBook('new');
+    setAppMode('write');
   };
 
   useEffect(() => {
@@ -47,7 +48,30 @@ export function Sidebar() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="px-3 pb-2 space-y-1">
+            <button 
+              onClick={() => setAppMode('write')}
+              title={isSidebarCollapsed ? t('write_mode', 'Write') : undefined}
+              className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-medium flex items-center transition-colors", 
+                isSidebarCollapsed ? "justify-center" : "gap-2",
+                appMode === 'write' ? 'bg-zinc-200 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100' : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50')}
+            >
+              <PenLine className="w-5 h-5 shrink-0" />
+              {!isSidebarCollapsed && <span>{t('write_mode', 'Write')}</span>}
+            </button>
+            <button 
+              onClick={() => setAppMode('typeset')}
+              title={isSidebarCollapsed ? t('typeset_mode', 'Layout') : undefined}
+              className={cn("w-full text-left px-3 py-2 rounded-lg text-sm font-medium flex items-center transition-colors", 
+                isSidebarCollapsed ? "justify-center" : "gap-2",
+                appMode === 'typeset' ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-400' : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50')}
+            >
+              <LayoutTemplate className="w-5 h-5 shrink-0" />
+              {!isSidebarCollapsed && <span>{t('typeset_mode', 'Layout')}</span>}
+            </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 border-t border-zinc-200 dark:border-zinc-800">
           <button
             onClick={handleNewBook}
             title={isSidebarCollapsed ? t('new_book') : undefined}

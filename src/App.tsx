@@ -4,11 +4,12 @@ import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { BookCreator } from './components/BookCreator';
 import { BookEditor } from './components/BookEditor';
+import { BookTypesetter } from './components/BookTypesetter';
 import { Toaster } from 'sonner';
 import './i18n';
 
 export default function App() {
-  const { loadBooks, activeBookId, books, theme } = useStore();
+  const { loadBooks, activeBookId, books, theme, appMode } = useStore();
 
   useEffect(() => {
     loadBooks();
@@ -49,7 +50,11 @@ export default function App() {
       {activeBookId === null ? (
         <Dashboard />
       ) : activeBook ? (
-        <BookEditor />
+        appMode === 'typeset' ? (
+          <BookTypesetter />
+        ) : (
+          <BookEditor />
+        )
       ) : (
         <BookCreator />
       )}

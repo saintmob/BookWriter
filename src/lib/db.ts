@@ -10,6 +10,28 @@ export interface Book {
   updatedAt: number;
 }
 
+export interface FloatingImage {
+  id: string;
+  url: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  pageIndex?: number; // Which page this image belongs to
+}
+
+export type TrimFormat = 'a4' | 'letter' | 'trade' | 'pocket';
+
+export interface PageLayout {
+  marginTop: number;
+  marginBottom: number;
+  marginLeft: number;
+  marginRight: number;
+  format?: TrimFormat;
+  fontSize?: number;
+  lineHeight?: number;
+}
+
 export interface Chapter {
   id: string;
   bookId: string;
@@ -20,6 +42,8 @@ export interface Chapter {
   order: number;
   createdAt: number;
   updatedAt: number;
+  layout?: PageLayout;
+  floatingImages?: FloatingImage[];
 }
 
 export interface ChatMessage {
