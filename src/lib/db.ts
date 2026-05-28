@@ -24,7 +24,7 @@ export interface FloatingImage {
   shadow?: string;
   objectFit?: 'cover' | 'contain' | 'fill';
   blendMode?: string;
-  layoutMode?: 'absolute' | 'wrap-left' | 'wrap-right' | 'wrap-center';
+  layoutMode?: 'absolute' | 'wrap-left' | 'wrap-right' | 'wrap-center' | 'full-width';
   paragraphIndex?: number;
 }
 

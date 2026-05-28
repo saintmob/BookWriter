@@ -44,6 +44,13 @@ export function Dashboard() {
         await db.saveChapter(chapter);
       }
 
+      // Save chat messages if present
+      if (Array.isArray(data.chatMessages)) {
+        for (const message of data.chatMessages) {
+          await db.saveChatMessage(message);
+        }
+      }
+
       await loadBooks();
       toast.success(t('import_success'), { id: toastId });
     } catch (error: any) {

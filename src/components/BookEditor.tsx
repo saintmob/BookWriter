@@ -265,11 +265,20 @@ export function BookEditor() {
     setShowExportMenu(false);
   };
 
-  const handleExportJSON = () => {
+  const handleExportJSON = async () => {
     if (!book) return;
+    
+    // Fetch chat messages for all chapters
+    const allChatMessages = [];
+    for (const chapter of chapters) {
+      const messages = await db.getChatMessages(chapter.id);
+      allChatMessages.push(...messages);
+    }
+    
     const data = {
       book,
       chapters,
+      chatMessages: allChatMessages,
       version: '1.0',
       exportedAt: new Date().toISOString()
     };

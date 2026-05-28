@@ -41,6 +41,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             'none';
             
           const isCenter = img.layoutMode === 'wrap-center';
+          const isFullWidth = img.layoutMode === 'full-width';
           const isSelected = selectedImageId === img.id;
 
           return (
@@ -53,10 +54,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               className={isSelected ? "ring-2 ring-emerald-500 ring-offset-1" : ""}
               style={{
                 float: floatStyle,
-                display: isCenter ? 'block' : 'inline-block',
-                margin: isCenter ? '1rem auto' : img.layoutMode === 'wrap-left' ? '0.25rem 1rem 0.5rem 0' : '0.25rem 0 0.5rem 1rem',
-                width: img.width,
-                height: img.height,
+                display: (isCenter || isFullWidth) ? 'block' : 'inline-block',
+                margin: (isCenter || isFullWidth) ? '1rem auto' : img.layoutMode === 'wrap-left' ? '0.25rem 1rem 0.5rem 0' : '0.25rem 0 0.5rem 1rem',
+                width: isFullWidth ? '100%' : img.width,
+                height: isFullWidth ? 'auto' : img.height,
                 opacity: img.opacity ?? 1,
                 mixBlendMode: (img.blendMode as any) || 'normal',
                 borderRadius: img.borderRadius ?? 0,
@@ -68,7 +69,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 position: 'relative',
                 zIndex: img.zIndex ?? 10,
                 cursor: 'pointer',
-                clear: isCenter ? 'both' : 'none',
+                clear: (isCenter || isFullWidth) ? 'both' : 'none',
               }}
             >
               <img src={img.url} alt="" style={{ width: '100%', height: '100%', objectFit: (img.objectFit as any) || 'cover', display: 'block' }} />

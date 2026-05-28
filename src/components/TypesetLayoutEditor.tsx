@@ -346,6 +346,14 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
                     right: layout.marginRight,
                   }}
                 />
+                <div 
+                  className="absolute w-full text-center text-xs text-zinc-400 font-serif select-none pointer-events-none"
+                  style={{
+                    bottom: Math.max(10, layout.marginBottom / 2 - 8),
+                  }}
+                >
+                  {i + 1}
+                </div>
               </div>
             ))}
 
@@ -515,10 +523,11 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
                   <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Layout Mode</h4>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { id: 'absolute', label: 'Absolute', desc: 'Free drag' },
+                      { id: 'absolute', label: 'Absolute', desc: 'Free drag overlay' },
                       { id: 'wrap-left', label: 'Float Left', desc: 'Text wraps right' },
                       { id: 'wrap-right', label: 'Float Right', desc: 'Text wraps left' },
-                      { id: 'wrap-center', label: 'Center', desc: 'Block break' }
+                      { id: 'wrap-center', label: 'Center', desc: 'Block break' },
+                      { id: 'full-width', label: 'Full Width', desc: 'Spans column' }
                     ].map(mode => (
                       <button
                         key={mode.id}
