@@ -59,6 +59,7 @@ export function BookTypesetter() {
       <div className="flex-1 flex flex-col min-w-0">
          {activeChapter ? (
             <TypesetLayoutEditor 
+               key={activeChapter.id}
                chapter={activeChapter}
                content={activeChapter.content}
                onUpdateChapter={(updated) => {

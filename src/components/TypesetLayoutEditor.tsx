@@ -130,6 +130,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
   };
 
   const handleLayoutChange = (key: keyof PageLayout, value: string | number) => {
@@ -186,7 +187,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
             <div className="h-6 w-px bg-zinc-200 dark:bg-zinc-800 hidden sm:block"></div>
             
             <span className="text-xs text-zinc-500 hidden sm:block">
-              {formatData.label} • {pageCount} {pageCount === 1 ? 'Page' : 'Pages'}
+              <span>{`${formatData.label} • ${pageCount} ${pageCount === 1 ? 'Page' : 'Pages'}`}</span>
             </span>
           </div>
 
@@ -357,7 +358,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
           {/* Format Settings */}
           <div className="space-y-3">
             <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-              <LayoutTemplate className="w-4 h-4 text-zinc-400" /> Trim Size
+              <LayoutTemplate className="w-4 h-4 text-zinc-400" /> <span>Trim Size</span>
             </h4>
             <div className="grid grid-cols-1 gap-2">
               {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
@@ -383,7 +384,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
           {/* Typography Settings */}
           <div className="space-y-3">
             <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-              <Type className="w-4 h-4 text-zinc-400" /> Typography
+              <Type className="w-4 h-4 text-zinc-400" /> <span>Typography</span>
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -413,7 +414,7 @@ export function TypesetLayoutEditor({ chapter, content, onUpdateChapter }: Types
           {/* Margins */}
           <div className="space-y-3">
             <h4 className="text-sm font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-               <div className="w-4 h-4 border-2 border-zinc-400 rounded-sm" /> Page Margins (px)
+               <div className="w-4 h-4 border-2 border-zinc-400 rounded-sm" /> <span>Page Margins (px)</span>
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
