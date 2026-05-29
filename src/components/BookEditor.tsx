@@ -361,7 +361,7 @@ export function BookEditor() {
       {/* GLOBAL APPLICATION TOP BAR */}
       <div className="h-14 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between px-4 z-20 shrink-0 select-none shadow-sm w-full">
         {/* LEFT COMPONENT */}
-        <div className="flex items-center gap-2 shrink-0 min-w-[200px] lg:w-1/3">
+        <div className="flex items-center gap-2 shrink-0 min-w-[200px]">
           {/* Back to library */}
           <button 
             onClick={() => setActiveBook(null)}
@@ -485,7 +485,7 @@ export function BookEditor() {
         </div>
 
         {/* RIGHT COMPONENT */}
-        <div className="flex items-center justify-end gap-2 shrink-0 lg:w-1/3">
+        <div className="flex items-center justify-end gap-2 shrink-0">
           <button
             onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
             className={cn(

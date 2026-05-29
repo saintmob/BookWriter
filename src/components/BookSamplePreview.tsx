@@ -104,6 +104,56 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
     }
   };
 
+  const getChapterStartPage = (chapterIdx: number): number => {
+    if (!contentRef.current) return 0;
+    const el = contentRef.current.querySelector(`[data-chapter-index="${chapterIdx}"]`);
+    if (!el) return 0;
+    const elRect = el.getBoundingClientRect();
+    const contentRect = contentRef.current.getBoundingClientRect();
+    const offset = elRect.left - contentRect.left;
+    const page = Math.floor(offset / SPREAD_STRIDE);
+    return Math.max(0, Math.min(totalPages - 1, page));
+  };
+
+  const getCurrentChapterIndex = (): number => {
+    if (!contentRef.current) return 0;
+    const els = contentRef.current.querySelectorAll('.chapter-start');
+    let activeIdx = 0;
+    const currentScrollX = currentPage * SPREAD_STRIDE;
+    
+    els.forEach(el => {
+      const elRect = el.getBoundingClientRect();
+      const contentRect = contentRef.current!.getBoundingClientRect();
+      const offset = elRect.left - contentRect.left;
+      const idx = parseInt(el.getAttribute('data-chapter-index') || '0', 10);
+      if (offset <= currentScrollX + 50) {
+        activeIdx = Math.max(activeIdx, idx);
+      }
+    });
+    
+    return activeIdx;
+  };
+
+  const goToPrevChapter = () => {
+    const currentIdx = getCurrentChapterIndex();
+    const currentChapterStartPage = getChapterStartPage(currentIdx);
+    
+    if (currentPage > currentChapterStartPage) {
+      setCurrentPage(currentChapterStartPage);
+    } else if (currentIdx > 0) {
+      const prevChapterStartPage = getChapterStartPage(currentIdx - 1);
+      setCurrentPage(prevChapterStartPage);
+    }
+  };
+
+  const goToNextChapter = () => {
+    const currentIdx = getCurrentChapterIndex();
+    if (currentIdx < chapters.length - 1) {
+      const nextChapterStartPage = getChapterStartPage(currentIdx + 1);
+      setCurrentPage(nextChapterStartPage);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900/95 backdrop-blur-sm text-zinc-100 animate-in fade-in duration-200">
       {/* Header / Toolbar */}
@@ -310,7 +360,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                    </div>
 
                    {chapters.map((chapter, idx) => (
-                     <div key={chapter.id} className="chapter-start">
+                     <div key={chapter.id} className="chapter-start" data-chapter-id={chapter.id} data-chapter-index={idx}>
                        <div className="text-center mb-12">
                          <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500 block mb-4">Chapter {idx + 1}</span>
                          <h2 className="!mt-0 !mb-0 !text-2xl border-none">{chapter.title}</h2>
@@ -320,7 +370,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                          <img src={chapter.image} alt={chapter.title} className="w-full h-auto mb-8" />
                        )}
                        
-                       <MarkdownRenderer>
+                       <MarkdownRenderer floatingImages={chapter.floatingImages || []}>
                          {chapter.content || ''}
                        </MarkdownRenderer>
                        
@@ -333,6 +383,29 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
           </div>
         </div>
         
+        {/* Chapter Navigation Controls (Bottom Left) */}
+        <div className="absolute bottom-6 left-6 flex items-center gap-2 bg-zinc-900/90 backdrop-blur px-3 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg select-none">
+          <button
+            onClick={goToPrevChapter}
+            disabled={currentPage === 0}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded text-zinc-350 hover:text-white hover:bg-zinc-800/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            title={t('previous_chapter')}
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>{t('previous_chapter')}</span>
+          </button>
+          <div className="w-px h-4 bg-zinc-800"></div>
+          <button
+            onClick={goToNextChapter}
+            disabled={getCurrentChapterIndex() >= chapters.length - 1}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded text-zinc-350 hover:text-white hover:bg-zinc-800/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+            title={t('next_chapter')}
+          >
+            <span>{t('next_chapter')}</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
         {/* Page Number Indicator (Bottom) */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900/80 backdrop-blur px-4 py-2 rounded-full text-xs text-zinc-400 border border-zinc-800">
           {t('sample_preview')} • {currentPage + 1} / {totalPages || 1}

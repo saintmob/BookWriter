@@ -29,7 +29,13 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     if (!isBlock) return <Tag {...props} />;
     
     const idx = elementIndex++;
-    const imgs = floatingImages.filter(img => img.paragraphIndex === idx && img.layoutMode && img.layoutMode !== 'absolute');
+    const imgs = floatingImages.filter(img => {
+      if (img.paragraphIndex !== idx) return false;
+      if (showBlockIndices) {
+        return img.layoutMode && img.layoutMode !== 'absolute';
+      }
+      return true;
+    });
     
     // Aesthetic paragraph index indicator for precise anchoring (pretext style)
     const blockIndexIndicator = showBlockIndices ? (
@@ -74,7 +80,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             img.layoutMode === 'wrap-right' ? 'right' : 
             'none';
             
-          const isCenter = img.layoutMode === 'wrap-center';
+          const isCenter = img.layoutMode === 'wrap-center' || img.layoutMode === 'absolute' || !img.layoutMode;
           const isFullWidth = img.layoutMode === 'full-width';
           const isSelected = selectedImageId === img.id;
 
