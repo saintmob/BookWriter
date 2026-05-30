@@ -63,7 +63,7 @@ const FORMATS: Record<TrimFormat, { width: number; height: number; label: string
   pocket: { width: 408, height: 660, label: 'Pocket (4.25x6.87")', printLabel: 'Pocket Novel' },
 };
 
-const DEFAULT_LAYOUT: PageLayout & { columns?: number; paperStyle?: 'warm' | 'white' | 'dark' | 'kraft' } = {
+const DEFAULT_LAYOUT: PageLayout = {
   marginTop: 48,
   marginBottom: 48,
   marginLeft: 48,
@@ -73,6 +73,12 @@ const DEFAULT_LAYOUT: PageLayout & { columns?: number; paperStyle?: 'warm' | 'wh
   lineHeight: 1.6,
   columns: 1,
   paperStyle: 'warm',
+  justifyText: true,
+  firstLineIndent: 0,
+  paragraphSpacing: 16,
+  fontFamily: 'serif',
+  dropCaps: false,
+  headerPos: 'top-center'
 };
 
 const PAGE_GAP = 40; // Gap between sheets on canvas
@@ -104,7 +110,7 @@ export function TypesetLayoutEditor({
   } = useStore();
   
   // Load settings
-  const [layout, setLayout] = useState<PageLayout & { columns?: number; paperStyle?: 'warm' | 'white' | 'dark' | 'kraft' }>(() => {
+  const [layout, setLayout] = useState<PageLayout>(() => {
     return { ...DEFAULT_LAYOUT, ...chapter.layout };
   });
   const [floatingImages, setFloatingImages] = useState<FloatingImage[]>(chapter.floatingImages || []);
@@ -149,7 +155,10 @@ export function TypesetLayoutEditor({
     warm: 'bg-[#faf6ee] text-[#1c1917] border-amber-900/10',
     white: 'bg-white text-zinc-900 border-zinc-200',
     dark: 'bg-[#18181b] text-zinc-100 border-zinc-800',
-    kraft: 'bg-[#e6d0a7] text-[#2c1d11] border-amber-800/20'
+    kraft: 'bg-[#e6d0a7] text-[#2c1d11] border-amber-800/20',
+    vintage: 'bg-[#f4ebd8] text-[#3e2723] border-[#8d6e63]/30 shadow-[inset_0_0_100px_rgba(141,110,99,0.15)]',
+    glossy: 'bg-[#f8f9fa] text-[#212529] border-slate-200',
+    newsprint: 'bg-[#e2e2df] text-[#2b2b2b] border-[#bcbcba]',
   };
 
   const currentLanguage = i18n.language || 'zh';
@@ -424,15 +433,38 @@ export function TypesetLayoutEditor({
                       </>
                     )}
 
-                    {/* Auto layout page counters */}
-                    <div 
-                      className="absolute w-full text-center font-serif text-[11px] tracking-widest uppercase opacity-45 pointer-events-none select-none"
-                      style={{
-                        bottom: Math.max(12, layout.marginBottom / 2.2),
-                      }}
-                    >
-                      {i + 1}
-                    </div>
+                    {/* Auto layout page counters and running headers */}
+                    {layout.headerPos !== 'hidden' && (
+                      <div 
+                        className={cn(
+                          "absolute w-full px-12 font-sans text-[10px] tracking-widest uppercase opacity-45 pointer-events-none select-none flex items-center",
+                          layout.headerPos?.includes('top') ? 'top-6' : 'bottom-6',
+                          i % 2 === 0 ? "justify-end" : "justify-start" // Even pages (left) -> justify-end (often title), Odd pages (right) -> justify-start (often chapter)
+                        )}
+                        style={{
+                          top: layout.headerPos?.includes('top') ? Math.max(12, layout.marginTop / 2.5) : undefined,
+                          bottom: layout.headerPos?.includes('bottom') ? Math.max(12, layout.marginBottom / 2.5) : undefined,
+                        }}
+                      >
+                        {layout.headerPos?.includes('center') && (
+                          <div className="absolute left-0 right-0 text-center font-serif text-[11px]">{i + 1}</div>
+                        )}
+                        
+                        <div className="w-full flex items-center justify-between">
+                          {i % 2 === 0 ? (
+                            <>
+                              {!layout.headerPos?.includes('center') && <span>{i + 1}</span>}
+                              <span className="truncate max-w-[60%]">{bookTitle || 'Untitled Book'}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="truncate max-w-[60%]">{chapter.title || 'Untitled Chapter'}</span>
+                              {!layout.headerPos?.includes('center') && <span>{i + 1}</span>}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -459,12 +491,20 @@ export function TypesetLayoutEditor({
                       marginRight: layout.marginRight,
                       fontSize: `${layout.fontSize || 16}px`,
                       lineHeight: layout.lineHeight || 1.6,
-                    }}
+                      columnCount: layout.columns || 1,
+                      columnGap: '2em',
+                      fontFamily: layout.fontFamily === 'sans' ? 'ui-sans-serif, system-ui, sans-serif' : 
+                                  layout.fontFamily === 'mono' ? 'ui-monospace, monospace' : 
+                                  'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
+                      textAlign: layout.justifyText ? 'justify' : 'left',
+                      '--paragraph-spacing': `${layout.paragraphSpacing ?? 16}px`,
+                      '--first-line-indent': `${layout.firstLineIndent ?? 0}em`,
+                    } as React.CSSProperties}
                     className={cn(
-                      "prose max-w-none text-justify",
+                      "prose max-w-none break-words",
                       paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
-                      // Inject professional font pairing options matching classical book editions
-                      "font-serif font-normal"
+                      layout.dropCaps && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
+                      "[&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
                     )}
                   >
                     <MarkdownRenderer 
@@ -921,13 +961,16 @@ export function TypesetLayoutEditor({
                     {collapsedSections.paper ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>
                   {!collapsedSections.paper && (
-                    <div className="p-3 space-y-2 animate-fade-in">
+                    <div className="p-3 space-y-2 animate-fade-in max-h-60 overflow-y-auto">
                       <div className="grid grid-cols-2 gap-2">
                         {[
                           { id: 'warm', label: currentLanguage === 'zh' ? '墨香雅黄' : 'Antique Warm', desc: 'Cream paper [#faf6ee]' },
                           { id: 'white', label: currentLanguage === 'zh' ? '现代冷白' : 'Office White', desc: 'Crisp sheet [#ffffff]' },
                           { id: 'dark', label: currentLanguage === 'zh' ? '玄色沉浸' : 'Ink Noir', desc: 'Dark board [#18181b]' },
-                          { id: 'kraft', label: currentLanguage === 'zh' ? '原生牛皮纸' : 'Kraft Board', desc: 'Paper pulp [#e6a7e5]' }
+                          { id: 'kraft', label: currentLanguage === 'zh' ? '原生牛皮纸' : 'Kraft Board', desc: 'Paper pulp [#e6a7e5]' },
+                          { id: 'vintage', label: currentLanguage === 'zh' ? '古典羊皮纸' : 'Vintage Parchment', desc: 'Aged & Textural' },
+                          { id: 'glossy', label: currentLanguage === 'zh' ? '铜版亮光纸' : 'Glossy Art Paper', desc: 'Sleek & Cool' },
+                          { id: 'newsprint', label: currentLanguage === 'zh' ? '廉价新闻纸' : 'Newsprint Pulp', desc: 'Gritty & Rough' }
                         ].map(theme => (
                           <button
                             key={theme.id}
@@ -949,7 +992,7 @@ export function TypesetLayoutEditor({
                   )}
                 </div>
                 
-                {/* Trim Dimensions selection */}
+                {/* Trim Dimensions and Headers */}
                 <div className="border border-zinc-150 dark:border-zinc-800 rounded-lg overflow-hidden bg-zinc-50/50 dark:bg-zinc-950/20">
                   <button
                     onClick={() => toggleSection('trim')}
@@ -957,7 +1000,7 @@ export function TypesetLayoutEditor({
                     className="w-full h-9 px-3 flex items-center justify-between text-[11px] font-bold text-zinc-500 hover:text-zinc-805 dark:hover:text-zinc-200 uppercase tracking-wider bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-150 dark:border-zinc-800 transition-colors"
                   >
                     <div className="flex items-center gap-1.5">
-                      <span>{currentLanguage === 'zh' ? '二、拼版规格尺寸规格 (对标 InDesign)' : 'Editorial Trim Slices'}</span>
+                      <span>{currentLanguage === 'zh' ? '二、拼版与书眉位置' : 'Editorial Slices & Folios'}</span>
                       <span title="Corresponds to standard printing book page dimensions.">
                         <HelpCircle className="w-3.5 h-3.5 text-zinc-400" />
                       </span>
@@ -965,28 +1008,46 @@ export function TypesetLayoutEditor({
                     {collapsedSections.trim ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>
                   {!collapsedSections.trim && (
-                    <div className="p-3 space-y-1.5 animate-fade-in max-h-56 overflow-y-auto">
-                      {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
-                        <button
-                          key={f}
-                          type="button"
-                          onClick={() => handleLayoutChange('format', f)}
-                          className={cn(
-                            "w-full text-left p-2 rounded-md border transition-all flex justify-between items-center",
-                            layout.format === f 
-                              ? "bg-zinc-100 dark:bg-zinc-805 border-zinc-400 dark:border-zinc-700 ring-1 ring-zinc-500 shadow-sm"
-                              : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-gray-850 hover:border-zinc-300 dark:hover:border-zinc-750"
-                          )}
+                    <div className="p-3 space-y-3 animate-fade-in max-h-56 overflow-y-auto">
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] uppercase font-bold text-zinc-400 block">{currentLanguage === 'zh' ? '物理开本规格' : 'Trim Size Formats'}</label>
+                        {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => handleLayoutChange('format', f)}
+                            className={cn(
+                              "w-full text-left p-2 rounded-md border transition-all flex justify-between items-center",
+                              layout.format === f 
+                                ? "bg-zinc-100 dark:bg-zinc-805 border-zinc-400 dark:border-zinc-700 ring-1 ring-zinc-500 shadow-sm"
+                                : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-gray-850 hover:border-zinc-300 dark:hover:border-zinc-750"
+                            )}
+                          >
+                            <div>
+                              <div className="font-bold text-zinc-900 dark:text-zinc-100">{FORMATS[f].label}</div>
+                              <div className="text-[9px] text-zinc-400 mt-0.5">{f === 'pocket' ? 'Standard Novel size' : 'Classic Publishing canvas'}</div>
+                            </div>
+                            <span className="font-mono text-[9px] opacity-70 bg-zinc-200 dark:bg-zinc-900 p-1 rounded">
+                              {FORMATS[f].width} × {FORMATS[f].height} px
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                      
+                      <div className="space-y-1.5 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                        <label className="text-[10px] uppercase font-bold text-zinc-400 block">{currentLanguage === 'zh' ? '书眉页码格式' : 'Running Headers & Folios'}</label>
+                        <select 
+                          value={layout.headerPos || 'top-center'}
+                          onChange={e => handleLayoutChange('headerPos', e.target.value)}
+                          className="w-full text-xs p-2 bg-white dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
                         >
-                          <div>
-                            <div className="font-bold text-zinc-900 dark:text-zinc-100">{FORMATS[f].label}</div>
-                            <div className="text-[9px] text-zinc-400 mt-0.5">{f === 'pocket' ? 'Standard Novel size' : 'Classic Publishing canvas'}</div>
-                          </div>
-                          <span className="font-mono text-[9px] opacity-70 bg-zinc-200 dark:bg-zinc-900 p-1 rounded">
-                            {FORMATS[f].width} × {FORMATS[f].height} px
-                          </span>
-                        </button>
-                      ))}
+                          <option value="hidden">Hidden {currentLanguage === 'zh' ? '(无书眉)' : ''}</option>
+                          <option value="top-center">Top Center {currentLanguage === 'zh' ? '(顶部居中)' : ''}</option>
+                          <option value="top-outside">Top Outside {currentLanguage === 'zh' ? '(顶部门外侧)' : ''}</option>
+                          <option value="bottom-center">Bottom Center {currentLanguage === 'zh' ? '(底部居中)' : ''}</option>
+                          <option value="bottom-outside">Bottom Outside {currentLanguage === 'zh' ? '(底部门外侧)' : ''}</option>
+                        </select>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -998,11 +1059,26 @@ export function TypesetLayoutEditor({
                     type="button"
                     className="w-full h-9 px-3 flex items-center justify-between text-[11px] font-bold text-zinc-500 hover:text-zinc-805 dark:hover:text-zinc-200 uppercase tracking-wider bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-150 dark:border-zinc-800 transition-colors"
                   >
-                    <span>{currentLanguage === 'zh' ? '三、字形与文本多栏分段' : 'DTP Typography & Layout Columns'}</span>
+                    <span>{currentLanguage === 'zh' ? '三、字形与文本多栏分段' : 'DTP Typography & Layout'}</span>
                     {collapsedSections.typography ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                   </button>
                   {!collapsedSections.typography && (
-                    <div className="p-3 space-y-3 animate-fade-in">
+                    <div className="p-3 space-y-4 animate-fade-in">
+                      
+                      {/* Font Family selection */}
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '书刊字体性格' : 'Typeface Family'}</label>
+                        <select 
+                          value={layout.fontFamily || 'serif'}
+                          onChange={e => handleLayoutChange('fontFamily', e.target.value)}
+                          className="w-full text-xs p-2 bg-white dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 font-serif"
+                        >
+                          <option value="serif">Classical Serif {currentLanguage === 'zh' ? '(经典衬线体)' : ''}</option>
+                          <option value="sans">Modern Sans {currentLanguage === 'zh' ? '(现代无衬线体)' : ''}</option>
+                          <option value="mono">Typewriter/Mono {currentLanguage === 'zh' ? '(等宽打字机)' : ''}</option>
+                        </select>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-3 text-xs">
                         <div>
                           <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '基础字号 (px)' : 'Base Font Size'}</label>
@@ -1025,8 +1101,57 @@ export function TypesetLayoutEditor({
                         </div>
                       </div>
 
+                      {/* Advanced Paragraph formats */}
+                      <div className="grid grid-cols-2 gap-3 text-xs border-t border-zinc-200 dark:border-zinc-800 pt-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '首行缩进 (em)' : 'First Line Indent'}</label>
+                          <input 
+                            type="number"
+                            step="1"
+                            value={layout.firstLineIndent ?? 0}
+                            onChange={e => handleLayoutChange('firstLineIndent', Math.max(0, Number(e.target.value)))}
+                            className="w-full p-2 bg-white dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-md"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '段间距 (px)' : 'Para Spacing'}</label>
+                          <input 
+                            type="number"
+                            value={layout.paragraphSpacing ?? 16}
+                            onChange={e => handleLayoutChange('paragraphSpacing', Math.max(0, Number(e.target.value)))}
+                            className="w-full p-2 bg-white dark:bg-zinc-950 border border-zinc-150 dark:border-zinc-850 rounded-md"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+                        <label className="flex items-center justify-between p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-850 transition-colors">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-[11px]">{currentLanguage === 'zh' ? '段落两端对齐' : 'Justify Text Format'}</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={layout.justifyText !== false}
+                            onChange={(e) => handleLayoutChange('justifyText', e.target.checked)}
+                            className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305"
+                          />
+                        </label>
+                        
+                        <label className="flex items-center justify-between p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-850 transition-colors">
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-[11px]">{currentLanguage === 'zh' ? '开启首字下沉 (Drop Caps)' : 'Enable Drop Caps'}</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={!!layout.dropCaps}
+                            onChange={(e) => handleLayoutChange('dropCaps', e.target.checked)}
+                            className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305"
+                          />
+                        </label>
+                      </div>
+
                       {/* Columns Presets - fully professional */}
-                      <div>
+                      <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
                         <label className="text-[10px] uppercase font-bold text-zinc-405 block mb-1.5 flex justify-between">
                           <span>{currentLanguage === 'zh' ? '画板分栏数' : 'Page Columns Count'}</span>
                           <span className="font-mono text-emerald-500 font-bold">{columnsCount} Col{columnsCount > 1 && 's'}</span>
@@ -1048,10 +1173,8 @@ export function TypesetLayoutEditor({
                             </button>
                           ))}
                         </div>
-                        <p className="text-[9px] text-zinc-400 mt-1.5">
-                          {currentLanguage === 'zh' ? '调整分栏后，文字将自动跨页分流拼版，极具视觉冲击力！' : 'Text streams flow seamlessly into columns across page gutters'}
-                        </p>
                       </div>
+
                     </div>
                   )}
                 </div>

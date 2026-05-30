@@ -38,6 +38,14 @@ export interface PageLayout {
   format?: TrimFormat;
   fontSize?: number;
   lineHeight?: number;
+  columns?: number;
+  paperStyle?: 'warm' | 'white' | 'dark' | 'kraft' | 'vintage' | 'glossy' | 'newsprint';
+  justifyText?: boolean;
+  firstLineIndent?: number;
+  paragraphSpacing?: number;
+  fontFamily?: string;
+  dropCaps?: boolean;
+  headerPos?: 'hidden' | 'top-center' | 'top-outside' | 'bottom-center' | 'bottom-outside';
 }
 
 export interface Chapter {
