@@ -13,6 +13,7 @@ interface MarkdownRendererProps {
   selectedImageId?: string | null;
   onImageClick?: (id: string) => void;
   showBlockIndices?: boolean;
+  sceneBreakStyle?: 'asterism' | 'dots' | 'line' | 'space';
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ 
@@ -21,6 +22,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   selectedImageId,
   onImageClick,
   showBlockIndices = false,
+  sceneBreakStyle = 'line',
 }) => {
   let elementIndex = 0;
 
@@ -127,7 +129,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   width: '100%', 
                   height: '100%', 
                   objectFit: (img.objectFit as any) || 'cover', 
-                  display: 'block' 
+                  display: 'block',
+                  filter: `${img.grayscale ? 'grayscale(100%) ' : ''}${img.sepia ? 'sepia(100%) ' : ''}${img.invert ? 'invert(100%)' : ''}`.trim() || 'none'
                 }} 
               />
             </span>
@@ -151,6 +154,18 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         ul(props) { return renderWithImages('ul', props); },
         ol(props) { return renderWithImages('ol', props); },
         blockquote(props) { return renderWithImages('blockquote', props); },
+        hr(props) {
+          const idx = elementIndex++;
+          if (sceneBreakStyle === 'asterism') {
+            return <div className="text-center font-serif text-2xl my-6 tracking-[1em] text-zinc-500 opacity-60 pointer-events-none select-none">&#10086; &#10086; &#10086;</div>;
+          } else if (sceneBreakStyle === 'dots') {
+            return <div className="text-center text-xl my-6 tracking-[1em] text-zinc-500 opacity-60 pointer-events-none select-none">&#8226; &#8226; &#8226;</div>;
+          } else if (sceneBreakStyle === 'space') {
+            return <div className="h-12 w-full my-6"></div>;
+          } else {
+            return <hr className="my-8 border-t border-zinc-300 dark:border-zinc-700 w-1/3 mx-auto opacity-50" />;
+          }
+        },
         code({ node, inline, className, children, ...props }: any) {
           const match = /language-(\w+)/.exec(className || '');
           const language = match ? match[1] : '';

@@ -227,10 +227,14 @@ export function TypesetLayoutEditor({
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file && file.type.startsWith('image/')) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const dropX = e.clientX - rect.left;
+      const dropY = e.clientY - rect.top;
+
       const reader = new FileReader();
       reader.onload = (event) => {
         const url = event.target?.result as string;
-        insertNewFloatingImage(url);
+        insertNewFloatingImage(url, dropX, dropY);
       };
       reader.readAsDataURL(file);
     }
@@ -246,12 +250,12 @@ export function TypesetLayoutEditor({
   };
 
   // Safe insertion of a new floating layout image attached to block flow
-  const insertNewFloatingImage = (url: string) => {
+  const insertNewFloatingImage = (url: string, x = 30, y = 60) => {
     const newImg: FloatingImage = {
       id: uuidv4(),
       url,
-      x: 30,
-      y: 60,
+      x,
+      y,
       width: 280,
       height: 200,
       opacity: 1,
@@ -412,6 +416,16 @@ export function TypesetLayoutEditor({
                       height: formatData.height,
                     }}
                   >
+                    {/* Embedded Texture Overlay for organic paper feel */}
+                    {(paperStyle === 'kraft' || paperStyle === 'vintage' || paperStyle === 'newsprint') && (
+                      <div 
+                        className="absolute inset-0 opacity-[0.12] pointer-events-none mix-blend-color-burn" 
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+                        }}
+                      />
+                    )}
+
                     {/* Visual Bleed Guides & Margins lines typically found in Adobe InDesign */}
                     {showGuides && (
                       <>
@@ -497,6 +511,9 @@ export function TypesetLayoutEditor({
                                   layout.fontFamily === 'mono' ? 'ui-monospace, monospace' : 
                                   'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif',
                       textAlign: layout.justifyText ? 'justify' : 'left',
+                      hyphens: layout.hyphenation ? 'auto' : 'none',
+                      textRendering: 'optimizeLegibility',
+                      fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
                       '--paragraph-spacing': `${layout.paragraphSpacing ?? 16}px`,
                       '--first-line-indent': `${layout.firstLineIndent ?? 0}em`,
                     } as React.CSSProperties}
@@ -507,11 +524,30 @@ export function TypesetLayoutEditor({
                       "[&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
                     )}
                   >
+                    {layout.chapterTitleStyle && layout.chapterTitleStyle !== 'hidden' && (
+                      <div className={cn(
+                        "mb-12",
+                        layout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
+                        layout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-zinc-900 dark:border-zinc-100 pb-4 mb-10" : 
+                        "text-left" // minimal
+                      )}>
+                        <h1 className={cn(
+                          "m-0 leading-tight",
+                          layout.chapterTitleStyle === 'classical' ? "text-4xl font-serif font-normal" : 
+                          layout.chapterTitleStyle === 'modern' ? "text-5xl font-sans font-bold tracking-tight" : 
+                          "text-2xl font-serif italic"
+                        )}>
+                          {chapter.title || 'Untitled Chapter'}
+                        </h1>
+                      </div>
+                    )}
+                    
                     <MarkdownRenderer 
                       floatingImages={floatingImages}
                       selectedImageId={selectedImageId}
                       onImageClick={setSelectedImageId}
                       showBlockIndices={true}
+                      sceneBreakStyle={layout.sceneBreakStyle}
                     >
                       {content || ''}
                     </MarkdownRenderer>
@@ -612,7 +648,10 @@ export function TypesetLayoutEditor({
                           src={img.url} 
                           className="w-full h-full pointer-events-none select-none" 
                           referrerPolicy="no-referrer"
-                          style={{ objectFit: (img.objectFit as any) || 'cover' }} 
+                          style={{ 
+                            objectFit: (img.objectFit as any) || 'cover',
+                            filter: `${img.grayscale ? 'grayscale(100%) ' : ''}${img.sepia ? 'sepia(100%) ' : ''}${img.invert ? 'invert(100%)' : ''}`.trim() || 'none'
+                          }} 
                         />
                         {/* Bleed guid corners */}
                         {showGuides && (
@@ -864,6 +903,37 @@ export function TypesetLayoutEditor({
                             <option value="color-burn">Color Burn</option>
                           </select>
                         </div>
+                        
+                        {/* CSS Visual Filters */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <label className="flex flex-col items-center justify-center p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-850 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!img.grayscale}
+                              onChange={(e) => updateImg({ grayscale: e.target.checked })}
+                              className="mb-1.5 w-3.5 h-3.5 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305"
+                            />
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-[10px]">Grayscale</span>
+                          </label>
+                          <label className="flex flex-col items-center justify-center p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-850 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!img.sepia}
+                              onChange={(e) => updateImg({ sepia: e.target.checked })}
+                              className="mb-1.5 w-3.5 h-3.5 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305"
+                            />
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-[10px]">Sepia</span>
+                          </label>
+                          <label className="flex flex-col items-center justify-center p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-850 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!img.invert}
+                              onChange={(e) => updateImg({ invert: e.target.checked })}
+                              className="mb-1.5 w-3.5 h-3.5 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305"
+                            />
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-[10px]">Invert</span>
+                          </label>
+                        </div>
 
                         {/* Crop aspect fill selector */}
                         <div>
@@ -1009,29 +1079,38 @@ export function TypesetLayoutEditor({
                   </button>
                   {!collapsedSections.trim && (
                     <div className="p-3 space-y-3 animate-fade-in max-h-56 overflow-y-auto">
-                      <div className="space-y-1.5">
+                      <div className="space-y-2">
                         <label className="text-[10px] uppercase font-bold text-zinc-400 block">{currentLanguage === 'zh' ? '物理开本规格' : 'Trim Size Formats'}</label>
-                        {(Object.keys(FORMATS) as TrimFormat[]).map((f) => (
-                          <button
-                            key={f}
-                            type="button"
-                            onClick={() => handleLayoutChange('format', f)}
-                            className={cn(
-                              "w-full text-left p-2 rounded-md border transition-all flex justify-between items-center",
-                              layout.format === f 
-                                ? "bg-zinc-100 dark:bg-zinc-805 border-zinc-400 dark:border-zinc-700 ring-1 ring-zinc-500 shadow-sm"
-                                : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-gray-850 hover:border-zinc-300 dark:hover:border-zinc-750"
-                            )}
-                          >
-                            <div>
-                              <div className="font-bold text-zinc-900 dark:text-zinc-100">{FORMATS[f].label}</div>
-                              <div className="text-[9px] text-zinc-400 mt-0.5">{f === 'pocket' ? 'Standard Novel size' : 'Classic Publishing canvas'}</div>
-                            </div>
-                            <span className="font-mono text-[9px] opacity-70 bg-zinc-200 dark:bg-zinc-900 p-1 rounded">
-                              {FORMATS[f].width} × {FORMATS[f].height} px
-                            </span>
-                          </button>
-                        ))}
+                        <div className="grid grid-cols-2 gap-2">
+                          {(Object.keys(FORMATS) as TrimFormat[]).map((f) => {
+                            const ratio = FORMATS[f].height / FORMATS[f].width;
+                            return (
+                              <button
+                                key={f}
+                                type="button"
+                                onClick={() => handleLayoutChange('format', f)}
+                                className={cn(
+                                  "w-full text-left p-2 rounded-lg border transition-all flex flex-col justify-between items-center text-center gap-2 h-[96px]",
+                                  layout.format === f 
+                                    ? "bg-zinc-100 dark:bg-zinc-805 border-zinc-400 dark:border-zinc-700 ring-2 ring-emerald-500 shadow-sm"
+                                    : "bg-white dark:bg-zinc-950 border-zinc-200 dark:border-gray-850 hover:border-zinc-300 dark:hover:border-zinc-750"
+                                )}
+                              >
+                                <div 
+                                  className={cn(
+                                    "border bg-white shadow-sm transition-all mt-1",
+                                    layout.format === f ? "border-emerald-500" : "border-zinc-300 dark:border-zinc-700"
+                                  )} 
+                                  style={{ width: '28px', height: `${28 * ratio}px` }} 
+                                />
+                                <div className="leading-tight">
+                                  <div className="font-bold text-[10px] text-zinc-900 dark:text-zinc-100">{FORMATS[f].label.split(' ')[0]}</div>
+                                  <div className="text-[8px] text-zinc-400 font-mono mt-0.5">{FORMATS[f].width}x{FORMATS[f].height}</div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                       
                       <div className="space-y-1.5 pt-2 border-t border-zinc-200 dark:border-zinc-800">
@@ -1139,6 +1218,18 @@ export function TypesetLayoutEditor({
                         
                         <label className="flex items-center justify-between p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-850 transition-colors">
                           <div className="flex flex-col">
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-[11px]">{currentLanguage === 'zh' ? '文字自动断字 (Hyphenation)' : 'Auto Hyphenation'}</span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={!!layout.hyphenation}
+                            onChange={(e) => handleLayoutChange('hyphenation', e.target.checked)}
+                            className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305"
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-850 transition-colors">
+                          <div className="flex flex-col">
                             <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-[11px]">{currentLanguage === 'zh' ? '开启首字下沉 (Drop Caps)' : 'Enable Drop Caps'}</span>
                           </div>
                           <input
@@ -1148,6 +1239,36 @@ export function TypesetLayoutEditor({
                             className="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305"
                           />
                         </label>
+                      </div>
+
+                      {/* Ornaments and Stylings */}
+                      <div className="grid grid-cols-2 gap-3 text-xs border-t border-zinc-200 dark:border-zinc-800 pt-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '章节标题样式' : 'Chapter Title'}</label>
+                          <select 
+                            value={layout.chapterTitleStyle || 'hidden'}
+                            onChange={e => handleLayoutChange('chapterTitleStyle', e.target.value)}
+                            className="w-full text-xs p-2 bg-white dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                          >
+                            <option value="hidden">Hidden</option>
+                            <option value="classical">Classical Center</option>
+                            <option value="modern">Modern Bold</option>
+                            <option value="minimal">Minimal Inline</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '场景分隔符' : 'Scene Break'}</label>
+                          <select 
+                            value={layout.sceneBreakStyle || 'line'}
+                            onChange={e => handleLayoutChange('sceneBreakStyle', e.target.value)}
+                            className="w-full text-xs p-2 bg-white dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                          >
+                            <option value="line">Line (___)</option>
+                            <option value="asterism">Asterism (❦ ❦ ❦)</option>
+                            <option value="dots">Dots (• • •)</option>
+                            <option value="space">Space Empty</option>
+                          </select>
+                        </div>
                       </div>
 
                       {/* Columns Presets - fully professional */}

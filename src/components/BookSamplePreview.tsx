@@ -154,6 +154,22 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
     }
   };
 
+  const baseLayout = chapters[0]?.layout || {};
+  const fontFamilyCss = baseLayout.fontFamily === 'sans' ? 'ui-sans-serif, system-ui, sans-serif' : 
+                        baseLayout.fontFamily === 'mono' ? 'ui-monospace, monospace' : 
+                        'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif';
+  
+  const paperClasses = {
+    warm: 'bg-[#faf6ee] text-[#1c1917]',
+    white: 'bg-white text-zinc-900',
+    dark: 'bg-[#18181b] text-zinc-100',
+    kraft: 'bg-[#e6d0a7] text-[#2c1d11]',
+    vintage: 'bg-[#f4ebd8] text-[#3e2723]',
+    glossy: 'bg-[#f8f9fa] text-[#212529]',
+    newsprint: 'bg-[#e2e2df] text-[#2b2b2b]',
+  };
+  const currentPaperClass = paperClasses[(baseLayout.paperStyle || 'warm') as keyof typeof paperClasses] || paperClasses.warm;
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900/95 backdrop-blur-sm text-zinc-100 animate-in fade-in duration-200">
       {/* Header / Toolbar */}
@@ -248,7 +264,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
           {/* Book Container (Viewport) - Fixed Dimensions */}
           <div 
             ref={containerRef}
-            className="relative bg-[#fcfbf9] text-zinc-900 shadow-2xl overflow-hidden"
+            className={cn("relative shadow-2xl overflow-hidden", currentPaperClass)}
             style={{
               width: `${BOOK_WIDTH}px`,
               height: `${BOOK_HEIGHT}px`,
@@ -256,6 +272,15 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
           >
             {/* Paper Texture Effect */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")` }}></div>
+            
+            {(baseLayout.paperStyle === 'kraft' || baseLayout.paperStyle === 'vintage' || baseLayout.paperStyle === 'newsprint') && (
+              <div 
+                className="absolute inset-0 opacity-[0.12] pointer-events-none z-0 mix-blend-color-burn" 
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+                }}
+              />
+            )}
 
             {/* Spine Shadow / Binding Effect */}
             <div className="absolute left-1/2 top-0 bottom-0 w-24 -ml-12 bg-gradient-to-r from-transparent via-black/5 to-transparent pointer-events-none z-20 mix-blend-multiply"></div>
@@ -264,7 +289,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
             {/* Content Wrapper (Scrollable/Transformable) */}
             <div 
               ref={contentRef}
-              className="h-full transition-transform duration-500 ease-in-out will-change-transform"
+              className="h-full transition-transform duration-500 ease-in-out will-change-transform z-10 relative"
               style={{
                 transform: `translateX(-${currentPage * SPREAD_STRIDE}px)`,
                 columnWidth: `${COLUMN_WIDTH}px`,
@@ -277,22 +302,28 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
             >
               {/* Render Content */}
               <div 
-                className="prose prose-zinc max-w-none font-serif text-justify leading-relaxed antialiased"
-                style={{ width: `${COLUMN_WIDTH}px` }} // Explicitly set width to force column break
+                className={cn(
+                  "prose max-w-none antialiased break-words",
+                  baseLayout.paperStyle === 'dark' ? 'prose-invert' : 'prose-zinc'
+                )}
+                style={{ 
+                  width: `${COLUMN_WIDTH}px`,
+                  fontFamily: fontFamilyCss,
+                  fontSize: `${baseLayout.fontSize || 16}px`,
+                  lineHeight: baseLayout.lineHeight || 1.6,
+                  textAlign: baseLayout.justifyText !== false ? 'justify' : 'left',
+                  hyphens: baseLayout.hyphenation ? 'auto' : 'none',
+                  textRendering: 'optimizeLegibility',
+                  fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
+                }}
               >
                 <style>{`
-                  .sample-content {
-                    font-size: 15px; /* More realistic book font size */
-                    line-height: 1.75;
-                    color: #27272a;
-                  }
                   .sample-content h1 { 
                     margin-top: 0; 
                     font-size: 2.2em; 
                     text-align: center; 
                     margin-bottom: 4rem; 
                     break-before: column; 
-                    font-family: "Playfair Display", serif;
                     font-weight: 700;
                     letter-spacing: -0.02em;
                   }
@@ -300,15 +331,14 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                     font-size: 1.4em; 
                     margin-top: 3rem; 
                     margin-bottom: 2rem; 
-                    font-family: "Playfair Display", serif;
                     font-weight: 600;
                     text-align: center;
                     letter-spacing: 0.05em;
                   }
                   /* Traditional Paragraph Styling */
                   .sample-content p { 
-                    margin-bottom: 0; 
-                    text-indent: 2em; 
+                    margin-bottom: ${baseLayout.paragraphSpacing ?? 16}px; 
+                    text-indent: ${baseLayout.firstLineIndent ?? 2}em; 
                   }
                   /* No indent for first paragraph after headings */
                   .sample-content h1 + p,
@@ -316,6 +346,20 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                   .sample-content hr + p {
                     text-indent: 0;
                   }
+                  /* Add Drop Caps */
+                  ${baseLayout.dropCaps ? `
+                    .chapter-start > *:not(h1):not(h2):not(img):not(div.text-center):first-child::first-letter,
+                    .chapter-start > h2 + p::first-letter,
+                    .chapter-start > div.text-center + p::first-letter,
+                    .chapter-start > img + p::first-letter {
+                      float: left;
+                      font-size: 3em;
+                      font-weight: bold;
+                      padding-right: 0.1em;
+                      line-height: 0.8;
+                      margin-top: 0.1em;
+                    }
+                  ` : ''}
                   /* Add spacing back for non-paragraph elements if needed */
                   .sample-content blockquote {
                     margin: 1.5rem 2rem;
@@ -361,16 +405,38 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
 
                    {chapters.map((chapter, idx) => (
                      <div key={chapter.id} className="chapter-start" data-chapter-id={chapter.id} data-chapter-index={idx}>
-                       <div className="text-center mb-12">
-                         <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500 block mb-4">Chapter {idx + 1}</span>
-                         <h2 className="!mt-0 !mb-0 !text-2xl border-none">{chapter.title}</h2>
-                       </div>
+                       {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
+                          <div className={cn(
+                            "mb-12",
+                            baseLayout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
+                            baseLayout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-inherit pb-4 mb-10" : 
+                            "text-left" // minimal
+                          )}>
+                            <span className="text-[10px] font-bold uppercase tracking-[0.25em] opacity-50 block mb-4">Chapter {idx + 1}</span>
+                            <h2 className={cn(
+                              "!m-0 !border-none leading-tight",
+                              baseLayout.chapterTitleStyle === 'classical' ? "!text-4xl font-normal !font-serif" : 
+                              baseLayout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
+                              "!text-2xl !font-serif italic"
+                            )}>
+                              {chapter.title}
+                            </h2>
+                          </div>
+                       ) : (
+                         <div className="text-center mb-12">
+                           <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500 block mb-4">Chapter {idx + 1}</span>
+                           <h2 className="!mt-0 !mb-0 !text-2xl border-none">{chapter.title}</h2>
+                         </div>
+                       )}
                        
                        {chapter.image && (
                          <img src={chapter.image} alt={chapter.title} className="w-full h-auto mb-8" />
                        )}
                        
-                       <MarkdownRenderer floatingImages={chapter.floatingImages || []}>
+                       <MarkdownRenderer 
+                         floatingImages={chapter.floatingImages || []}
+                         sceneBreakStyle={baseLayout.sceneBreakStyle}
+                       >
                          {chapter.content || ''}
                        </MarkdownRenderer>
                        

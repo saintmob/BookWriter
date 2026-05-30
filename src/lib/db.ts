@@ -26,6 +26,9 @@ export interface FloatingImage {
   blendMode?: string;
   layoutMode?: 'absolute' | 'wrap-left' | 'wrap-right' | 'wrap-center' | 'full-width';
   paragraphIndex?: number;
+  grayscale?: boolean;
+  sepia?: boolean;
+  invert?: boolean;
 }
 
 export type TrimFormat = 'a4' | 'letter' | 'trade' | 'pocket';
@@ -46,6 +49,9 @@ export interface PageLayout {
   fontFamily?: string;
   dropCaps?: boolean;
   headerPos?: 'hidden' | 'top-center' | 'top-outside' | 'bottom-center' | 'bottom-outside';
+  chapterTitleStyle?: 'hidden' | 'classical' | 'modern' | 'minimal';
+  sceneBreakStyle?: 'asterism' | 'dots' | 'line' | 'space';
+  hyphenation?: boolean;
 }
 
 export interface Chapter {
