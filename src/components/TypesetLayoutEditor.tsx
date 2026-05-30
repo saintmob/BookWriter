@@ -108,7 +108,7 @@ export function TypesetLayoutEditor({
     zoom,
     setZoom
   } = useStore();
-  
+
   // Load settings
   const [layout, setLayout] = useState<PageLayout>(() => {
     return { ...DEFAULT_LAYOUT, ...chapter.layout };
@@ -116,8 +116,58 @@ export function TypesetLayoutEditor({
   const [floatingImages, setFloatingImages] = useState<FloatingImage[]>(chapter.floatingImages || []);
   const [pageCount, setPageCount] = useState(1);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+  const [croppingImageId, setCroppingImageId] = useState<string | null>(null);
   const [showGuides, setShowGuides] = useState(true);
   const [activeAssetTab, setActiveAssetTab] = useState<'details' | 'assets' | 'ai'>('ai');
+  const [isMaskDragging, setIsMaskDragging] = useState<{ id: string, startX: number, startY: number, startObjectX: number, startObjectY: number } | null>(null);
+
+  useEffect(() => {
+    if (!isMaskDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const dx = (e.clientX - isMaskDragging.startX) * -0.5; // inverted panning sensitivity
+      const dy = (e.clientY - isMaskDragging.startY) * -0.5;
+      
+      const newX = Math.max(0, Math.min(100, isMaskDragging.startObjectX + dx));
+      const newY = Math.max(0, Math.min(100, isMaskDragging.startObjectY + dy));
+      
+      setFloatingImages(prev => prev.map(img => 
+        img.id === isMaskDragging.id ? { ...img, objectPosition: `${Math.round(newX)}% ${Math.round(newY)}%` } : img
+      ));
+    };
+
+    const handleMouseUp = () => {
+      setIsMaskDragging(null);
+      // Persist the changes to chapter
+      onUpdateChapter({ ...chapter, floatingImages, layout });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isMaskDragging, floatingImages, chapter.content, layout]);
+
+  // Parse object position string to numbers
+  const parseObjectPosition = (pos: string | undefined): [number, number] => {
+    if (!pos) return [50, 50];
+    const match = pos.match(/(-?\d+)%?\s+(-?\d+)%?/);
+    if (match) return [Number(match[1]), Number(match[2])];
+    return [50, 50];
+  };
+
+  const handleMaskDragStart = (e: React.MouseEvent, img: FloatingImage) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const [objX, objY] = parseObjectPosition(img.objectPosition);
+    setIsMaskDragging({ id: img.id, startX: e.clientX, startY: e.clientY, startObjectX: objX, startObjectY: objY });
+  };
+
+  const handleGlobalMouseMove = (e: MouseEvent) => {
+    // ... mask drag logic will be handled here or inside a global effect
+  };
   
   // Direct Block Editing Overlay state
   const [editingBlock, setEditingBlock] = useState<{ index: number; text: string } | null>(null);
@@ -251,20 +301,24 @@ export function TypesetLayoutEditor({
 
   // Safe insertion of a new floating layout image attached to block flow
   const insertNewFloatingImage = (url: string, x = 30, y = 60) => {
+    const roughParagraphIndex = Math.max(0, Math.floor((y - layout.marginTop) / 100));
+
     const newImg: FloatingImage = {
       id: uuidv4(),
       url,
       x,
       y,
-      width: 280,
-      height: 200,
+      width: 400,
+      height: 300,
       opacity: 1,
       borderRadius: 8,
       shadow: 'md',
       objectFit: 'cover',
+      objectPosition: 'center',
+      autoSize: true,
       blendMode: 'normal',
       layoutMode: 'wrap-left', // Floats left of text as default wrapped
-      paragraphIndex: 1,      // Anchored to paragraph block #1
+      paragraphIndex: roughParagraphIndex,      // Anchored to paragraph block
     };
     setFloatingImages(prev => [...prev, newImg]);
     setSelectedImageId(newImg.id);
@@ -545,7 +599,19 @@ export function TypesetLayoutEditor({
                     <MarkdownRenderer 
                       floatingImages={floatingImages}
                       selectedImageId={selectedImageId}
-                      onImageClick={setSelectedImageId}
+                      croppingImageId={croppingImageId}
+                      onImageClick={(id) => {
+                         setSelectedImageId(id);
+                         setActiveAssetTab('details');
+                      }}
+                      onImageDoubleClick={(id) => {
+                         if (croppingImageId === id) setCroppingImageId(null);
+                         else setCroppingImageId(id);
+                      }}
+                      onImageDragStart={(e, id) => {
+                         const img = floatingImages.find(i => i.id === id);
+                         if (img) handleMaskDragStart(e, img);
+                      }}
                       showBlockIndices={true}
                       sceneBreakStyle={layout.sceneBreakStyle}
                     >
@@ -643,6 +709,11 @@ export function TypesetLayoutEditor({
                           e.stopPropagation();
                           setSelectedImageId(img.id);
                         }}
+                        onDoubleClick={(e) => {
+                           e.stopPropagation();
+                           if (croppingImageId === img.id) setCroppingImageId(null);
+                           else setCroppingImageId(img.id);
+                        }}
                       >
                         <img 
                           src={img.url} 
@@ -650,9 +721,23 @@ export function TypesetLayoutEditor({
                           referrerPolicy="no-referrer"
                           style={{ 
                             objectFit: (img.objectFit as any) || 'cover',
+                            objectPosition: img.objectPosition || 'center',
                             filter: `${img.grayscale ? 'grayscale(100%) ' : ''}${img.sepia ? 'sepia(100%) ' : ''}${img.invert ? 'invert(100%)' : ''}`.trim() || 'none'
                           }} 
                         />
+                        {croppingImageId === img.id && (
+                          <div 
+                            className="absolute inset-0 bg-emerald-500/10 border-2 border-emerald-500 cursor-move z-50 flex items-center justify-center transition-opacity pointer-events-auto"
+                            onMouseDown={(e) => {
+                              e.stopPropagation(); // Prevent Rnd box drag
+                              handleMaskDragStart(e, img);
+                            }}
+                          >
+                            <div className="bg-black/50 text-white text-[10px] uppercase font-bold py-1 px-2 rounded backdrop-blur-sm shadow pointer-events-none">
+                              Pan Position
+                            </div>
+                          </div>
+                        )}
                         {/* Bleed guid corners */}
                         {showGuides && (
                           <div className="absolute inset-0 border border-emerald-400/50 pointer-events-none"></div>
@@ -773,8 +858,29 @@ export function TypesetLayoutEditor({
                             <input 
                               type="number"
                               value={img.height}
-                              onChange={e => updateImg({ height: Math.max(20, Number(e.target.value)) })}
+                              onChange={e => updateImg({ height: Math.max(20, Number(e.target.value)), autoSize: false })}
                               className="bg-transparent w-full outline-none font-bold text-zinc-850 dark:text-zinc-150 focus:ring-0"
+                            />
+                          </div>
+
+                          <label className="col-span-2 flex items-center justify-center p-2 rounded-lg bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 cursor-pointer hover:bg-zinc-200 dark:hover:bg-zinc-850 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={!!img.autoSize}
+                              onChange={(e) => updateImg({ autoSize: e.target.checked })}
+                              className="mr-2 w-3.5 h-3.5 rounded text-emerald-500 focus:ring-emerald-500 bg-zinc-55 border-zinc-305"
+                            />
+                            <span className="font-semibold text-zinc-700 dark:text-zinc-300 text-[10px]">Auto Calculate Size</span>
+                          </label>
+
+                          <div className="bg-zinc-100 dark:bg-zinc-900 p-2 rounded flex items-center gap-1 col-span-2 shadow-inner border border-zinc-200 dark:border-zinc-800">
+                            <span className="text-zinc-400 text-[10px] uppercase font-bold shrink-0">Object Position:</span>
+                            <input 
+                              type="text"
+                              value={img.objectPosition || 'center'}
+                              onChange={e => updateImg({ objectPosition: e.target.value })}
+                              placeholder="e.g. 50% 20%"
+                              className="bg-transparent w-full outline-none text-xs text-zinc-850 dark:text-zinc-150 focus:ring-0"
                             />
                           </div>
 

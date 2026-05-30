@@ -23,6 +23,8 @@ export interface FloatingImage {
   borderRadius?: number;
   shadow?: string;
   objectFit?: 'cover' | 'contain' | 'fill';
+  objectPosition?: string;
+  autoSize?: boolean;
   blendMode?: string;
   layoutMode?: 'absolute' | 'wrap-left' | 'wrap-right' | 'wrap-center' | 'full-width';
   paragraphIndex?: number;

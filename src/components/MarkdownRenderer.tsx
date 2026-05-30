@@ -11,7 +11,10 @@ interface MarkdownRendererProps {
   children: string;
   floatingImages?: FloatingImage[];
   selectedImageId?: string | null;
+  croppingImageId?: string | null;
   onImageClick?: (id: string) => void;
+  onImageDoubleClick?: (id: string) => void;
+  onImageDragStart?: (e: React.MouseEvent, id: string) => void;
   showBlockIndices?: boolean;
   sceneBreakStyle?: 'asterism' | 'dots' | 'line' | 'space';
 }
@@ -20,7 +23,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   children, 
   floatingImages = [], 
   selectedImageId,
+  croppingImageId,
   onImageClick,
+  onImageDoubleClick,
+  onImageDragStart,
   showBlockIndices = false,
   sceneBreakStyle = 'line',
 }) => {
@@ -93,6 +99,10 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 e.stopPropagation();
                 if (onImageClick) onImageClick(img.id);
               }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                if (onImageDoubleClick) onImageDoubleClick(img.id);
+              }}
               className={cn(
                 "inline-block transition-all duration-200 select-none",
                 isSelected 
@@ -108,7 +118,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                     ? '0.35rem 1.75rem 0.65rem 0' 
                     : '0.35rem 0 0.65rem 1.75rem',
                 width: isFullWidth ? '100%' : `${img.width}px`,
-                height: isFullWidth ? 'auto' : `${img.height}px`,
+                height: isFullWidth ? 'auto' : img.autoSize ? 'auto' : `${img.height}px`,
                 opacity: img.opacity ?? 1,
                 mixBlendMode: (img.blendMode as any) || 'normal',
                 borderRadius: `${img.borderRadius ?? 0}px`,
@@ -118,8 +128,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                            img.shadow === 'xl' ? '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)' : 'none',
                 overflow: 'hidden',
                 position: 'relative',
-                cursor: 'pointer',
+                cursor: croppingImageId === img.id ? 'move' : 'pointer',
                 clear: (isCenter || isFullWidth) ? 'both' : 'none',
+                shapeOutside: floatStyle !== 'none' ? 'margin-box' : 'none',
               }}
             >
               <img 
@@ -129,10 +140,23 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   width: '100%', 
                   height: '100%', 
                   objectFit: (img.objectFit as any) || 'cover', 
+                  objectPosition: img.objectPosition || 'center',
                   display: 'block',
                   filter: `${img.grayscale ? 'grayscale(100%) ' : ''}${img.sepia ? 'sepia(100%) ' : ''}${img.invert ? 'invert(100%)' : ''}`.trim() || 'none'
                 }} 
               />
+              {croppingImageId === img.id && (
+                <div 
+                  className="absolute inset-0 bg-emerald-500/10 border-2 border-emerald-500 cursor-move z-50 flex items-center justify-center transition-opacity"
+                  onMouseDown={(e) => {
+                    if (onImageDragStart) onImageDragStart(e, img.id);
+                  }}
+                >
+                  <div className="bg-black/50 text-white text-[10px] uppercase font-bold py-1 px-2 rounded backdrop-blur-sm shadow pointer-events-none">
+                    Pan Position
+                  </div>
+                </div>
+              )}
             </span>
           );
         })}

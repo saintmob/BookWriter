@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Book, Chapter } from '../lib/db';
+import { Book, Chapter, PageLayout } from '../lib/db';
 import { X, ChevronLeft, ChevronRight, Printer, BookOpen, Minus, Plus, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { cn } from '../lib/utils';
@@ -154,7 +154,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
     }
   };
 
-  const baseLayout = chapters[0]?.layout || {};
+  const baseLayout: Partial<PageLayout> = chapters[0]?.layout || {};
   const fontFamilyCss = baseLayout.fontFamily === 'sans' ? 'ui-sans-serif, system-ui, sans-serif' : 
                         baseLayout.fontFamily === 'mono' ? 'ui-monospace, monospace' : 
                         'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif';
