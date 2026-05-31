@@ -33,7 +33,7 @@ export interface FloatingImage {
   invert?: boolean;
 }
 
-export type TrimFormat = 'a4' | 'letter' | 'trade' | 'pocket';
+export type TrimFormat = 'a4' | 'letter' | 'trade' | 'pocket' | 'landscape' | 'square';
 
 export interface PageLayout {
   marginTop: number;

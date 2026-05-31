@@ -61,6 +61,8 @@ const FORMATS: Record<TrimFormat, { width: number; height: number; label: string
   letter: { width: 816, height: 1056, label: 'US Letter (8.5x11")', printLabel: 'US Letter' },
   trade: { width: 576, height: 864, label: 'Trade (6x9")', printLabel: 'Digest 6" x 9"' },
   pocket: { width: 408, height: 660, label: 'Pocket (4.25x6.87")', printLabel: 'Pocket Novel' },
+  landscape: { width: 1123, height: 794, label: 'Landscape (297x210mm)', printLabel: 'Art Wide' },
+  square: { width: 864, height: 864, label: 'Square (9x9")', printLabel: 'Art Square' },
 };
 
 const DEFAULT_LAYOUT: PageLayout = {

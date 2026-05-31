@@ -29,6 +29,8 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
     letter: { width: 816, height: 1056 },
     trade: { width: 576, height: 864 },
     pocket: { width: 408, height: 653 },
+    landscape: { width: 1123, height: 794 },
+    square: { width: 864, height: 864 },
   };
   const formatData = FORMATS[baseLayout.format || 'a4'] || FORMATS.a4;
 
