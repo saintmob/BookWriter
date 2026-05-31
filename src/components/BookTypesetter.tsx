@@ -57,10 +57,11 @@ export function BookTypesetter() {
 
       {/* Main Canvas Area */}
       <div className="flex-1 flex flex-col min-w-0">
-         {activeChapter ? (
+         {activeChapter && activeBook ? (
             <TypesetLayoutEditor 
                key={activeChapter.id}
                chapter={activeChapter}
+               book={activeBook}
                content={activeChapter.content || ''}
                onContentChange={async (newContent) => {
                   const updated = { ...activeChapter, content: newContent, updatedAt: Date.now() };
@@ -69,6 +70,9 @@ export function BookTypesetter() {
                }}
                onUpdateChapter={(updated) => {
                   setChapters(chapters.map(c => c.id === updated.id ? updated : c));
+               }}
+               onUpdateBook={(updatedBook) => {
+                 useStore.getState().updateBook(updatedBook.id, updatedBook);
                }}
             />
          ) : (

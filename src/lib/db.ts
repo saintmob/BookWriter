@@ -6,6 +6,13 @@ export interface Book {
   idea: string;
   summary: string;
   coverImage?: string;
+  layout?: Partial<PageLayout>;
+  coverTitle?: string;
+  coverAuthor?: string;
+  coverPublisher?: string;
+  coverLayoutType?: string;
+  coverTextColor?: string;
+  coverOverlayOpacity?: number;
   createdAt: number;
   updatedAt: number;
 }

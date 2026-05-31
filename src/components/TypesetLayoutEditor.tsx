@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Rnd } from 'react-rnd';
 import { 
   Settings, 
@@ -32,7 +32,7 @@ import {
   PanelRightClose,
   PanelRightOpen
 } from 'lucide-react';
-import { Chapter, FloatingImage, PageLayout, TrimFormat, db } from '../lib/db';
+import { Book, Chapter, FloatingImage, PageLayout, TrimFormat, db } from '../lib/db';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
@@ -43,9 +43,11 @@ import { ChapterChat } from './ChapterChat';
 
 interface TypesetLayoutEditorProps {
   chapter: Chapter;
+  book: Book;
   content: string;
   onContentChange: (newContent: string) => void;
   onUpdateChapter: (chapter: Chapter) => void;
+  onUpdateBook: (book: Book) => void;
   isGeneratingContent?: boolean;
   isGeneratingImage?: boolean;
   isProofreading?: boolean;
@@ -87,9 +89,11 @@ const PAGE_GAP = 40; // Gap between sheets on canvas
 
 export function TypesetLayoutEditor({ 
   chapter, 
+  book,
   content, 
   onContentChange, 
   onUpdateChapter,
+  onUpdateBook,
   isGeneratingContent = false,
   isGeneratingImage = false,
   isProofreading = false,
@@ -112,9 +116,22 @@ export function TypesetLayoutEditor({
   } = useStore();
 
   // Load settings
-  const [layout, setLayout] = useState<PageLayout>(() => {
-    return { ...DEFAULT_LAYOUT, ...chapter.layout };
-  });
+  const [layoutScope, setLayoutScope] = useState<'book' | 'chapter'>('book');
+  const [localBookLayout, setLocalBookLayout] = useState<Partial<PageLayout>>(book.layout || {});
+  const [localChapterLayout, setLocalChapterLayout] = useState<Partial<PageLayout>>(chapter.layout || {});
+
+  const effectiveLayout = useMemo<PageLayout>(() => {
+    return { ...DEFAULT_LAYOUT, ...localBookLayout, ...localChapterLayout };
+  }, [localBookLayout, localChapterLayout]);
+
+  const layout = useMemo<PageLayout>(() => {
+    if (layoutScope === 'book') {
+      return { ...DEFAULT_LAYOUT, ...localBookLayout };
+    } else {
+      return effectiveLayout; 
+    }
+  }, [layoutScope, localBookLayout, effectiveLayout]);
+
   const [floatingImages, setFloatingImages] = useState<FloatingImage[]>(chapter.floatingImages || []);
   const [pageCount, setPageCount] = useState(1);
   const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
@@ -217,7 +234,11 @@ export function TypesetLayoutEditor({
 
   // Keep internal states in sync with props changes
   useEffect(() => {
-    setLayout({ ...DEFAULT_LAYOUT, ...chapter.layout });
+    setLocalBookLayout(book.layout || {});
+  }, [book.layout]);
+
+  useEffect(() => {
+    setLocalChapterLayout(chapter.layout || {});
     setFloatingImages(chapter.floatingImages || []);
   }, [chapter.id]);
 
@@ -232,13 +253,22 @@ export function TypesetLayoutEditor({
   // Synchronize layout & images changes automatically back to chapter DB with debounce
   useEffect(() => {
     const timeout = setTimeout(async () => {
-      const isLayoutEqual = JSON.stringify(layout) === JSON.stringify({ ...DEFAULT_LAYOUT, ...chapter.layout });
+      // 1. Sync Book layout
+      const isBookLayoutEqual = JSON.stringify(localBookLayout) === JSON.stringify(book.layout || {});
+      if (!isBookLayoutEqual) {
+        const updatedBook = { ...book, layout: localBookLayout as PageLayout, updatedAt: Date.now() };
+        await db.saveBook(updatedBook);
+        onUpdateBook(updatedBook);
+      }
+
+      // 2. Sync Chapter layout
+      const isChapterLayoutEqual = JSON.stringify(localChapterLayout) === JSON.stringify(chapter.layout || {});
       const isImagesEqual = JSON.stringify(floatingImages) === JSON.stringify(chapter.floatingImages || []);
       
-      if (!isLayoutEqual || !isImagesEqual) {
+      if (!isChapterLayoutEqual || !isImagesEqual) {
         const updatedChapter = { 
           ...chapter, 
-          layout, 
+          layout: localChapterLayout as PageLayout, 
           floatingImages,
           updatedAt: Date.now()
         };
@@ -248,7 +278,7 @@ export function TypesetLayoutEditor({
     }, 1200);
 
     return () => clearTimeout(timeout);
-  }, [layout, floatingImages, chapter, onUpdateChapter]);
+  }, [localBookLayout, localChapterLayout, floatingImages, chapter, book, onUpdateChapter, onUpdateBook]);
 
   // Calculate live multi-column page counts based on text wrapper container scroll dimensions
   useEffect(() => {
@@ -298,7 +328,11 @@ export function TypesetLayoutEditor({
   };
 
   const handleLayoutChange = (key: keyof PageLayout | 'columns' | 'paperStyle', value: any) => {
-    setLayout(prev => ({ ...prev, [key]: value }));
+    if (layoutScope === 'book') {
+      setLocalBookLayout(prev => ({ ...prev, [key]: value }));
+    } else {
+      setLocalChapterLayout(prev => ({ ...prev, [key]: value }));
+    }
   };
 
   // Safe insertion of a new floating layout image attached to block flow
@@ -1127,6 +1161,33 @@ export function TypesetLayoutEditor({
             })() : (
               // DEFAULT SCREEN IF NO IMAGE SELECTED: PAGE/TRIM METRICS EDITING (MIMICKING ADOBE PROPERTIES PANEL)
               <div className="space-y-4 animate-fade-in text-xs">
+                {/* Book vs Chapter Scope Toggle */}
+                <div className="bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg flex items-center shadow-inner mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setLayoutScope('book')}
+                    className={cn(
+                      "flex-1 py-1.5 text-[11px] font-bold rounded-md transition-all truncate px-1",
+                      layoutScope === 'book'
+                        ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    )}
+                  >
+                    {currentLanguage === 'zh' ? '全书全局设定' : 'Global Book Settings'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLayoutScope('chapter')}
+                    className={cn(
+                      "flex-1 py-1.5 text-[11px] font-bold rounded-md transition-all truncate px-1 text-center",
+                      layoutScope === 'chapter'
+                        ? "bg-white dark:bg-zinc-800 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                        : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                    )}
+                  >
+                    {currentLanguage === 'zh' ? '本章特殊独立版式' : 'Chapter Override'}
+                  </button>
+                </div>
                 
                 {/* Visual Preset Selection (Antique vs Dark Velvet etc) */}
                 <div className="border border-zinc-150 dark:border-zinc-800 rounded-lg overflow-hidden bg-zinc-50/50 dark:bg-zinc-950/20">
@@ -1189,6 +1250,13 @@ export function TypesetLayoutEditor({
                     <div className="p-3 space-y-3 animate-fade-in max-h-56 overflow-y-auto">
                       <div className="space-y-2">
                         <label className="text-[10px] uppercase font-bold text-zinc-400 block">{currentLanguage === 'zh' ? '物理开本规格' : 'Trim Size Formats'}</label>
+                        {layoutScope === 'chapter' ? (
+                          <div className="p-3 text-center border border-dashed border-zinc-300 dark:border-zinc-700 rounded-lg text-zinc-400 bg-zinc-50 dark:bg-zinc-900 leading-snug">
+                            {currentLanguage === 'zh' 
+                              ? '同一本书不能有多种开本。请切换到“全书全局设定”以修改此项。' 
+                              : 'Format applies to the whole book. Switch to "Global Book Settings" to edit.'}
+                          </div>
+                        ) : (
                         <div className="grid grid-cols-2 gap-2">
                           {(Object.keys(FORMATS) as TrimFormat[]).map((f) => {
                             const ratio = FORMATS[f].height / FORMATS[f].width;
@@ -1219,6 +1287,7 @@ export function TypesetLayoutEditor({
                             );
                           })}
                         </div>
+                        )}
                       </div>
                       
                       <div className="space-y-1.5 pt-2 border-t border-zinc-200 dark:border-zinc-800">

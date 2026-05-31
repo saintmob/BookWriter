@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Book, Chapter, PageLayout } from '../lib/db';
-import { X, ChevronLeft, ChevronRight, Printer, BookOpen, Minus, Plus, Maximize, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Printer, BookOpen, Minus, Plus, Maximize, FileText } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { PagedjsPreview } from './PagedjsPreview';
 import { cn } from '../lib/utils';
 
 interface BookSamplePreviewProps {
@@ -21,8 +22,11 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
+  const [usePagedJs, setUsePagedJs] = useState(false);
+  const sourceHiddenRef = useRef<HTMLDivElement>(null);
+  const [htmlContent, setHtmlContent] = useState<string>('');
 
-  const baseLayout: Partial<PageLayout> = chapters[0]?.layout || {};
+  const baseLayout: Partial<PageLayout> = book.layout || chapters[0]?.layout || {};
   
   const FORMATS: Record<string, { width: number, height: number }> = {
     a4: { width: 794, height: 1123 },
@@ -102,12 +106,125 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   useEffect(() => {
     if (isReady && contentRef.current) {
       const { scrollWidth } = contentRef.current;
-      // Calculate total spreads
-      // We subtract the initial padding to get "content length" logic roughly
       const pages = Math.ceil(scrollWidth / SPREAD_STRIDE);
-      setTotalPages(Math.max(1, pages));
+      if (!usePagedJs) setTotalPages(Math.max(1, pages));
     }
-  }, [isReady, book, chapters]);
+  }, [isReady, book, chapters, usePagedJs]);
+
+  useEffect(() => {
+    if (usePagedJs && sourceHiddenRef.current) {
+      // Small timeout to let React finish mounting markdown DOM
+      const to = setTimeout(() => {
+        if (sourceHiddenRef.current) {
+          setHtmlContent(sourceHiddenRef.current.innerHTML);
+        }
+      }, 300);
+      return () => clearTimeout(to);
+    }
+  }, [usePagedJs, isOpen, book, chapters]);
+
+  const paperBgColor = currentPaperClass.includes('zinc-900') || currentPaperClass.includes('18181b') ? '#18181b' : 
+                       currentPaperClass.includes('faf6ee') ? '#faf6ee' : 
+                       currentPaperClass.includes('e6d0a7') ? '#e6d0a7' : 
+                       currentPaperClass.includes('f4ebd8') ? '#f4ebd8' : 
+                       currentPaperClass.includes('e2e2df') ? '#e2e2df' : '#ffffff';
+                       
+  const paperTextColor = currentPaperClass.includes('zinc-900') || currentPaperClass.includes('18181b') ? '#eeeeee' : '#1c1917';
+
+  const pagedJsCss = `
+    @page {
+      size: ${SINGLE_PAGE_WIDTH}px ${SINGLE_PAGE_HEIGHT}px;
+      margin-top: ${baseLayout.marginTop || 60}px;
+      margin-bottom: ${baseLayout.marginBottom || 60}px;
+      margin-left: ${baseLayout.marginLeft || 80}px;
+      margin-right: ${baseLayout.marginRight || 80}px;
+      @bottom-center {
+        content: counter(page);
+        font-family: ${fontFamilyCss};
+        font-size: 11px;
+        color: #999;
+      }
+    }
+    
+    .pagedjs_pages {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 32px 0px;
+      background: transparent;
+      padding: 40px;
+      max-width: 100vw;
+    }
+    .pagedjs_page {
+      background-color: ${paperBgColor};
+      background-image: ${
+        (baseLayout.paperStyle === 'kraft' || baseLayout.paperStyle === 'vintage' || baseLayout.paperStyle === 'newsprint')
+          ? "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.12' mix-blend-mode='color-burn'/%3E%3C/svg%3E\")"
+          : "none"
+      };
+      color: ${paperTextColor};
+      border: 1px solid rgba(0,0,0,0.08);
+      position: relative;
+    }
+    
+    /* Left Page binding spine shadow */
+    .pagedjs_left_page {
+      border-top-left-radius: 4px;
+      border-bottom-left-radius: 4px;
+      background-image: linear-gradient(to right, transparent 95%, rgba(0,0,0,0.05) 100%);
+      box-shadow: -10px 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    /* Right Page binding spine shadow */
+    .pagedjs_right_page {
+      border-top-right-radius: 4px;
+      border-bottom-right-radius: 4px;
+      background-image: linear-gradient(to left, transparent 95%, rgba(0,0,0,0.05) 100%);
+      box-shadow: 10px 10px 30px rgba(0,0,0,0.3);
+    }
+    
+    .pagedjs_first_page {
+      border-radius: 4px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .pagedjs_margin-bottom-center {
+       padding-bottom: 20px;
+    }
+    
+    .book-content-wrapper {
+      font-family: ${fontFamilyCss};
+      font-size: ${baseLayout.fontSize || 16}px;
+      line-height: ${baseLayout.lineHeight || 1.6};
+      text-align: ${baseLayout.justifyText !== false ? 'justify' : 'left'};
+      hyphens: ${baseLayout.hyphenation ? 'auto' : 'none'};
+      --paragraph-spacing: ${baseLayout.paragraphSpacing || 16}px;
+      --first-line-indent: ${baseLayout.firstLineIndent || 0}em;
+    }
+    .book-content-wrapper p {
+      margin-top: 0;
+      margin-bottom: var(--paragraph-spacing);
+      text-indent: var(--first-line-indent);
+    }
+    ${baseLayout.dropCaps ? `
+      .book-content-wrapper p:first-of-type::first-letter {
+         float: left;
+         font-size: 3em;
+         font-weight: bold;
+         padding-right: 8px;
+         line-height: 0.8;
+      }
+    ` : ''}
+    .chapter-start {
+      break-before: page;
+    }
+    .break-before-column {
+      break-before: page;
+    }
+  `;
 
   if (!isOpen) return null;
 
@@ -188,13 +305,22 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
           <div>
             <h2 className="text-lg font-semibold">{t('sample_preview')}</h2>
             <div className="flex items-center gap-2 text-sm text-zinc-400">
-              <span>{t('double_page_view')}</span>
+              <span>{usePagedJs ? 'True Typeset (Paged.js)' : t('double_page_view')}</span>
               <span className="w-1 h-1 rounded-full bg-zinc-700"></span>
-              <span>{currentPage + 1} / {totalPages || 1}</span>
+              <span>{usePagedJs ? `${totalPages} Pages` : `${currentPage + 1} / ${totalPages || 1}`}</span>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setUsePagedJs(prev => !prev)}
+            className={cn("px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-medium border text-xs", 
+              usePagedJs ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700")}
+            title="Toggle True Typesetting Engine"
+          >
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">Paged.js</span>
+          </button>
           <button
             onClick={handlePrint}
             className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors text-zinc-200 flex items-center gap-2 font-medium"
@@ -218,191 +344,311 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
         ref={wrapperRef}
         className="flex-1 flex items-center justify-center p-4 overflow-hidden relative bg-zinc-950"
       >
-        
-        {/* Navigation Buttons - Fixed to screen edges */}
-        <button 
-          onClick={prevPage}
-          disabled={currentPage === 0}
-          className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-4 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white disabled:opacity-0 disabled:pointer-events-none transition-all z-40 shadow-xl backdrop-blur-sm border border-zinc-700"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-
-        <button 
-          onClick={nextPage}
-          disabled={currentPage >= totalPages - 1}
-          className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-4 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white disabled:opacity-0 disabled:pointer-events-none transition-all z-40 shadow-xl backdrop-blur-sm border border-zinc-700"
-        >
-          <ChevronRight className="w-6 h-6" />
-        </button>
-
-        {/* Zoom Controls */}
-        <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-zinc-900/90 backdrop-blur px-2 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg">
-           <button 
-             onClick={() => setScale(s => Math.max(0.2, s - 0.1))}
-             className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
-             title="Zoom Out"
-           >
-             <Minus className="w-4 h-4" />
-           </button>
-           <span className="text-xs font-mono w-12 text-center text-zinc-300 select-none">{Math.round(scale * 100)}%</span>
-           <button 
-             onClick={() => setScale(s => Math.min(2.0, s + 0.1))}
-             className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
-             title="Zoom In"
-           >
-             <Plus className="w-4 h-4" />
-           </button>
-           <div className="w-px h-4 bg-zinc-800 mx-1"></div>
-           <button 
-             onClick={fitToScreen}
-             className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
-             title="Fit to Screen"
-           >
-             <Maximize className="w-4 h-4" />
-           </button>
-        </div>
-
-        {/* Scalable Container Wrapper */}
-        <div 
-          className="transition-transform duration-300 ease-out origin-center will-change-transform"
-          style={{ transform: `scale(${scale})` }}
-        >
-          {/* Book Container (Viewport) - Fixed Dimensions */}
-          <div 
-            ref={containerRef}
-            className={cn("relative shadow-2xl overflow-hidden", currentPaperClass)}
-            style={{
-              width: `${BOOK_WIDTH}px`,
-              height: `${BOOK_HEIGHT}px`,
-            }}
-          >
-            {/* Paper Texture Effect */}
-            <div className="absolute inset-0 opacity-[0.03] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")` }}></div>
-            
-            {(baseLayout.paperStyle === 'kraft' || baseLayout.paperStyle === 'vintage' || baseLayout.paperStyle === 'newsprint') && (
-              <div 
-                className="absolute inset-0 opacity-[0.12] pointer-events-none z-0 mix-blend-color-burn" 
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
-                }}
-              />
-            )}
-
-            {/* Spine Shadow / Binding Effect */}
-            <div className="absolute left-1/2 top-0 bottom-0 w-24 -ml-12 bg-gradient-to-r from-transparent via-black/5 to-transparent pointer-events-none z-20 mix-blend-multiply"></div>
-            <div className="absolute left-1/2 top-0 bottom-0 w-px bg-black/5 z-20"></div>
-
-            {/* Content Wrapper (Scrollable/Transformable) */}
-            <div 
-              ref={contentRef}
-              className="h-full transition-transform duration-500 ease-in-out will-change-transform z-10 relative"
-              style={{
-                transform: `translateX(-${currentPage * SPREAD_STRIDE}px)`,
-                columnWidth: `${SINGLE_PAGE_WIDTH}px`,
-                columnGap: `0px`,
-                paddingTop: baseLayout.marginTop ?? 60,
-                paddingBottom: baseLayout.marginBottom ?? 60,
-                height: '100%',
-                columnFill: 'auto',
-                width: 'max-content',
-              }}
-            >
-              {/* Render Content */}
-              <div 
-                className={cn(
-                  "prose max-w-none antialiased break-words",
-                  baseLayout.paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
-                  baseLayout.dropCaps && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
-                  "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
-                )}
-                style={{ 
-                  width: `${SINGLE_PAGE_WIDTH - (baseLayout.marginLeft ?? 80) - (baseLayout.marginRight ?? 80)}px`,
-                  marginLeft: baseLayout.marginLeft ?? 80,
-                  marginRight: baseLayout.marginRight ?? 80,
-                  columnCount: baseLayout.columns || 1,
-                  columnGap: '2em',
-                  fontFamily: fontFamilyCss,
-                  fontSize: `${baseLayout.fontSize || 16}px`,
-                  lineHeight: baseLayout.lineHeight || 1.6,
-                  textAlign: baseLayout.justifyText !== false ? 'justify' : 'left',
-                  hyphens: baseLayout.hyphenation ? 'auto' : 'none',
-                  textRendering: 'optimizeLegibility',
-                  fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
-                  '--paragraph-spacing': `${baseLayout.paragraphSpacing ?? 16}px`,
-                  '--first-line-indent': `${baseLayout.firstLineIndent ?? 0}em`,
-                } as React.CSSProperties}
-              >
-                 {/* Title Page */}
-                   <div style={{ breakAfter: 'column', height: `${SINGLE_PAGE_HEIGHT - (baseLayout.marginTop ?? 60) - (baseLayout.marginBottom ?? 60)}px`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', width: '100%', paddingLeft: '40px', paddingRight: '40px' }}>
-                      <div className="mb-8 text-xs font-bold tracking-[0.3em] uppercase opacity-50">InkSpire Edition</div>
-                      <h1 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight !text-center !break-before-auto">{book.title}</h1>
-                      <div className="w-12 h-1 bg-current opacity-20 mb-8"></div>
-                      <p className="text-lg italic opacity-80 max-w-xs mx-auto leading-relaxed !text-indent-0 !text-center">{book.summary}</p>
-                   </div>
-
-                   {chapters.map((chapter, idx) => (
-                     <div key={chapter.id} className="chapter-start break-before-column" style={{ breakBefore: 'column' }} data-chapter-id={chapter.id} data-chapter-index={idx}>
-                       {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
-                          <div className={cn(
-                            "mb-12",
-                            baseLayout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
-                            baseLayout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-inherit pb-4 mb-10" : 
-                            "text-left" // minimal
-                          )}>
-                            <h2 className={cn(
-                              "!m-0 !border-none leading-tight",
-                              baseLayout.chapterTitleStyle === 'classical' ? "!text-4xl !font-normal !font-serif" : 
-                              baseLayout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
-                              "!text-2xl !font-serif italic"
-                            )}>
-                              {chapter.title}
-                            </h2>
-                          </div>
-                       ) : (null)}
-                       
-                       <MarkdownRenderer 
-                         floatingImages={chapter.floatingImages || []}
-                         sceneBreakStyle={baseLayout.sceneBreakStyle}
-                       >
-                         {chapter.content || ''}
-                       </MarkdownRenderer>
-                       
-                       {idx < chapters.length - 1 && <hr />}
-                     </div>
-                   ))}
-              </div>
+        {usePagedJs ? (
+          <div className="absolute inset-0 w-full h-full overflow-hidden">
+            <PagedjsPreview 
+               contentHtml={htmlContent} 
+               css={pagedJsCss} 
+               onProcessed={setTotalPages} 
+               scale={scale}
+            />
+            {/* Zoom Controls for Pagedjs */}
+            <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-zinc-900/90 backdrop-blur px-2 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg">
+               <button 
+                 onClick={() => setScale(s => Math.max(0.2, s - 0.1))}
+                 className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                 title="Zoom Out"
+               >
+                 <Minus className="w-4 h-4" />
+               </button>
+               <span className="text-xs font-mono w-12 text-center text-zinc-300 select-none">{Math.round(scale * 100)}%</span>
+               <button 
+                 onClick={() => setScale(s => Math.min(2.0, s + 0.1))}
+                 className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                 title="Zoom In"
+               >
+                 <Plus className="w-4 h-4" />
+               </button>
             </div>
           </div>
-        </div>
-        
-        {/* Chapter Navigation Controls (Bottom Left) */}
-        <div className="absolute bottom-6 left-6 flex items-center gap-2 bg-zinc-900/90 backdrop-blur px-3 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg select-none">
-          <button
-            onClick={goToPrevChapter}
-            disabled={currentPage === 0}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded text-zinc-350 hover:text-white hover:bg-zinc-800/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
-            title={t('previous_chapter')}
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-            <span>{t('previous_chapter')}</span>
-          </button>
-          <div className="w-px h-4 bg-zinc-800"></div>
-          <button
-            onClick={goToNextChapter}
-            disabled={getCurrentChapterIndex() >= chapters.length - 1}
-            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded text-zinc-350 hover:text-white hover:bg-zinc-800/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
-            title={t('next_chapter')}
-          >
-            <span>{t('next_chapter')}</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+        ) : (
+          <>
+            {/* Navigation Buttons - Fixed to screen edges */}
+            <button 
+              onClick={prevPage}
+              disabled={currentPage === 0}
+              className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 p-4 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white disabled:opacity-0 disabled:pointer-events-none transition-all z-40 shadow-xl backdrop-blur-sm border border-zinc-700"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+
+            <button 
+              onClick={nextPage}
+              disabled={currentPage >= totalPages - 1}
+              className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 p-4 rounded-full bg-zinc-800/80 hover:bg-zinc-700 text-white disabled:opacity-0 disabled:pointer-events-none transition-all z-40 shadow-xl backdrop-blur-sm border border-zinc-700"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+
+            {/* Zoom Controls */}
+            <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-zinc-900/90 backdrop-blur px-2 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg">
+               <button 
+                 onClick={() => setScale(s => Math.max(0.2, s - 0.1))}
+                 className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                 title="Zoom Out"
+               >
+                 <Minus className="w-4 h-4" />
+               </button>
+               <span className="text-xs font-mono w-12 text-center text-zinc-300 select-none">{Math.round(scale * 100)}%</span>
+               <button 
+                 onClick={() => setScale(s => Math.min(2.0, s + 0.1))}
+                 className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                 title="Zoom In"
+               >
+                 <Plus className="w-4 h-4" />
+               </button>
+               <div className="w-px h-4 bg-zinc-800 mx-1"></div>
+               <button 
+                 onClick={fitToScreen}
+                 className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                 title="Fit to Screen"
+               >
+                 <Maximize className="w-4 h-4" />
+               </button>
+            </div>
+
+            {/* Scalable Container Wrapper */}
+            <div 
+              className="transition-transform duration-300 ease-out origin-center will-change-transform"
+              style={{ transform: `scale(${scale})` }}
+            >
+              {/* Book Container (Viewport) - Fixed Dimensions */}
+              <div 
+                ref={containerRef}
+                className={cn("relative shadow-2xl overflow-hidden", currentPaperClass)}
+                style={{
+                  width: `${BOOK_WIDTH}px`,
+                  height: `${BOOK_HEIGHT}px`,
+                }}
+              >
+                {/* Paper Texture Effect */}
+                <div className="absolute inset-0 opacity-[0.03] pointer-events-none z-0" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E")` }}></div>
+                
+                {(baseLayout.paperStyle === 'kraft' || baseLayout.paperStyle === 'vintage' || baseLayout.paperStyle === 'newsprint') && (
+                  <div 
+                    className="absolute inset-0 opacity-[0.12] pointer-events-none z-0 mix-blend-color-burn" 
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+                    }}
+                  />
+                )}
+
+                {/* Spine Shadow / Binding Effect */}
+                <div className="absolute left-1/2 top-0 bottom-0 w-24 -ml-12 bg-gradient-to-r from-transparent via-black/5 to-transparent pointer-events-none z-20 mix-blend-multiply"></div>
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-black/5 z-20"></div>
+
+                {/* Page Number Footers Overlay */}
+                {!usePagedJs && isReady && (
+                  <div 
+                    className="absolute left-0 bottom-4 right-0 pointer-events-none z-30 transition-transform duration-500 ease-in-out"
+                    style={{
+                      width: `${totalPages * SPREAD_STRIDE}px`,
+                      transform: `translateX(-${currentPage * SPREAD_STRIDE}px)`,
+                      height: '24px',
+                      display: 'flex',
+                    }}
+                  >
+                    {Array.from({ length: totalPages }).map((_, i) => (
+                      <div 
+                        key={i} 
+                        className="relative flex justify-between text-xs opacity-40 select-none shrink-0"
+                        style={{
+                          width: `${SPREAD_STRIDE}px`,
+                        }}
+                      >
+                        {/* Left page number of the spread */}
+                        <div 
+                          className="absolute text-center text-[10px] font-mono"
+                          style={{
+                            left: '0px',
+                            width: `${SINGLE_PAGE_WIDTH}px`,
+                            fontFamily: fontFamilyCss,
+                          }}
+                        >
+                          {i * 2 + 1}
+                        </div>
+                        {/* Right page number of the spread */}
+                        <div 
+                          className="absolute text-center text-[10px] font-mono"
+                          style={{
+                            left: `${SINGLE_PAGE_WIDTH}px`,
+                            width: `${SINGLE_PAGE_WIDTH}px`,
+                            fontFamily: fontFamilyCss,
+                          }}
+                        >
+                          {i * 2 + 2}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Content Wrapper (Scrollable/Transformable) */}
+                <div 
+                  ref={contentRef}
+                  className="h-full transition-transform duration-500 ease-in-out will-change-transform z-10 relative"
+                  style={{
+                    transform: `translateX(-${currentPage * SPREAD_STRIDE}px)`,
+                    columnWidth: `${SINGLE_PAGE_WIDTH}px`,
+                    columnGap: `0px`,
+                    paddingTop: baseLayout.marginTop ?? 60,
+                    paddingBottom: baseLayout.marginBottom ?? 60,
+                    height: '100%',
+                    columnFill: 'auto',
+                    width: 'max-content',
+                  }}
+                >
+                  {/* Render Content */}
+                  <div 
+                    className={cn(
+                      "prose max-w-none antialiased break-words",
+                      baseLayout.paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
+                      baseLayout.dropCaps && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
+                      "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
+                    )}
+                    style={{ 
+                      width: `${SINGLE_PAGE_WIDTH - (baseLayout.marginLeft ?? 80) - (baseLayout.marginRight ?? 80)}px`,
+                      marginLeft: baseLayout.marginLeft ?? 80,
+                      marginRight: baseLayout.marginRight ?? 80,
+                      columnCount: baseLayout.columns || 1,
+                      columnGap: '2em',
+                      fontFamily: fontFamilyCss,
+                      fontSize: `${baseLayout.fontSize || 16}px`,
+                      lineHeight: baseLayout.lineHeight || 1.6,
+                      textAlign: baseLayout.justifyText !== false ? 'justify' : 'left',
+                      hyphens: baseLayout.hyphenation ? 'auto' : 'none',
+                      textRendering: 'optimizeLegibility',
+                      fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
+                      '--paragraph-spacing': `${baseLayout.paragraphSpacing ?? 16}px`,
+                      '--first-line-indent': `${baseLayout.firstLineIndent ?? 0}em`,
+                    } as React.CSSProperties}
+                  >
+                     {/* Title Page */}
+                       <div style={{ breakAfter: 'column', height: `${SINGLE_PAGE_HEIGHT - (baseLayout.marginTop ?? 60) - (baseLayout.marginBottom ?? 60)}px`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', width: '100%', paddingLeft: '40px', paddingRight: '40px' }}>
+                          <div className="mb-8 text-xs font-bold tracking-[0.3em] uppercase opacity-50">InkSpire Edition</div>
+                          <h1 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight !text-center !break-before-auto">{book.title}</h1>
+                          <div className="w-12 h-1 bg-current opacity-20 mb-8"></div>
+                          <p className="text-lg italic opacity-80 max-w-xs mx-auto leading-relaxed !text-indent-0 !text-center">{book.summary}</p>
+                       </div>
+
+                       {chapters.map((chapter, idx) => (
+                         <div key={chapter.id} className="chapter-start break-before-column" style={{ breakBefore: 'column' }} data-chapter-id={chapter.id} data-chapter-index={idx}>
+                           {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
+                              <div className={cn(
+                                "mb-12",
+                                baseLayout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
+                                baseLayout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-inherit pb-4 mb-10" : 
+                                "text-left" // minimal
+                              )}>
+                                <h2 className={cn(
+                                  "!m-0 !border-none leading-tight",
+                                  baseLayout.chapterTitleStyle === 'classical' ? "!text-4xl !font-normal !font-serif" : 
+                                  baseLayout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
+                                  "!text-2xl !font-serif italic"
+                                )}>
+                                  {chapter.title}
+                                </h2>
+                              </div>
+                           ) : (null)}
+                           
+                           <MarkdownRenderer 
+                             floatingImages={chapter.floatingImages || []}
+                             sceneBreakStyle={baseLayout.sceneBreakStyle}
+                           >
+                             {chapter.content || ''}
+                           </MarkdownRenderer>
+                           
+                           {idx < chapters.length - 1 && <hr />}
+                         </div>
+                       ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Chapter Navigation Controls (Bottom Left) */}
+            <div className="absolute bottom-6 left-6 flex items-center gap-2 bg-zinc-900/90 backdrop-blur px-3 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg select-none">
+              <button
+                onClick={goToPrevChapter}
+                disabled={currentPage === 0}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded text-zinc-350 hover:text-white hover:bg-zinc-800/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                title={t('previous_chapter')}
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>{t('previous_chapter')}</span>
+              </button>
+              <div className="w-px h-4 bg-zinc-800"></div>
+              <button
+                onClick={goToNextChapter}
+                disabled={getCurrentChapterIndex() >= chapters.length - 1}
+                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded text-zinc-350 hover:text-white hover:bg-zinc-800/80 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                title={t('next_chapter')}
+              >
+                <span>{t('next_chapter')}</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Page Number Indicator (Bottom) */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900/80 backdrop-blur px-4 py-2 rounded-full text-xs text-zinc-400 border border-zinc-800">
+              {t('sample_preview')} • {currentPage + 1} / {totalPages || 1}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Hidden Source Element for Paged.js - this lets React render it naturally then we grab HTML */}
+      <div 
+        ref={sourceHiddenRef} 
+        style={{ display: 'none' }}
+        className="book-content-wrapper pagedjs-content"
+      >
+        {/* Title Page */}
+        <div className="chapter-start" style={{ textAlign: 'center', width: '100%', breakAfter: 'page' }}>
+           <div style={{ marginBottom: '2rem', fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em', textTransform: 'uppercase', opacity: 0.5 }}>InkSpire Edition</div>
+           <h1 style={{ fontSize: '3rem', fontWeight: 'bold', marginBottom: '2rem' }}>{book.title}</h1>
+           <div style={{ width: '3rem', height: '0.25rem', background: 'currentColor', opacity: 0.2, margin: '0 auto 2rem auto' }}></div>
+           <p style={{ fontSize: '1.25rem', fontStyle: 'italic', opacity: 0.8, maxWidth: '20rem', margin: '0 auto' }}>{book.summary}</p>
         </div>
 
-        {/* Page Number Indicator (Bottom) */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900/80 backdrop-blur px-4 py-2 rounded-full text-xs text-zinc-400 border border-zinc-800">
-          {t('sample_preview')} • {currentPage + 1} / {totalPages || 1}
-        </div>
+        {chapters.map((chapter, idx) => (
+          <div key={chapter.id} className="chapter-start" data-chapter-id={chapter.id} data-chapter-index={idx}>
+            {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
+               <div style={{
+                 marginBottom: '3rem',
+                 ...(baseLayout.chapterTitleStyle === 'classical' ? { textAlign: 'center', marginTop: '3rem', marginBottom: '4rem' } : 
+                     baseLayout.chapterTitleStyle === 'modern' ? { textAlign: 'left', borderBottom: '2px solid', paddingBottom: '1rem', marginBottom: '2.5rem' } : 
+                     { textAlign: 'left' })
+               }}>
+                 <h2 style={{
+                   margin: 0, border: 'none', lineHeight: 1.1,
+                   ...(baseLayout.chapterTitleStyle === 'classical' ? { fontSize: '2.5rem', fontWeight: 'normal', fontFamily: 'serif' } : 
+                       baseLayout.chapterTitleStyle === 'modern' ? { fontSize: '3rem', fontFamily: 'sans-serif', fontWeight: 'bold', letterSpacing: '-0.025em' } : 
+                       { fontSize: '1.5rem', fontFamily: 'serif', fontStyle: 'italic' })
+                 }}>
+                   {chapter.title}
+                 </h2>
+               </div>
+            ) : null}
+            
+            <MarkdownRenderer 
+              floatingImages={chapter.floatingImages || []}
+              sceneBreakStyle={baseLayout.sceneBreakStyle}
+            >
+              {chapter.content || ''}
+            </MarkdownRenderer>
+          </div>
+        ))}
       </div>
 
       {/* Print Styles (Hidden in UI, visible when printing) */}
