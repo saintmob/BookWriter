@@ -428,14 +428,16 @@ export function TypesetLayoutEditor({
       <div className="flex flex-col flex-1 relative overflow-hidden h-full">
 
         {/* Workspace Dual Area Wrapper */}
-        <div className="flex-1 flex flex-row overflow-hidden relative bg-[#121214] border-t border-zinc-250 dark:border-zinc-800">
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden relative bg-[#121214] border-t border-zinc-250 dark:border-zinc-800">
           
           {/* 1. STORY MODE WRITER (Markdown panel) */}
           {(workspaceMode === 'story' || workspaceMode === 'split') && (
             <div 
               className={cn(
-                "h-full overflow-hidden flex flex-col bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 transition-all duration-300 select-text",
-                workspaceMode === 'story' ? "w-full" : "w-1/2"
+                "overflow-hidden flex flex-col bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 transition-all duration-300 select-text",
+                workspaceMode === 'story' 
+                  ? "w-full h-full" 
+                  : "w-full h-1/2 lg:h-full lg:w-1/2 border-b lg:border-b-0 lg:border-r"
               )}
             >
               {/* Writer Header */}
@@ -478,8 +480,10 @@ export function TypesetLayoutEditor({
               onDragOver={handleDragOver}
               onClick={() => setSelectedImageId(null)}
               className={cn(
-                "h-full overflow-auto bg-[#1a1a1e] p-8 flex isolate relative select-none justify-center items-start custom-scroll-dtp",
-                workspaceMode === 'dtp' ? "w-full" : "w-1/2"
+                "overflow-auto bg-[#1a1a1e] p-8 flex isolate relative select-none justify-center items-start custom-scroll-dtp border-t lg:border-t-0",
+                workspaceMode === 'dtp' 
+                  ? "w-full h-full" 
+                  : "w-full h-1/2 lg:h-full lg:w-1/2"
               )}
             >
               {/* Virtual DTP Drawing board frame - styled with standard desktop backing */}
@@ -804,8 +808,10 @@ export function TypesetLayoutEditor({
 
       {/* Right properties workspace sidebar */}
       <div className={cn(
-        "transition-all duration-300 ease-in-out bg-white dark:bg-zinc-900 flex flex-col h-full overflow-hidden shadow-xl z-20 relative",
-        isRightSidebarOpen ? "w-80 shrink-0 border-l border-zinc-200 dark:border-zinc-800 opacity-100" : "w-0 border-l-0 shadow-none opacity-0 invisible pointer-events-none"
+        "transition-all duration-300 ease-in-out bg-white dark:bg-zinc-900 flex flex-col h-full overflow-hidden shadow-xl z-20 xl:relative max-xl:absolute max-xl:top-0 max-xl:bottom-0 max-xl:z-40",
+        isRightSidebarOpen 
+          ? "w-80 shrink-0 border-l border-zinc-200 dark:border-zinc-800 opacity-100 max-xl:right-0" 
+          : "w-0 border-l-0 shadow-none opacity-0 invisible pointer-events-none max-xl:-right-80"
       )}>
         
         {/* Properties Selector Header Tabs */}

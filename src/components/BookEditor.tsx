@@ -520,10 +520,10 @@ export function BookEditor() {
           ))}
         </div>
 
-      {/* Outline Sidebar */}
+      {/* Outline Sidebar - Floating drawer on mobile/tablet for perfect viewport adaptation */}
       <div className={cn(
-        "transition-all duration-300 ease-in-out border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex flex-col print:hidden overflow-hidden shrink-0 h-full relative",
-        isOutlineSidebarOpen ? "w-72" : "w-0 border-r-0 shadow-none opacity-0 pointer-events-none"
+        "transition-all duration-300 ease-in-out border-r border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex flex-col print:hidden overflow-hidden shrink-0 h-full max-md:absolute max-md:z-40 max-md:shadow-2xl",
+        isOutlineSidebarOpen ? "w-72 left-0" : "w-0 max-md:-left-72 border-r-0 shadow-none opacity-0 pointer-events-none"
       )}>
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
           {/* Cover Entrance */}

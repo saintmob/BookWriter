@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Book, db } from '../lib/db';
 import { Image as ImageIcon, Sparkles, Upload, Loader2, Check, Layout, Type, Sliders, Palette } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,6 +22,30 @@ export function BookCoverEditor({ book, onUpdateBook, onGenerateImageOfPrompt, l
   const [coverTextColor, setCoverTextColor] = useState(book.coverTextColor || '#111111');
   const [coverOverlayOpacity, setCoverOverlayOpacity] = useState<number>(book.coverOverlayOpacity !== undefined ? book.coverOverlayOpacity : 0.0);
   const [solidBgColor, setSolidBgColor] = useState(book.coverImage?.startsWith('#') ? book.coverImage : '#f5ebd5');
+
+  const [scale, setScale] = useState(1);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        const targetWidth = 390;
+        const targetHeight = 560;
+        const padding = 32; // Total padding (16px on each side)
+        
+        const scaleW = (width - padding) / targetWidth;
+        const scaleH = (height - padding) / targetHeight;
+        
+        // Scale down if container is too small, but don't upscale beyond 1.0
+        setScale(Math.min(1, Math.max(0.2, scaleW), Math.max(0.2, scaleH)));
+      }
+    });
+
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -229,10 +253,10 @@ export function BookCoverEditor({ book, onUpdateBook, onGenerateImageOfPrompt, l
   const isBgImage = book.coverImage && (book.coverImage.startsWith('http') || book.coverImage.startsWith('data:image'));
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans">
+    <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden bg-zinc-50 dark:bg-zinc-950 font-sans relative">
       
-      {/* Settings control panel */}
-      <div className="w-full lg:w-[480px] border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-y-auto flex flex-col shrink-0 select-none shadow-sm">
+      {/* Settings control panel - Responsive height below LG breakpoint with smooth scrolling */}
+      <div className="w-full lg:w-[420px] h-[50vh] lg:h-full max-h-[50vh] lg:max-h-none border-b lg:border-b-0 lg:border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-y-auto flex flex-col shrink-0 select-none shadow-sm scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800">
         <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/40 flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
@@ -452,10 +476,10 @@ export function BookCoverEditor({ book, onUpdateBook, onGenerateImageOfPrompt, l
       </div>
 
       {/* Main Preview stage */}
-      <div className="flex-1 flex items-center justify-center p-8 overflow-auto bg-zinc-950/95 relative animate-fade-in">
+      <div ref={containerRef} className="flex-1 flex items-center justify-center p-4 md:p-8 overflow-hidden bg-zinc-950/95 relative animate-fade-in mini-preview-stage">
         
         {/* Book Spine simulation */}
-        <div className="relative shadow-[0_30px_70px_rgba(0,0,0,0.6)] rounded-r-2xl overflow-hidden border border-zinc-800/20 transition-all cursor-default select-none group"
+        <div className="relative shadow-[0_30px_70px_rgba(0,0,0,0.6)] rounded-r-2xl overflow-hidden border border-zinc-800/20 transition-all duration-300 cursor-default select-none group origin-center shrink-0"
              style={{ 
                width: '390px', 
                height: '560px',
@@ -463,6 +487,7 @@ export function BookCoverEditor({ book, onUpdateBook, onGenerateImageOfPrompt, l
                backgroundImage: standsAsImage(book.coverImage) ? `url("${book.coverImage}")` : 'none',
                backgroundSize: 'cover',
                backgroundPosition: 'center',
+               transform: `scale(${scale})`,
              }}
         >
           {/* Subtle paper grain texture */}
