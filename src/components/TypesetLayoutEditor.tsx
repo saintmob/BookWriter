@@ -575,10 +575,10 @@ export function TypesetLayoutEditor({
                       "prose max-w-none break-words",
                       paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
                       layout.dropCaps && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
-                      "[&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
+                      "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
                     )}
                   >
-                    {layout.chapterTitleStyle && layout.chapterTitleStyle !== 'hidden' && (
+                    {layout.chapterTitleStyle && layout.chapterTitleStyle !== 'hidden' ? (
                       <div className={cn(
                         "mb-12",
                         layout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
@@ -586,15 +586,15 @@ export function TypesetLayoutEditor({
                         "text-left" // minimal
                       )}>
                         <h1 className={cn(
-                          "m-0 leading-tight",
-                          layout.chapterTitleStyle === 'classical' ? "text-4xl font-serif font-normal" : 
-                          layout.chapterTitleStyle === 'modern' ? "text-5xl font-sans font-bold tracking-tight" : 
-                          "text-2xl font-serif italic"
+                          "!m-0 !border-none leading-tight",
+                          layout.chapterTitleStyle === 'classical' ? "!text-4xl !font-normal !font-serif" : 
+                          layout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
+                          "!text-2xl !font-serif italic"
                         )}>
                           {chapter.title || 'Untitled Chapter'}
                         </h1>
                       </div>
-                    )}
+                    ) : (null)}
                     
                     <MarkdownRenderer 
                       floatingImages={floatingImages}

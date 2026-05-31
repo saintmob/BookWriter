@@ -22,16 +22,38 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
 
+  const baseLayout: Partial<PageLayout> = chapters[0]?.layout || {};
+  
+  const FORMATS: Record<string, { width: number, height: number }> = {
+    a4: { width: 794, height: 1123 },
+    letter: { width: 816, height: 1056 },
+    trade: { width: 576, height: 864 },
+    pocket: { width: 408, height: 653 },
+  };
+  const formatData = FORMATS[baseLayout.format || 'a4'] || FORMATS.a4;
+
   // Constants for Book Layout
-  const BOOK_WIDTH = 1100;
-  const BOOK_HEIGHT = 780;
-  const OUTER_PADDING = 80;
-  const COLUMN_GAP = 100;
-  // Derived Constants
-  // Content Width = 1100 - 160 = 940
-  // Column Width = (940 - 100) / 2 = 420
-  const COLUMN_WIDTH = (BOOK_WIDTH - (OUTER_PADDING * 2) - COLUMN_GAP) / 2;
-  const SPREAD_STRIDE = (COLUMN_WIDTH + COLUMN_GAP) * 2; // Distance to scroll for next spread
+  const SINGLE_PAGE_WIDTH = formatData.width;
+  const SINGLE_PAGE_HEIGHT = formatData.height;
+  const BOOK_WIDTH = SINGLE_PAGE_WIDTH * 2;
+  const BOOK_HEIGHT = SINGLE_PAGE_HEIGHT;
+  const PAGE_GAP = 0;
+  const SPREAD_STRIDE = BOOK_WIDTH;
+
+  const fontFamilyCss = baseLayout.fontFamily === 'sans' ? 'ui-sans-serif, system-ui, sans-serif' : 
+                        baseLayout.fontFamily === 'mono' ? 'ui-monospace, monospace' : 
+                        'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif';
+
+  const paperClasses = {
+    warm: 'bg-[#faf6ee] text-[#1c1917]',
+    white: 'bg-white text-zinc-900',
+    dark: 'bg-[#18181b] text-zinc-100',
+    kraft: 'bg-[#e6d0a7] text-[#2c1d11]',
+    vintage: 'bg-[#f4ebd8] text-[#3e2723]',
+    glossy: 'bg-[#f8f9fa] text-[#212529]',
+    newsprint: 'bg-[#e2e2df] text-[#2b2b2b]',
+  };
+  const currentPaperClass = paperClasses[(baseLayout.paperStyle || 'warm') as keyof typeof paperClasses] || paperClasses.warm;
 
   // Auto-fit function
   const fitToScreen = () => {
@@ -80,8 +102,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
       const { scrollWidth } = contentRef.current;
       // Calculate total spreads
       // We subtract the initial padding to get "content length" logic roughly
-      // But simpler: Math.ceil((scrollWidth - OUTER_PADDING) / SPREAD_STRIDE)
-      const pages = Math.ceil((scrollWidth - OUTER_PADDING) / SPREAD_STRIDE);
+      const pages = Math.ceil(scrollWidth / SPREAD_STRIDE);
       setTotalPages(Math.max(1, pages));
     }
   }, [isReady, book, chapters]);
@@ -153,22 +174,6 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
       setCurrentPage(nextChapterStartPage);
     }
   };
-
-  const baseLayout: Partial<PageLayout> = chapters[0]?.layout || {};
-  const fontFamilyCss = baseLayout.fontFamily === 'sans' ? 'ui-sans-serif, system-ui, sans-serif' : 
-                        baseLayout.fontFamily === 'mono' ? 'ui-monospace, monospace' : 
-                        'ui-serif, Georgia, Cambria, "Times New Roman", Times, serif';
-  
-  const paperClasses = {
-    warm: 'bg-[#faf6ee] text-[#1c1917]',
-    white: 'bg-white text-zinc-900',
-    dark: 'bg-[#18181b] text-zinc-100',
-    kraft: 'bg-[#e6d0a7] text-[#2c1d11]',
-    vintage: 'bg-[#f4ebd8] text-[#3e2723]',
-    glossy: 'bg-[#f8f9fa] text-[#212529]',
-    newsprint: 'bg-[#e2e2df] text-[#2b2b2b]',
-  };
-  const currentPaperClass = paperClasses[(baseLayout.paperStyle || 'warm') as keyof typeof paperClasses] || paperClasses.warm;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900/95 backdrop-blur-sm text-zinc-100 animate-in fade-in duration-200">
@@ -292,9 +297,10 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
               className="h-full transition-transform duration-500 ease-in-out will-change-transform z-10 relative"
               style={{
                 transform: `translateX(-${currentPage * SPREAD_STRIDE}px)`,
-                columnWidth: `${COLUMN_WIDTH}px`,
-                columnGap: `${COLUMN_GAP}px`,
-                padding: `60px ${OUTER_PADDING}px 80px ${OUTER_PADDING}px`,
+                columnWidth: `${SINGLE_PAGE_WIDTH}px`,
+                columnGap: `0px`,
+                paddingTop: baseLayout.marginTop ?? 60,
+                paddingBottom: baseLayout.marginBottom ?? 60,
                 height: '100%',
                 columnFill: 'auto',
                 width: 'max-content',
@@ -304,10 +310,16 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
               <div 
                 className={cn(
                   "prose max-w-none antialiased break-words",
-                  baseLayout.paperStyle === 'dark' ? 'prose-invert' : 'prose-zinc'
+                  baseLayout.paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
+                  baseLayout.dropCaps && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
+                  "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
                 )}
                 style={{ 
-                  width: `${COLUMN_WIDTH}px`,
+                  width: `${SINGLE_PAGE_WIDTH - (baseLayout.marginLeft ?? 80) - (baseLayout.marginRight ?? 80)}px`,
+                  marginLeft: baseLayout.marginLeft ?? 80,
+                  marginRight: baseLayout.marginRight ?? 80,
+                  columnCount: baseLayout.columns || 1,
+                  columnGap: '2em',
                   fontFamily: fontFamilyCss,
                   fontSize: `${baseLayout.fontSize || 16}px`,
                   lineHeight: baseLayout.lineHeight || 1.6,
@@ -315,96 +327,20 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                   hyphens: baseLayout.hyphenation ? 'auto' : 'none',
                   textRendering: 'optimizeLegibility',
                   fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
-                }}
+                  '--paragraph-spacing': `${baseLayout.paragraphSpacing ?? 16}px`,
+                  '--first-line-indent': `${baseLayout.firstLineIndent ?? 0}em`,
+                } as React.CSSProperties}
               >
-                <style>{`
-                  .sample-content h1 { 
-                    margin-top: 0; 
-                    font-size: 2.2em; 
-                    text-align: center; 
-                    margin-bottom: 4rem; 
-                    break-before: column; 
-                    font-weight: 700;
-                    letter-spacing: -0.02em;
-                  }
-                  .sample-content h2 { 
-                    font-size: 1.4em; 
-                    margin-top: 3rem; 
-                    margin-bottom: 2rem; 
-                    font-weight: 600;
-                    text-align: center;
-                    letter-spacing: 0.05em;
-                  }
-                  /* Traditional Paragraph Styling */
-                  .sample-content p { 
-                    margin-bottom: ${baseLayout.paragraphSpacing ?? 16}px; 
-                    text-indent: ${baseLayout.firstLineIndent ?? 2}em; 
-                  }
-                  /* No indent for first paragraph after headings */
-                  .sample-content h1 + p,
-                  .sample-content h2 + p,
-                  .sample-content hr + p {
-                    text-indent: 0;
-                  }
-                  /* Add Drop Caps */
-                  ${baseLayout.dropCaps ? `
-                    .chapter-start > *:not(h1):not(h2):not(img):not(div.text-center):first-child::first-letter,
-                    .chapter-start > h2 + p::first-letter,
-                    .chapter-start > div.text-center + p::first-letter,
-                    .chapter-start > img + p::first-letter {
-                      float: left;
-                      font-size: 3em;
-                      font-weight: bold;
-                      padding-right: 0.1em;
-                      line-height: 0.8;
-                      margin-top: 0.1em;
-                    }
-                  ` : ''}
-                  /* Add spacing back for non-paragraph elements if needed */
-                  .sample-content blockquote {
-                    margin: 1.5rem 2rem;
-                    font-style: italic;
-                    text-indent: 0;
-                    color: #52525b;
-                  }
-                  .sample-content img { 
-                    max-width: 100%; 
-                    height: auto; 
-                    margin: 2rem auto; 
-                    display: block; 
-                    break-inside: avoid; 
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-                    filter: sepia(0.2) contrast(1.05);
-                  }
-                  .sample-content hr { 
-                    border: 0; 
-                    text-align: center; 
-                    margin: 2.5rem 0; 
-                    height: auto;
-                    background: none;
-                  }
-                  .sample-content hr:after { 
-                    content: "❦"; 
-                    font-size: 1.2em; 
-                    color: #a1a1aa; 
-                    display: block;
-                  }
-                  .chapter-start {
-                    break-before: column;
-                    padding-top: 4rem; /* Sink */
-                  }
-                `}</style>
-                <div className="sample-content">
-                   {/* Title Page */}
-                   <div style={{ breakAfter: 'column', height: '640px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-                      <div className="mb-8 text-xs font-bold tracking-[0.3em] uppercase text-zinc-400">InkSpire Edition</div>
-                      <h1 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight text-zinc-900 !text-center !break-before-auto">{book.title}</h1>
-                      <div className="w-12 h-1 bg-zinc-900 mb-8"></div>
-                      <p className="text-lg italic text-zinc-600 max-w-xs mx-auto leading-relaxed !text-indent-0 !text-center">{book.summary}</p>
+                 {/* Title Page */}
+                   <div style={{ breakAfter: 'column', height: `${SINGLE_PAGE_HEIGHT - (baseLayout.marginTop ?? 60) - (baseLayout.marginBottom ?? 60)}px`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', width: '100%', paddingLeft: '40px', paddingRight: '40px' }}>
+                      <div className="mb-8 text-xs font-bold tracking-[0.3em] uppercase opacity-50">InkSpire Edition</div>
+                      <h1 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight !text-center !break-before-auto">{book.title}</h1>
+                      <div className="w-12 h-1 bg-current opacity-20 mb-8"></div>
+                      <p className="text-lg italic opacity-80 max-w-xs mx-auto leading-relaxed !text-indent-0 !text-center">{book.summary}</p>
                    </div>
 
                    {chapters.map((chapter, idx) => (
-                     <div key={chapter.id} className="chapter-start" data-chapter-id={chapter.id} data-chapter-index={idx}>
+                     <div key={chapter.id} className="chapter-start break-before-column" style={{ breakBefore: 'column' }} data-chapter-id={chapter.id} data-chapter-index={idx}>
                        {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
                           <div className={cn(
                             "mb-12",
@@ -412,26 +348,16 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                             baseLayout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-inherit pb-4 mb-10" : 
                             "text-left" // minimal
                           )}>
-                            <span className="text-[10px] font-bold uppercase tracking-[0.25em] opacity-50 block mb-4">Chapter {idx + 1}</span>
                             <h2 className={cn(
                               "!m-0 !border-none leading-tight",
-                              baseLayout.chapterTitleStyle === 'classical' ? "!text-4xl font-normal !font-serif" : 
+                              baseLayout.chapterTitleStyle === 'classical' ? "!text-4xl !font-normal !font-serif" : 
                               baseLayout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
                               "!text-2xl !font-serif italic"
                             )}>
                               {chapter.title}
                             </h2>
                           </div>
-                       ) : (
-                         <div className="text-center mb-12">
-                           <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500 block mb-4">Chapter {idx + 1}</span>
-                           <h2 className="!mt-0 !mb-0 !text-2xl border-none">{chapter.title}</h2>
-                         </div>
-                       )}
-                       
-                       {chapter.image && (
-                         <img src={chapter.image} alt={chapter.title} className="w-full h-auto mb-8" />
-                       )}
+                       ) : (null)}
                        
                        <MarkdownRenderer 
                          floatingImages={chapter.floatingImages || []}
@@ -443,7 +369,6 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                        {idx < chapters.length - 1 && <hr />}
                      </div>
                    ))}
-                </div>
               </div>
             </div>
           </div>
