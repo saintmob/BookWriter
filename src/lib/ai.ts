@@ -39,7 +39,38 @@ async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<st
   const state = useStore.getState();
   const provider = state.textProvider || 'openrouter';
 
-  if (provider === 'openrouter') {
+  if (provider === 'deepseek') {
+    const apiKey = state.deepseekApiKey || process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new Error('DeepSeek API Key is missing. Please set it in Settings.');
+    }
+    const model = state.deepseekTextModel || 'deepseek-v4-flash';
+    try {
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: 'user', content: prompt }],
+          response_format: jsonMode ? { type: 'json_object' } : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`DeepSeek API error: ${response.status} ${errorData.error?.message || response.statusText}`);
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      return jsonMode ? content : stripMarkdownCodeBlocks(content);
+    } catch (error: any) {
+      throw new Error(handleAIError(error, 'DeepSeek'));
+    }
+  } else if (provider === 'openrouter') {
     const apiKey = state.openRouterApiKey || process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       throw new Error('OpenRouter API Key is missing. Please set it in Settings.');

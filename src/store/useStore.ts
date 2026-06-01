@@ -17,7 +17,7 @@ interface AppState {
   activeChapterId: string | null;
   theme: 'dark' | 'light' | 'system';
   language: 'en' | 'zh';
-  textProvider: 'gemini' | 'openrouter';
+  textProvider: 'gemini' | 'openrouter' | 'deepseek';
   imageProvider: 'gemini' | 'openrouter';
   geminiApiKey: string | null;
   geminiTextModel: string;
@@ -25,6 +25,8 @@ interface AppState {
   openRouterApiKey: string | null;
   openRouterTextModel: string;
   openRouterImageModel: string;
+  deepseekApiKey: string | null;
+  deepseekTextModel: string;
   draft: DraftState;
   workspaceMode: 'story' | 'split' | 'dtp';
   setWorkspaceMode: (mode: 'story' | 'split' | 'dtp') => void;
@@ -40,7 +42,7 @@ interface AppState {
   setShowGuides: (show: boolean) => void;
   setTheme: (theme: 'dark' | 'light' | 'system') => void;
   setLanguage: (lang: 'en' | 'zh') => void;
-  setTextProvider: (provider: 'gemini' | 'openrouter') => void;
+  setTextProvider: (provider: 'gemini' | 'openrouter' | 'deepseek') => void;
   setImageProvider: (provider: 'gemini' | 'openrouter') => void;
   setGeminiApiKey: (key: string | null) => void;
   setGeminiTextModel: (model: string) => void;
@@ -48,6 +50,8 @@ interface AppState {
   setOpenRouterApiKey: (key: string | null) => void;
   setOpenRouterTextModel: (model: string) => void;
   setOpenRouterImageModel: (model: string) => void;
+  setDeepseekApiKey: (key: string | null) => void;
+  setDeepseekTextModel: (model: string) => void;
   loadBooks: () => Promise<void>;
   createBook: (title: string, idea: string, summary: string, coverImage?: string) => Promise<Book>;
   setActiveBook: (id: string | null) => void;
@@ -81,6 +85,8 @@ export const useStore = create<AppState>()(
       openRouterApiKey: null,
       openRouterTextModel: 'google/gemma-4-31b-it:free',
       openRouterImageModel: 'google/gemini-3.1-flash-image-preview',
+      deepseekApiKey: null,
+      deepseekTextModel: 'deepseek-v4-flash',
       draft: initialDraft,
       workspaceMode: 'split',
       setWorkspaceMode: (mode) => set({ workspaceMode: mode }),
@@ -104,6 +110,8 @@ export const useStore = create<AppState>()(
       setOpenRouterApiKey: (key) => set({ openRouterApiKey: key }),
       setOpenRouterTextModel: (model) => set({ openRouterTextModel: model }),
       setOpenRouterImageModel: (model) => set({ openRouterImageModel: model }),
+      setDeepseekApiKey: (key) => set({ deepseekApiKey: key }),
+      setDeepseekTextModel: (model) => set({ deepseekTextModel: model }),
       loadBooks: async () => {
         const books = await db.getBooks();
         set({ books });
@@ -156,6 +164,8 @@ export const useStore = create<AppState>()(
         openRouterApiKey: state.openRouterApiKey,
         openRouterTextModel: state.openRouterTextModel,
         openRouterImageModel: state.openRouterImageModel,
+        deepseekApiKey: state.deepseekApiKey,
+        deepseekTextModel: state.deepseekTextModel,
         workspaceMode: state.workspaceMode,
         isOutlineSidebarOpen: state.isOutlineSidebarOpen,
         isRightSidebarOpen: state.isRightSidebarOpen,

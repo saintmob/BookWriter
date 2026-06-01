@@ -19,6 +19,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     openRouterApiKey, setOpenRouterApiKey,
     openRouterTextModel, setOpenRouterTextModel,
     openRouterImageModel, setOpenRouterImageModel,
+    deepseekApiKey, setDeepseekApiKey,
+    deepseekTextModel, setDeepseekTextModel,
     textProvider, setTextProvider,
     imageProvider, setImageProvider,
     theme, setTheme, 
@@ -31,11 +33,14 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [orKey, setOrKey] = useState(openRouterApiKey || '');
   const [orTextModel, setOrTextModel] = useState(openRouterTextModel || 'google/gemma-4-31b-it:free');
   const [orImageModel, setOrImageModel] = useState(openRouterImageModel || 'google/gemini-3.1-flash-image-preview');
+  const [dsKey, setDsKey] = useState(deepseekApiKey || '');
+  const [dsTextModel, setDsTextModel] = useState(deepseekTextModel || 'deepseek-v4-flash');
   const [localTextProvider, setLocalTextProvider] = useState(textProvider || 'openrouter');
   const [localImageProvider, setLocalImageProvider] = useState(imageProvider || 'gemini');
   
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [showOrKey, setShowOrKey] = useState(false);
+  const [showDsKey, setShowDsKey] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
   const handleSave = () => {
@@ -45,6 +50,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setOpenRouterApiKey(orKey.trim() || null);
     setOpenRouterTextModel(orTextModel.trim() || 'google/gemma-4-31b-it:free');
     setOpenRouterImageModel(orImageModel.trim() || 'google/gemini-3.1-flash-image-preview');
+    setDeepseekApiKey(dsKey.trim() || null);
+    setDeepseekTextModel(dsTextModel.trim() || 'deepseek-v4-flash');
     setTextProvider(localTextProvider);
     setImageProvider(localImageProvider);
     setIsSaved(true);
@@ -135,7 +142,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </p>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 md:grid-cols-2 gap-6">
                 {/* OpenRouter Card */}
                 <div className="border rounded-xl p-5 transition-all relative overflow-hidden border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                   <div className="flex justify-between items-center mb-5">
@@ -327,6 +334,69 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* DeepSeek Card */}
+                <div className="border rounded-xl p-5 transition-all relative overflow-hidden border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+                  <div className="flex justify-between items-center mb-5">
+                    <h3 className="font-semibold text-zinc-900 dark:text-zinc-100">DeepSeek</h3>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        {t('deepseek_api_key')}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showDsKey ? "text" : "password"}
+                          value={dsKey}
+                          onChange={(e) => setDsKey(e.target.value)}
+                          placeholder={t('deepseek_api_key_placeholder')}
+                          className="w-full px-4 py-2 pr-10 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                        />
+                        <button
+                          onClick={() => setShowDsKey(!showDsKey)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                        >
+                          {showDsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400 flex items-start gap-1">
+                        <AlertCircle className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <span>
+                          {t('deepseek_api_key_help')}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        {t('deepseek_text_model')}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={dsTextModel}
+                          onChange={(e) => setDsTextModel(e.target.value)}
+                          placeholder="deepseek-v4-flash"
+                          className="w-full px-4 py-2 pr-12 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
+                        />
+                        <button
+                          onClick={() => setLocalTextProvider('deepseek')}
+                          className={cn(
+                            "absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md transition-colors",
+                            localTextProvider === 'deepseek' 
+                              ? "bg-emerald-500 text-white" 
+                              : "bg-zinc-200 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-300 dark:hover:bg-zinc-700"
+                          )}
+                          title={localTextProvider === 'deepseek' ? t('text_active') : t('set_as_text')}
+                        >
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
             </div>
           </div>
