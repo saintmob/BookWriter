@@ -99,6 +99,8 @@ export function ChapterChat({
   const textProvider = useStore((state) => state.textProvider);
   const webSearchEnabled = useStore((state) => state.webSearchEnabled);
   const setWebSearchEnabled = useStore((state) => state.setWebSearchEnabled);
+  const thinkingEnabled = useStore((state) => state.thinkingEnabled);
+  const setThinkingEnabled = useStore((state) => state.setThinkingEnabled);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -433,6 +435,49 @@ export function ChapterChat({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* AI Engine Config Status Panel above dialog composer */}
+      <div className="px-4 py-2 border-t border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/40 dark:bg-zinc-950/20 flex flex-wrap items-center justify-between gap-3 shrink-0 select-none text-xs">
+        <div className="flex items-center gap-2">
+          {/* Web Search Toggle Button */}
+          {textProvider === 'gemini' && (
+            <button
+              type="button"
+              onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all duration-200 cursor-pointer ${
+                webSearchEnabled
+                  ? 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-transparent border-zinc-200 dark:border-zinc-850/70 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/50'
+              }`}
+              title={language === 'zh' ? '内置 AI 模型支持实时联网检索，答案更充沛' : 'Gemini Web Search Grounding'}
+            >
+              <span>🌐</span>
+              <span>{language === 'zh' ? '联网对答' : 'Web Search'}</span>
+              <span className={`w-1.5 h-1.5 rounded-full ${webSearchEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-350 dark:bg-zinc-700'}`} />
+            </button>
+          )}
+
+          {/* Thinking Mode Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setThinkingEnabled(!thinkingEnabled)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-all duration-200 cursor-pointer ${
+              thinkingEnabled
+                ? 'bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/20 text-amber-600 dark:text-amber-400'
+                : 'bg-transparent border-zinc-200 dark:border-zinc-850/70 text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900/50'
+            }`}
+            title={language === 'zh' ? '开启后，AI 返回结果时将暴露并呈现完整的逻辑思考和推理过程' : 'Request model chain-of-thought visible processing'}
+          >
+            <span>🧠</span>
+            <span>{language === 'zh' ? '深度思考' : 'Deep Thinking'}</span>
+            <span className={`w-1.5 h-1.5 rounded-full ${thinkingEnabled ? 'bg-amber-500 animate-pulse' : 'bg-zinc-350 dark:bg-zinc-700'}`} />
+          </button>
+        </div>
+
+        <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono tracking-wider hidden xs:inline uppercase">
+          {language === 'zh' ? 'AI 伴创引擎状态面板' : 'AI Copilot Configurations'}
+        </span>
+      </div>
+
       {/* Footer message composer */}
       <div className="p-3 border-t border-zinc-200/80 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 backdrop-blur-sm flex items-center gap-2 shrink-0">
         <button
@@ -444,25 +489,6 @@ export function ChapterChat({
         >
           <Trash2 className="w-4 h-4" />
         </button>
-
-        {/* Simplified Web Search Toggle */}
-        {textProvider === 'gemini' && (
-          <button
-            type="button"
-            onClick={() => setWebSearchEnabled(!webSearchEnabled)}
-            className={`px-3 py-2.5 rounded-xl border transition-all shrink-0 flex items-center gap-1.5 text-xs font-bold shadow-2xs group ${
-              webSearchEnabled
-                ? 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:text-zinc-600 dark:hover:text-zinc-350'
-            }`}
-            title={language === 'zh' ? '点击开关：内置 AI 是否联网实时搜索' : 'Web Search Toggle'}
-          >
-            <span className={webSearchEnabled ? 'animate-bounce text-emerald-500' : ''}>🌐</span>
-            <span className="hidden sm:inline">
-              {language === 'zh' ? (webSearchEnabled ? '联网开' : '不联网') : (webSearchEnabled ? 'Search ON' : 'Search OFF')}
-            </span>
-          </button>
-        )}
 
         <div className="flex-1 relative">
           <textarea

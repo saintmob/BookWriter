@@ -883,6 +883,20 @@ Return ONLY a JSON object with:
 Do not include markdown formatting like \`\`\`json.`;
 
   const state = useStore.getState();
+  let finalPrompt = prompt;
+  if (state.thinkingEnabled) {
+    finalPrompt += `\n\nCRITICAL INSTRUCTION FOR THINKING MODE:
+Before writing the final JSON response, you MUST think step-by-step about how you will address the user's instructions or what chapter revisions/suggestions are needed. Write your detailed chain of thought / reasoning process inside a <think>...</think> block at the very beginning of your response, separate from and before the JSON object.
+Example response format:
+<think>
+Your step-by-step thinking/reasoning here...
+</think>
+{
+  "reply": "...",
+  "updatedContent": "..."
+}`;
+  }
+
   const provider = state.textProvider || 'openrouter';
   let rawBuffer = '';
   let searchQueries: string[] = [];
@@ -901,7 +915,7 @@ Do not include markdown formatting like \`\`\`json.`;
 
       const responseStream = await ai.models.generateContentStream({
         model: model,
-        contents: prompt,
+        contents: finalPrompt,
         config: Object.keys(config).length > 0 ? config : undefined,
       });
 
@@ -957,7 +971,7 @@ Do not include markdown formatting like \`\`\`json.`;
         },
         body: JSON.stringify({
           model: model,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [{ role: 'user', content: finalPrompt }],
           stream: true,
         }),
       });
@@ -1040,7 +1054,7 @@ Do not include markdown formatting like \`\`\`json.`;
         },
         body: JSON.stringify({
           model: model,
-          messages: [{ role: 'user', content: prompt }],
+          messages: [{ role: 'user', content: finalPrompt }],
           stream: true,
         }),
       });

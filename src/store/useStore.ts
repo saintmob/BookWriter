@@ -29,6 +29,8 @@ interface AppState {
   deepseekTextModel: string;
   webSearchEnabled: boolean;
   setWebSearchEnabled: (enabled: boolean) => void;
+  thinkingEnabled: boolean;
+  setThinkingEnabled: (enabled: boolean) => void;
   draft: DraftState;
   workspaceMode: 'story' | 'split' | 'dtp';
   setWorkspaceMode: (mode: 'story' | 'split' | 'dtp') => void;
@@ -90,6 +92,7 @@ export const useStore = create<AppState>()(
       deepseekApiKey: null,
       deepseekTextModel: 'deepseek-v4-flash',
       webSearchEnabled: false,
+      thinkingEnabled: false,
       draft: initialDraft,
       workspaceMode: 'split',
       setWorkspaceMode: (mode) => set({ workspaceMode: mode }),
@@ -116,6 +119,7 @@ export const useStore = create<AppState>()(
       setDeepseekApiKey: (key) => set({ deepseekApiKey: key }),
       setDeepseekTextModel: (model) => set({ deepseekTextModel: model }),
       setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),
+      setThinkingEnabled: (enabled) => set({ thinkingEnabled: enabled }),
       loadBooks: async () => {
         const books = await db.getBooks();
         set({ books });
@@ -178,7 +182,8 @@ export const useStore = create<AppState>()(
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
         activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
         draft: state.draft, // Persist draft state to save progress
-        webSearchEnabled: state.webSearchEnabled
+        webSearchEnabled: state.webSearchEnabled,
+        thinkingEnabled: state.thinkingEnabled
       }),
     }
   )
