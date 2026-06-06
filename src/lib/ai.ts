@@ -111,6 +111,9 @@ async function callTextAI(prompt: string, jsonMode: boolean = false): Promise<st
       if (jsonMode) {
         config.responseMimeType = 'application/json';
       }
+      if (state.webSearchEnabled) {
+        config.tools = [{ googleSearch: {} }];
+      }
       let model = state.geminiTextModel || 'gemini-3.5-flash';
       if (model === 'gemini-3.1-flash-preview' || model === 'gemini-3-flash-preview') {
         model = 'gemini-3.5-flash';
@@ -759,12 +762,99 @@ Return ONLY the fully rewritten chapter content in markdown format. Do not inclu
   }
 }
 
-export async function chatWithChapter(
+export function parsePartialJSON(partialStr: string): { reply: string; updatedContent?: string } {
+  let reply = '';
+  let updatedContent = '';
+
+  const cleaned = partialStr.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    return {
+      reply: parsed.reply || '',
+      updatedContent: parsed.updatedContent
+    };
+  } catch (e) {
+    // Continue with custom parser
+  }
+
+  const replyStartIdx = cleaned.search(/"reply"\s*:\s*"/i);
+  if (replyStartIdx !== -1) {
+    const afterQuoteIdx = cleaned.indexOf('"', cleaned.indexOf(':', replyStartIdx) + 1) + 1;
+    if (afterQuoteIdx > 0) {
+      let currentVal = '';
+      let isEscaped = false;
+      for (let i = afterQuoteIdx; i < cleaned.length; i++) {
+        const char = cleaned[i];
+        if (isEscaped) {
+          currentVal += char;
+          isEscaped = false;
+        } else if (char === '\\') {
+          isEscaped = true;
+        } else if (char === '"') {
+          break;
+        } else {
+          currentVal += char;
+        }
+      }
+      reply = currentVal;
+    }
+  } else {
+    if (!cleaned.includes('"reply"')) {
+      reply = cleaned;
+    }
+  }
+
+  const contentStartIdx = cleaned.search(/"updatedContent"\s*:\s*"/i);
+  if (contentStartIdx !== -1) {
+    const afterQuoteIdx = cleaned.indexOf('"', cleaned.indexOf(':', contentStartIdx) + 1) + 1;
+    if (afterQuoteIdx > 0) {
+      let currentVal = '';
+      let isEscaped = false;
+      for (let i = afterQuoteIdx; i < cleaned.length; i++) {
+        const char = cleaned[i];
+        if (isEscaped) {
+          currentVal += char;
+          isEscaped = false;
+        } else if (char === '\\') {
+          isEscaped = true;
+        } else if (char === '"') {
+          break;
+        } else {
+          currentVal += char;
+        }
+      }
+      updatedContent = currentVal;
+    }
+  }
+
+  return { reply, updatedContent: updatedContent || undefined };
+}
+
+export function extractThinking(text: string): { thinking: string; remaining: string } {
+  const thinkStart = text.indexOf('<think>');
+  if (thinkStart !== -1) {
+    const thinkEnd = text.indexOf('</think>', thinkStart);
+    if (thinkEnd !== -1) {
+      const thinking = text.substring(thinkStart + 7, thinkEnd).trim();
+      const remaining = (text.substring(0, thinkStart) + text.substring(thinkEnd + 8)).trim();
+      return { thinking, remaining };
+    } else {
+      const thinking = text.substring(thinkStart + 7).trim();
+      const remaining = text.substring(0, thinkStart).trim();
+      return { thinking, remaining };
+    }
+  }
+  return { thinking: '', remaining: text };
+}
+
+export async function chatWithChapterStream(
   currentContent: string,
   instruction: string,
   chapterTitle: string,
   bookTitle: string,
-  language: string
+  language: string,
+  onChunk: (data: { reply: string; updatedContent?: string; searchQueries?: string[]; thinking?: string }) => void
 ): Promise<ChatResponse> {
   const prompt = `You are a professional book editor and co-author.
   
@@ -792,12 +882,239 @@ Return ONLY a JSON object with:
 - 'updatedContent': The full updated chapter content (only if a change was made).
 Do not include markdown formatting like \`\`\`json.`;
 
-  const text = await callTextAI(prompt, true);
-  const result = parseJSON(text || '{}');
-  if (result.updatedContent) {
-    result.updatedContent = stripMarkdownCodeBlocks(result.updatedContent);
+  const state = useStore.getState();
+  const provider = state.textProvider || 'openrouter';
+  let rawBuffer = '';
+  let searchQueries: string[] = [];
+
+  if (provider === 'gemini') {
+    try {
+      const ai = getGeminiAi();
+      const config: any = {};
+      if (state.webSearchEnabled) {
+        config.tools = [{ googleSearch: {} }];
+      }
+      let model = state.geminiTextModel || 'gemini-3.5-flash';
+      if (model === 'gemini-3.1-flash-preview' || model === 'gemini-3-flash-preview') {
+        model = 'gemini-3.5-flash';
+      }
+
+      const responseStream = await ai.models.generateContentStream({
+        model: model,
+        contents: prompt,
+        config: Object.keys(config).length > 0 ? config : undefined,
+      });
+
+      for await (const chunk of responseStream) {
+        // Extract web searches if present
+        const queries = chunk.candidates?.[0]?.groundingMetadata?.webSearchQueries;
+        if (queries && Array.isArray(queries)) {
+          for (const q of queries) {
+            if (!searchQueries.includes(q)) {
+              searchQueries.push(q);
+            }
+          }
+        }
+
+        const textChunk = chunk.text || '';
+        rawBuffer += textChunk;
+
+        const { reply, updatedContent } = parsePartialJSON(rawBuffer);
+        const { thinking, remaining } = extractThinking(reply);
+
+        onChunk({
+          reply: remaining,
+          updatedContent,
+          searchQueries,
+          thinking: thinking || undefined
+        });
+      }
+
+      const finalResult = parsePartialJSON(rawBuffer);
+      if (finalResult.updatedContent) {
+        finalResult.updatedContent = stripMarkdownCodeBlocks(finalResult.updatedContent);
+      }
+      const { thinking, remaining } = extractThinking(finalResult.reply);
+      return {
+        reply: remaining,
+        updatedContent: finalResult.updatedContent
+      };
+    } catch (err: any) {
+      throw new Error(handleAIError(err, 'Gemini'));
+    }
+  } else if (provider === 'deepseek') {
+    const apiKey = state.deepseekApiKey || process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
+      throw new Error('DeepSeek API Key is missing. Please set it in Settings.');
+    }
+    const model = state.deepseekTextModel || 'deepseek-v4-flash';
+    try {
+      const response = await fetch('https://api.deepseek.com/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: 'user', content: prompt }],
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`DeepSeek API error: ${response.status} ${errorData.error?.message || response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No readable stream reader in DeepSeek response');
+
+      const decoder = new TextDecoder('utf-8');
+      let sseAccumulator = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        sseAccumulator += decoder.decode(value, { stream: true });
+        const lines = sseAccumulator.split('\n');
+        sseAccumulator = lines.pop() || '';
+
+        for (const line of lines) {
+          const cleanedLine = line.trim();
+          if (!cleanedLine) continue;
+          if (cleanedLine.startsWith('data: ')) {
+            const dataStr = cleanedLine.slice(6).trim();
+            if (dataStr === '[DONE]') break;
+            try {
+              const dataObj = JSON.parse(dataStr);
+              const textChunk = dataObj.choices?.[0]?.delta?.content || '';
+              const reasoningChunk = dataObj.choices?.[0]?.delta?.reasoning_content || '';
+              
+              rawBuffer += textChunk;
+              
+              const { reply, updatedContent } = parsePartialJSON(rawBuffer);
+              const { thinking, remaining } = extractThinking(reply);
+
+              const finalThinking = reasoningChunk ? (thinking ? thinking + '\n' + reasoningChunk : reasoningChunk) : thinking;
+
+              onChunk({
+                reply: remaining,
+                updatedContent,
+                thinking: finalThinking || undefined
+              });
+            } catch (e) {
+              // ignore
+            }
+          }
+        }
+      }
+
+      const finalResult = parsePartialJSON(rawBuffer);
+      if (finalResult.updatedContent) {
+        finalResult.updatedContent = stripMarkdownCodeBlocks(finalResult.updatedContent);
+      }
+      const { thinking, remaining } = extractThinking(finalResult.reply);
+      return {
+        reply: remaining,
+        updatedContent: finalResult.updatedContent
+      };
+    } catch (err: any) {
+      throw new Error(handleAIError(err, 'DeepSeek'));
+    }
+  } else {
+    // OpenRouter (stream mode)
+    const apiKey = state.openRouterApiKey || process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('OpenRouter API Key is missing. Please set it in Settings.');
+    }
+    const model = state.openRouterTextModel || 'google/gemma-4-31b-it:free';
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'InkSpire',
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: [{ role: 'user', content: prompt }],
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`OpenRouter API error: ${response.status} ${errorData.error?.message || response.statusText}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No readable stream reader in OpenRouter response');
+
+      const decoder = new TextDecoder('utf-8');
+      let sseAccumulator = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        sseAccumulator += decoder.decode(value, { stream: true });
+        const lines = sseAccumulator.split('\n');
+        sseAccumulator = lines.pop() || '';
+
+        for (const line of lines) {
+          const cleanedLine = line.trim();
+          if (!cleanedLine) continue;
+          if (cleanedLine.startsWith('data: ')) {
+            const dataStr = cleanedLine.slice(6).trim();
+            if (dataStr === '[DONE]') break;
+            try {
+              const dataObj = JSON.parse(dataStr);
+              const textChunk = dataObj.choices?.[0]?.delta?.content || '';
+              const reasoningChunk = dataObj.choices?.[0]?.delta?.reasoning || '';
+
+              rawBuffer += textChunk;
+              const { reply, updatedContent } = parsePartialJSON(rawBuffer);
+              const { thinking, remaining } = extractThinking(reply);
+
+              const finalThinking = reasoningChunk ? (thinking ? thinking + '\n' + reasoningChunk : reasoningChunk) : thinking;
+
+              onChunk({
+                reply: remaining,
+                updatedContent,
+                thinking: finalThinking || undefined
+              });
+            } catch (e) {
+              // ignore
+            }
+          }
+        }
+      }
+
+      const finalResult = parsePartialJSON(rawBuffer);
+      if (finalResult.updatedContent) {
+        finalResult.updatedContent = stripMarkdownCodeBlocks(finalResult.updatedContent);
+      }
+      const { thinking, remaining } = extractThinking(finalResult.reply);
+      return {
+        reply: remaining,
+        updatedContent: finalResult.updatedContent
+      };
+    } catch (err: any) {
+      throw new Error(handleAIError(err, 'OpenRouter'));
+    }
   }
-  return result;
+}
+
+export async function chatWithChapter(
+  currentContent: string,
+  instruction: string,
+  chapterTitle: string,
+  bookTitle: string,
+  language: string
+): Promise<ChatResponse> {
+  return await chatWithChapterStream(currentContent, instruction, chapterTitle, bookTitle, language, () => {});
 }
 
 export async function extractMasterDesignerProfile(

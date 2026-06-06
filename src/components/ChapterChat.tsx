@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Send, Loader2, Sparkles, Check, X, Trash2, Wand2, Image as ImageIcon } from 'lucide-react';
-import { chatWithChapter } from '../lib/ai';
+import { chatWithChapter, chatWithChapterStream } from '../lib/ai';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { db, ChatMessage } from '../lib/db';
 import { v4 as uuidv4 } from 'uuid';
@@ -96,10 +96,21 @@ export function ChapterChat({
 }: ChapterChatProps) {
   const { t } = useTranslation();
   const activeChapterId = useStore((state) => state.activeChapterId);
+  const textProvider = useStore((state) => state.textProvider);
+  const webSearchEnabled = useStore((state) => state.webSearchEnabled);
+  const setWebSearchEnabled = useStore((state) => state.setWebSearchEnabled);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; messageId?: string; isClearAll?: boolean }>({
     isOpen: false,
@@ -149,33 +160,86 @@ export function ChapterChat({
     setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
 
+    const assistantMessageId = uuidv4();
+    const assistantPlaceholder: ChatMessage = {
+      id: assistantMessageId,
+      chapterId: activeChapterId,
+      role: 'assistant',
+      content: '',
+      thinking: '',
+      searchQueries: [],
+      createdAt: Date.now(),
+    };
+
+    setMessages(prev => [...prev, assistantPlaceholder]);
+
     try {
-      const response = await chatWithChapter(content, userMessageContent, chapterTitle, bookTitle, language);
-      
-      const assistantMessage: ChatMessage = {
-        id: uuidv4(),
+      let finalReply = '';
+      let finalUpdatedContent: string | undefined = undefined;
+      let finalSearchQueries: string[] = [];
+      let finalThinking = '';
+
+      await chatWithChapterStream(
+        content,
+        userMessageContent,
+        chapterTitle,
+        bookTitle,
+        language,
+        (chunk) => {
+          if (!isMountedRef.current) return;
+          setMessages(prev => prev.map(msg => {
+            if (msg.id === assistantMessageId) {
+              return {
+                ...msg,
+                content: chunk.reply,
+                updatedContent: chunk.updatedContent,
+                thinking: chunk.thinking,
+                searchQueries: chunk.searchQueries
+              };
+            }
+            return msg;
+          }));
+
+          finalReply = chunk.reply;
+          finalUpdatedContent = chunk.updatedContent;
+          finalSearchQueries = chunk.searchQueries || [];
+          finalThinking = chunk.thinking || '';
+        }
+      );
+
+      // Save complete message to DB
+      const finalAssistantMessage: ChatMessage = {
+        id: assistantMessageId,
         chapterId: activeChapterId,
         role: 'assistant',
-        content: response.reply,
-        updatedContent: response.updatedContent,
+        content: finalReply,
+        updatedContent: finalUpdatedContent,
+        thinking: finalThinking || undefined,
+        searchQueries: finalSearchQueries.length > 0 ? finalSearchQueries : undefined,
         createdAt: Date.now(),
       };
-      
-      await db.saveChatMessage(assistantMessage);
-      setMessages(prev => [...prev, assistantMessage]);
+      await db.saveChatMessage(finalAssistantMessage);
+
     } catch (error: any) {
       console.error('Chat failed', error);
-      const errorMessage: ChatMessage = {
-        id: uuidv4(),
-        chapterId: activeChapterId,
-        role: 'assistant',
-        content: error.message || t('chat_error'),
-        createdAt: Date.now(),
-      };
-      await db.saveChatMessage(errorMessage);
-      setMessages(prev => [...prev, errorMessage]);
+      if (isMountedRef.current) {
+        // Remove active placeholder and add precise error message
+        setMessages(prev => prev.filter(m => m.id !== assistantMessageId));
+        
+        const errorMessage: ChatMessage = {
+          id: uuidv4(),
+          chapterId: activeChapterId,
+          role: 'assistant',
+          content: error.message || t('chat_error'),
+          createdAt: Date.now(),
+        };
+        await db.saveChatMessage(errorMessage);
+        setMessages(prev => [...prev, errorMessage]);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -296,8 +360,40 @@ export function ChapterChat({
                     <span>{language === 'zh' ? 'AI 助手' : 'AI ASSISTANT'}</span>
                   </div>
                 )}
+
+                {/* Expose Grounding Search Queries */}
+                {msg.role === 'assistant' && msg.searchQueries && msg.searchQueries.length > 0 && (
+                  <div className="mb-2.5 flex flex-col gap-1.5 p-2 bg-zinc-50 dark:bg-zinc-950/40 rounded-lg border border-zinc-200/40 dark:border-zinc-800/40 text-[10px] text-zinc-500">
+                    <div className="flex items-center gap-1.5 font-bold text-emerald-600 dark:text-emerald-400">
+                      <span className="animate-spin text-xs">🌐</span>
+                      <span>{language === 'zh' ? '检索实时网络中...' : 'Web Search Steps'}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {msg.searchQueries.map((q, idx) => (
+                        <span key={idx} className="bg-white dark:bg-zinc-900 border border-zinc-150 dark:border-zinc-850 px-2 py-0.5 rounded text-[10px] text-zinc-600 dark:text-zinc-350">
+                          {q}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Expose Thinking / CoT Process */}
+                {msg.role === 'assistant' && msg.thinking && (
+                  <details className="mb-2.5 group/think" open={isLoading && msg.id === messages[messages.length - 1]?.id}>
+                    <summary className="list-none flex items-center gap-1.5 text-[10px] font-bold text-zinc-450 dark:text-zinc-500 hover:text-emerald-500 dark:hover:text-emerald-400 cursor-pointer select-none">
+                      <span className="w-3.5 h-3.5 rounded bg-amber-500/10 text-amber-500 dark:text-amber-400 flex items-center justify-center text-[10px]">🧠</span>
+                      <span>{language === 'zh' ? '思维链推理过程' : 'Reasoning Process'}</span>
+                      <span className="text-[9px] text-zinc-400 group-open/think:rotate-90 transition-transform ml-auto">▶</span>
+                    </summary>
+                    <div className="mt-1.5 pl-3 border-l-2 border-zinc-200 dark:border-zinc-800 text-[11px] text-zinc-500 dark:text-zinc-400 font-mono leading-relaxed whitespace-pre-wrap">
+                      {msg.thinking}
+                    </div>
+                  </details>
+                )}
+
                 <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-pre:my-1 select-text">
-                  <MarkdownRenderer>{msg.content}</MarkdownRenderer>
+                  <MarkdownRenderer>{msg.content || (isLoading && msg.id === messages[messages.length - 1]?.id ? '...' : '')}</MarkdownRenderer>
                 </div>
               </div>
 
@@ -348,6 +444,25 @@ export function ChapterChat({
         >
           <Trash2 className="w-4 h-4" />
         </button>
+
+        {/* Simplified Web Search Toggle */}
+        {textProvider === 'gemini' && (
+          <button
+            type="button"
+            onClick={() => setWebSearchEnabled(!webSearchEnabled)}
+            className={`px-3 py-2.5 rounded-xl border transition-all shrink-0 flex items-center gap-1.5 text-xs font-bold shadow-2xs group ${
+              webSearchEnabled
+                ? 'bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                : 'bg-zinc-50 dark:bg-zinc-900 text-zinc-400 border-zinc-200 dark:border-zinc-800 hover:text-zinc-600 dark:hover:text-zinc-350'
+            }`}
+            title={language === 'zh' ? '点击开关：内置 AI 是否联网实时搜索' : 'Web Search Toggle'}
+          >
+            <span className={webSearchEnabled ? 'animate-bounce text-emerald-500' : ''}>🌐</span>
+            <span className="hidden sm:inline">
+              {language === 'zh' ? (webSearchEnabled ? '联网开' : '不联网') : (webSearchEnabled ? 'Search ON' : 'Search OFF')}
+            </span>
+          </button>
+        )}
 
         <div className="flex-1 relative">
           <textarea

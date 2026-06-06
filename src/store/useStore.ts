@@ -27,6 +27,8 @@ interface AppState {
   openRouterImageModel: string;
   deepseekApiKey: string | null;
   deepseekTextModel: string;
+  webSearchEnabled: boolean;
+  setWebSearchEnabled: (enabled: boolean) => void;
   draft: DraftState;
   workspaceMode: 'story' | 'split' | 'dtp';
   setWorkspaceMode: (mode: 'story' | 'split' | 'dtp') => void;
@@ -87,6 +89,7 @@ export const useStore = create<AppState>()(
       openRouterImageModel: 'google/gemini-3.1-flash-image-preview',
       deepseekApiKey: null,
       deepseekTextModel: 'deepseek-v4-flash',
+      webSearchEnabled: false,
       draft: initialDraft,
       workspaceMode: 'split',
       setWorkspaceMode: (mode) => set({ workspaceMode: mode }),
@@ -112,6 +115,7 @@ export const useStore = create<AppState>()(
       setOpenRouterImageModel: (model) => set({ openRouterImageModel: model }),
       setDeepseekApiKey: (key) => set({ deepseekApiKey: key }),
       setDeepseekTextModel: (model) => set({ deepseekTextModel: model }),
+      setWebSearchEnabled: (enabled) => set({ webSearchEnabled: enabled }),
       loadBooks: async () => {
         const books = await db.getBooks();
         set({ books });
@@ -173,7 +177,8 @@ export const useStore = create<AppState>()(
         showGuides: state.showGuides,
         activeBookId: state.activeBookId, // Persist active book to prevent jumping to dashboard on refresh
         activeChapterId: state.activeChapterId, // Persist active chapter to prevent losing context
-        draft: state.draft // Persist draft state to save progress
+        draft: state.draft, // Persist draft state to save progress
+        webSearchEnabled: state.webSearchEnabled
       }),
     }
   )

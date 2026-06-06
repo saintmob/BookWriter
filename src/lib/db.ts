@@ -104,6 +104,8 @@ export interface ChatMessage {
   content: string;
   updatedContent?: string;
   createdAt: number;
+  thinking?: string;
+  searchQueries?: string[];
 }
 
 interface BookDB extends DBSchema {
