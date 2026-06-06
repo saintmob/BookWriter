@@ -1167,6 +1167,186 @@ export function TypesetLayoutEditor({
             })() : (
               // DEFAULT SCREEN IF NO IMAGE SELECTED: PAGE/TRIM METRICS EDITING (MIMICKING ADOBE PROPERTIES PANEL)
               <div className="space-y-4 animate-fade-in text-xs">
+                {/* Apply Smart Template feature */}
+                <div className="border border-indigo-200 dark:border-indigo-900/50 rounded-lg overflow-hidden bg-indigo-50/50 dark:bg-indigo-900/10 mb-2 p-3">
+                   <div className="flex items-start justify-between">
+                     <div>
+                       <h3 className="font-bold text-indigo-900 dark:text-indigo-100 flex items-center gap-1.5 mb-1">
+                         <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                         {currentLanguage === 'zh' ? '智能排版与风格应用' : 'Smart Typeset & Styling'}
+                       </h3>
+                       <p className="text-[10px] text-indigo-700/70 dark:text-indigo-300/60 leading-normal mb-3">
+                         {currentLanguage === 'zh' ? '描述排版意图或从记忆库加载组合。' : 'Describe your intent to AI or apply structural layouts.'}
+                       </p>
+                     </div>
+                   </div>
+                   
+                   <div className="space-y-2">
+                     <div className="flex relative">
+                        <input 
+                          type="text" 
+                          id="smartLayoutPrompt"
+                          onKeyDown={async (e) => {
+                             if (e.key === 'Enter') {
+                                const inputRaw = (e.target as HTMLInputElement).value;
+                                if (!inputRaw.trim()) return;
+                                
+                                const toastId = toast.loading(currentLanguage === 'zh' ? '正在运用美学计算版面骨架...' : 'Synthesizing layout structure...');
+                                try {
+                                   const { parseAndAnalyzeLayoutFromIntent } = await import('../lib/ai');
+                                   const result = await parseAndAnalyzeLayoutFromIntent(inputRaw, currentLanguage);
+                                   
+                                   const updates = {
+                                      marginTop: Number(result.marginTop) || layout.marginTop,
+                                      marginBottom: Number(result.marginBottom) || layout.marginBottom,
+                                      marginLeft: Number(result.marginLeft) || layout.marginLeft,
+                                      marginRight: Number(result.marginRight) || layout.marginRight,
+                                      fontSize: Number(result.fontSize) || layout.fontSize,
+                                      lineHeight: Number(result.lineHeight) || layout.lineHeight,
+                                      columns: Number(result.columns) || layout.columns,
+                                      paperStyle: result.paperStyle || layout.paperStyle,
+                                      format: result.format || layout.format,
+                                      fontFamily: result.fontFamily || layout.fontFamily,
+                                      headerPos: result.headerPos || layout.headerPos,
+                                      chapterTitleStyle: result.chapterTitleStyle || layout.chapterTitleStyle,
+                                      sceneBreakStyle: result.sceneBreakStyle || layout.sceneBreakStyle,
+                                      dropCaps: result.dropCaps !== undefined ? result.dropCaps : layout.dropCaps,
+                                      firstLineIndent: Number(result.firstLineIndent) || layout.firstLineIndent,
+                                      paragraphSpacing: Number(result.paragraphSpacing) || layout.paragraphSpacing,
+                                      justifyText: result.justifyText !== false
+                                   };
+                                   
+                                   Object.keys(updates).forEach(key => {
+                                      handleLayoutChange(key as any, updates[key as keyof typeof updates]);
+                                   });
+                                   
+                                   toast.success(currentLanguage === 'zh' ? '版骨图装配完毕！' : 'Aesthetic layout synthesized successfully!');
+                                   (e.target as HTMLInputElement).value = '';
+                                } catch (error) {
+                                   toast.error('Synthesis failed');
+                                } finally {
+                                   toast.dismiss(toastId);
+                                }
+                             }
+                          }}
+                          placeholder={currentLanguage === 'zh' ? '如："双栏诗集结构" (按回车生型)' : 'e.g. "two columns poetry"... (Press enter)'}
+                          className="w-full text-[11px] p-2 pr-8 bg-white dark:bg-zinc-950 border border-indigo-200 dark:border-indigo-800/80 rounded shadow-inner outline-none select-text"
+                        />
+                        <button className="absolute right-2 top-2" title="Press Enter to generate"><Wand2 className="w-3.5 h-3.5 text-indigo-400" /></button>
+                     </div>
+
+                     {(() => {
+                        try {
+                           const tmps = localStorage.getItem('inkspire_user_templates_' + book.id);
+                           const templates = tmps ? JSON.parse(tmps) : [];
+                           
+                           return (
+                              <div className="mt-2 space-y-2">
+                                 <div className="flex items-center justify-between">
+                                   <span className="text-[10px] font-bold text-indigo-900/60 dark:text-indigo-200/50 uppercase">
+                                     {currentLanguage === 'zh' ? '全书母版线框库' : 'Master Wireframes'}
+                                   </span>
+                                   <button
+                                     onClick={() => {
+                                       const name = window.prompt(currentLanguage === 'zh' ? '为新母版命名：' : 'Name this master template:', 'My Custom Layout');
+                                       if (!name) return;
+                                       const newTemplate = {
+                                         ...layout,
+                                         id: 'template-' + Date.now(),
+                                         name: name,
+                                         createdAt: Date.now()
+                                       };
+                                       const updated = [newTemplate, ...templates];
+                                       localStorage.setItem(`inkspire_user_templates_${book.id}`, JSON.stringify(updated));
+                                       toast.success(currentLanguage === 'zh' ? '母版已创建!' : 'Master created!');
+                                       setLocalBookLayout({...localBookLayout}); // trigger render
+                                     }}
+                                     className="h-6 px-2 shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-[9px] font-bold rounded flex items-center justify-center shadow"
+                                   >
+                                     <Plus className="w-3 h-3 mr-0.5" />
+                                     {currentLanguage === 'zh' ? '新建母版' : 'New Master'}
+                                   </button>
+                                 </div>
+
+                                 {templates && templates.length > 0 ? (
+                                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-indigo-200/50">
+                                      {templates.map((t: any) => (
+                                        <div 
+                                          key={t.id} 
+                                          className="shrink-0 w-24 border border-indigo-200/50 dark:border-indigo-800/50 bg-white/50 dark:bg-zinc-900/50 rounded-md p-1.5 flex flex-col gap-1.5 shadow-sm hover:border-indigo-400 cursor-pointer group relative"
+                                          onClick={() => {
+                                            const updates = {
+                                               marginTop: Number(t.marginTop) || layout.marginTop,
+                                               marginBottom: Number(t.marginBottom) || layout.marginBottom,
+                                               marginLeft: Number(t.marginLeft) || layout.marginLeft,
+                                               marginRight: Number(t.marginRight) || layout.marginRight,
+                                               fontSize: Number(t.fontSize) || layout.fontSize,
+                                               lineHeight: Number(t.lineHeight) || layout.lineHeight,
+                                               columns: Number(t.columns) || layout.columns,
+                                               paperStyle: t.paperStyle || layout.paperStyle,
+                                               format: t.format || layout.format,
+                                               fontFamily: t.fontFamily || layout.fontFamily,
+                                               headerPos: t.headerPos || layout.headerPos,
+                                               chapterTitleStyle: t.chapterTitleStyle || layout.chapterTitleStyle,
+                                               sceneBreakStyle: t.sceneBreakStyle || layout.sceneBreakStyle,
+                                               dropCaps: t.dropCaps !== undefined ? t.dropCaps : layout.dropCaps,
+                                               firstLineIndent: Number(t.firstLineIndent) || layout.firstLineIndent,
+                                               paragraphSpacing: Number(t.paragraphSpacing) || layout.paragraphSpacing,
+                                               justifyText: t.justifyText !== false
+                                            };
+                                            Object.keys(updates).forEach(key => {
+                                               handleLayoutChange(key as any, updates[key as keyof typeof updates]);
+                                            });
+                                            toast.success(currentLanguage === 'zh' ? `已应用母版: ${t.name}` : `Applied master: ${t.name}`);
+                                          }}
+                                        >
+                                          {/* Tiny Preview Graphic */}
+                                          <div className="h-14 rounded-[2px] border relative overflow-hidden" 
+                                               style={{ 
+                                                 backgroundColor: (t.paperStyle === 'dark' || t.paperStyle === 'slate') ? '#18181b' : (t.paperStyle === 'warm' || t.paperStyle === 'vintage') ? '#fdf6e3' : '#ffffff',
+                                                 borderColor: (t.paperStyle === 'dark' || t.paperStyle === 'slate') ? '#3f3f46' : '#e4e4e7'
+                                               }}>
+                                              <div className="absolute border border-indigo-500/20 bg-indigo-500/10 flex gap-[1px]" style={{
+                                                top: `${Math.min(10, (t.marginTop || 48) / 5)}px`, 
+                                                bottom: `${Math.min(10, (t.marginBottom || 48) / 5)}px`, 
+                                                left: `${Math.min(8, (t.marginLeft || 48) / 5)}px`, 
+                                                right: `${Math.min(8, (t.marginRight || 48) / 5)}px`, 
+                                              }}>
+                                                  {Array.from({length: t.columns || 1}).map((_, i) => (
+                                                      <div key={i} className="flex-1 h-full bg-zinc-500/15"></div>
+                                                  ))}
+                                              </div>
+                                          </div>
+                                          <div className="flex justify-between items-center text-[9px]">
+                                            <span className="font-bold text-indigo-900 dark:text-indigo-200 truncate">{t.name}</span>
+                                            <button 
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                const filtered = templates.filter((temp: any) => temp.id !== t.id);
+                                                localStorage.setItem(`inkspire_user_templates_${book.id}`, JSON.stringify(filtered));
+                                                setLocalBookLayout({...localBookLayout});
+                                              }}
+                                              className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-500"
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ))}
+                                   </div>
+                                 ) : (
+                                   <div className="h-16 border border-dashed border-indigo-200 flex items-center justify-center text-[10px] text-indigo-300 rounded-md">
+                                     {currentLanguage === 'zh' ? '暂无母版。修改后点击“新建”' : 'No masters.'}
+                                   </div>
+                                 )}
+                              </div>
+                           );
+                        } catch(e) {}
+                        return null;
+                     })()}
+                   </div>
+                </div>
+
                 {/* Book vs Chapter Scope Toggle */}
                 <div className="bg-zinc-100 dark:bg-zinc-900 p-1 rounded-lg flex items-center shadow-inner mt-2">
                   <button

@@ -13,6 +13,7 @@ import { SettingsModal } from './SettingsModal';
 import { BookSamplePreview } from './BookSamplePreview';
 import { TypesetLayoutEditor } from './TypesetLayoutEditor';
 import { BookCoverEditor } from './BookCoverEditor';
+import { DesignThemeEditor } from './DesignThemeEditor';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 
@@ -40,7 +41,7 @@ export function BookEditor() {
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [activeChapter, setActiveChapterState] = useState<Chapter | null>(null);
-  const [activeView, setActiveView] = useState<'chapter' | 'cover'>('chapter');
+  const [activeView, setActiveView] = useState<'chapter' | 'cover' | 'theme'>('chapter');
   
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -205,7 +206,8 @@ export function BookEditor() {
         activeChapter.title,
         activeChapter.description,
         prevChapter?.content || null,
-        language
+        language,
+        book.designTheme
       );
       setContent(newContent);
       
@@ -226,7 +228,10 @@ export function BookEditor() {
     if (!activeChapter) return;
     setIsGeneratingImage(true);
     try {
-      const prompt = `Illustration for chapter "${activeChapter.title}" of book "${book?.title}". The chapter is about: ${content.substring(0, 500)}...`;
+      let prompt = `Illustration for chapter "${activeChapter.title}" of book "${book?.title}". The chapter is about: ${content.substring(0, 500)}...`;
+      if (book?.designTheme?.illustrationStyle) {
+        prompt += `. Conforming strictly to artistic style: ${book.designTheme.illustrationStyle}`;
+      }
       const imageUrl = await generateImage(prompt);
       
       if (imageUrl) {
@@ -247,7 +252,11 @@ export function BookEditor() {
 
   const handleGenerateImageOfPrompt = async (promptText: string): Promise<string | null> => {
     try {
-      const imageUrl = await generateImage(promptText);
+      let prompt = promptText;
+      if (book?.designTheme?.illustrationStyle && !promptText.includes(book.designTheme.illustrationStyle)) {
+        prompt = `${promptText}. Style instructions: ${book.designTheme.illustrationStyle}`;
+      }
+      const imageUrl = await generateImage(prompt);
       return imageUrl || null;
     } catch (error: any) {
       console.error('Failed to generate flow image', error);
@@ -526,8 +535,8 @@ export function BookEditor() {
         isOutlineSidebarOpen ? "w-72 left-0" : "w-0 max-md:-left-72 border-r-0 shadow-none opacity-0 pointer-events-none"
       )}>
         <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {/* Cover Entrance */}
-          <div className="px-1 mb-4 select-none">
+          {/* Cover & Theme Entrance */}
+          <div className="px-1 mb-4 select-none flex flex-col gap-2">
             <button
               onClick={() => setActiveView('cover')}
               className={cn(
@@ -541,6 +550,22 @@ export function BookEditor() {
               <div className="flex-1 text-left">
                 <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '设计' : 'DESIGN'}</span>
                 <span className="block -mt-1 font-semibold">{language === 'zh' ? '全书封面设计' : 'Book Cover Design'}</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveView('theme')}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm border",
+                activeView === 'theme'
+                  ? "bg-indigo-600 border-indigo-500 text-white font-semibold"
+                  : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+              )}
+            >
+              <Sparkles className={cn("w-4 h-4", activeView === 'theme' ? "text-white" : "text-indigo-500 animate-pulse")} />
+              <div className="flex-1 text-left">
+                <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '核心美学' : 'STYLE BANK'}</span>
+                <span className="block -mt-1 font-semibold">{language === 'zh' ? '设计风格风格提取' : 'Design Theme & Style'}</span>
               </div>
             </button>
           </div>
@@ -650,6 +675,12 @@ export function BookEditor() {
             book={book}
             onUpdateBook={setBook}
             onGenerateImageOfPrompt={handleGenerateImageOfPrompt}
+            language={language}
+          />
+        ) : activeView === 'theme' && book ? (
+          <DesignThemeEditor
+            book={book}
+            onUpdateBook={setBook}
             language={language}
           />
         ) : activeChapter && book ? (

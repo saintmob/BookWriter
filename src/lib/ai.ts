@@ -185,22 +185,82 @@ Return ONLY a JSON object with 'summary' (a comprehensive overview of the book) 
   return parseJSON(text || '{}');
 }
 
+export async function extractDesignThemeStyle(
+  bookTitle: string,
+  bookSummary: string,
+  userInspirations: string,
+  existingTheme: any | null = null,
+  language: string = 'zh'
+): Promise<any> {
+  const existingStr = existingTheme 
+    ? `\nExisting Style Guidelines to grow upon (you should maintain, evolve, and refine these instead of overwriting completely): ${JSON.stringify(existingTheme)}\n` 
+    : '';
+    
+  const prompt = `You are a world-class book layout designer, typographer, and art director.
+Extract or evolve a highly cohesive, professional design theme/style guideline for the book "${bookTitle}".
+Book Summary: ${bookSummary}
+User Intent / Inspiration / Material details provided: ${userInspirations}
+${existingStr}
+
+You must return a cohesive JSON object representing the design theme structure. Ensure:
+1. "keywords": 3-5 concise, atmospheric style keywords (e.g. ["Classic Detective", "Nostalgic Vintage", "Chiaroscuro Silhouette"]).
+2. "colors": A structured color palette:
+   - "dominant": A dark/rich color hex code representing the main visual accent color of the design (not white).
+   - "accent": A bright, high-contrast accent color hex code (e.g. for highlights, lines, or details).
+   - "background": A soft, elegant paper/background hex code (e.g. warm ivory "#FBF9F4", vintage charcoal "#18181A", classic craft "#F2EADB").
+   - "text": A high-contrast readable text color hex code matching the background color (e.g. deep charcoal "#1C1917" on light backgrounds, or ivory "#F5F5F4" on dark backgrounds).
+3. "typography": Recommendations wrapping:
+   - "headingFont": Elegant heading font character/vibe description.
+   - "bodyFont": Readable body font character/vibe description.
+   - "styleVibe": One cohesive style name (e.g., "Vintage Academic Monolith", "Minimalist Cyberpunk").
+4. "illustrationStyle": A refined illustration style template/prompt. It must describe an artistic medium and aesthetics (textures, lighting, composition) suitable for image generator engines (like "stippling ink sketch, high-contrast chiaroscuro shadows, classic vintage gothic engraving, delicate paper textures").
+5. "typesettingGuidelines": Specific, actionable book design/DTP advice (e.g., margins, line heights, drop caps enable, columns recommendation, drop caps suggestions).
+6. "extractedGuidelines": A brief, highly refined editorial description (1-2 paragraphs) of this style model's design philosophy, detailing why these aesthetic configurations was chosen and how it pairs with the book's narrative.
+
+Return ONLY a valid JSON object matching the structures shown below with no extra markdown blocks or conversational text.
+{
+  "keywords": ["..."],
+  "colors": {
+    "dominant": "#HEX",
+    "accent": "#HEX",
+    "background": "#HEX",
+    "text": "#HEX"
+  },
+  "typography": {
+    "headingFont": "...",
+    "bodyFont": "...",
+    "styleVibe": "..."
+  },
+  "illustrationStyle": "...",
+  "typesettingGuidelines": "...",
+  "extractedGuidelines": "..."
+}`;
+
+  const text = await callTextAI(prompt, true);
+  return parseJSON(text || '{}');
+}
+
 export async function generateChapterContent(
   bookTitle: string,
   bookSummary: string,
   chapterTitle: string,
   chapterDescription: string,
   previousChapterContent: string | null,
-  language: string
+  language: string,
+  designTheme?: any
 ): Promise<string> {
   let prompt = `Write the content for a chapter of a book.
 Book Title: ${bookTitle}
 Book Summary: ${bookSummary}
 Chapter Title: ${chapterTitle}
 Chapter Description: ${chapterDescription}
-Language: ${language}
+Language: ${language}`;
 
-Write engaging, well-structured content that fits the tone of the book. Use markdown formatting.`;
+  if (designTheme && designTheme.extractedGuidelines) {
+    prompt += `\nCreative Tone and Aesthetic Direction to integrate: ${designTheme.extractedGuidelines}`;
+  }
+
+  prompt += `\n\nWrite engaging, well-structured content that fits the tone of the book. Use markdown formatting.`;
 
   if (previousChapterContent) {
     prompt += `\n\nFor context, here is the end of the previous chapter:\n${previousChapterContent.slice(-1000)}`;
@@ -698,6 +758,7 @@ Return ONLY the fully rewritten chapter content in markdown format. Do not inclu
     throw new Error(handleAIError(error, 'Gemini Proofread Apply'));
   }
 }
+
 export async function chatWithChapter(
   currentContent: string,
   instruction: string,
@@ -737,4 +798,77 @@ Do not include markdown formatting like \`\`\`json.`;
     result.updatedContent = stripMarkdownCodeBlocks(result.updatedContent);
   }
   return result;
+}
+
+export async function extractMasterDesignerProfile(
+  promptDescription: string,
+  language: string = 'zh'
+): Promise<any> {
+  const prompt = `You are an expert design historian and book layout researcher.
+Analyze the following user prompt requesting to create a custom/new Master Designer or design movement style profile.
+Description provided: ${promptDescription}
+
+Create a cohesive, highly structured Master Style profile JSON package. You must return a single JSON object with EXACTLY the following structure:
+{
+  "name": "Full Name in English",
+  "nameZh": "Full Name in Chinese (or same as English if not translatable)",
+  "vibe": "3-4 word phrase representing the design school / movement (e.g. Traditional Japanese Wabi-Sabi, Leipzig Traditional Novel, Chicago Bauhaus Neo-modern)",
+  "quote": "An inspirational custom-synthesized quote representing their visual philosophy (e.g. 'Symmetry is a quiet river; the page is its banks.')",
+  "colors": {
+    "dominant": "#HEX (a rich accent color)",
+    "accent": "#HEX (a sharp highlight color)",
+    "background": "#HEX (a soft, elegant paper bg color like warm cream or charcoal)",
+    "text": "#HEX (a highly readable contrast text color)"
+  },
+  "typography": {
+    "headingFont": "Description/vibe of recommended heading typography (e.g., 'Heavy Slab Serif', 'Geometric Sans-Serif Space')",
+    "bodyFont": "Description/vibe of recommended body copy typography (e.g., 'Elegant Renaissance Garamond Garamond')",
+    "styleVibe": "A concise style genre descriptor"
+  },
+  "illustrationStyle": "A detailed, descriptive illustration prompt style constraint (e.g., 'minimal single-line vector hand sketch, organic warm grainy watercolor offsets, natural sepia vellum raw textures')",
+  "typesettingGuidelines": "Actionable, precise typesetting/DTP recommendations (e.g., opening margins should be at least 60px, first-line indent set to 2em, columns set to 1, paragraphs to justified)",
+  "extractedGuidelines": "A beautiful, evocative 1-2 paragraph editorial synthesis of this custom master's core aesthetics and decorative logic, detailing how it elevates slow reading."
+}
+
+Return ONLY the valid JSON object with NO markdown markup or container blocks.`;
+
+  const text = await callTextAI(prompt, true);
+  return parseJSON(text || '{}');
+}
+
+export async function parseAndAnalyzeLayoutFromIntent(
+  layoutReferenceDescription: string,
+  language: string = 'zh'
+): Promise<any> {
+  const prompt = `You are a professional typesetter, layout editor, and grid structure architect.
+Analyze the following description of a page layout or reference layout pattern.
+Description: ${layoutReferenceDescription}
+
+Abstract this into a clean, modern, structural Typeset Layout Template configured with exact layout variables.
+Return exactly a structured JSON object with the following properties:
+{
+  "name": "Descriptive, elegant template name (e.g., 'Asymmetric Editorial columns', 'Medieval Manuscript Margin Grid')",
+  "headerPos": "one of: 'hidden' | 'top-center' | 'top-outside' | 'bottom-center' | 'bottom-outside'",
+  "columns": "1, 2, or 3 (numeric)",
+  "paperStyle": "one of: 'warm' | 'white' | 'dark' | 'kraft' | 'vintage' | 'glossy' | 'newsprint'",
+  "fontSize": "numeric (e.g. 14, 15, 16, 17, 18)",
+  "lineHeight": "numeric (e.g. 1.5, 1.6, 1.7, 1.8)",
+  "marginTop": "numeric in pixels (e.g. 36, 48, 64, 80)",
+  "marginBottom": "numeric in pixels (e.g. 36, 48, 64, 80)",
+  "marginLeft": "numeric in pixels (e.g. 36, 48, 64, 80)",
+  "marginRight": "numeric in pixels (e.g. 36, 48, 64, 80)",
+  "format": "one of: 'a4' | 'letter' | 'trade' | 'pocket' | 'landscape' | 'square'",
+  "chapterTitleStyle": "one of: 'hidden' | 'classical' | 'modern' | 'minimal'",
+  "sceneBreakStyle": "one of: 'asterism' | 'dots' | 'line' | 'space'",
+  "dropCaps": "boolean (true or false)",
+  "justifyText": "boolean (true or false)",
+  "firstLineIndent": "numeric in scale (0, 1, or 2 representing indent tabs)",
+  "paragraphSpacing": "numeric (e.g. 8, 12, 16, 20)",
+  "visualExplanation": "An organic, architectural briefing (1-2 sentences) of how this geometric wireframe maps columns, spacing, and image alignment to achieve perfect balance."
+}
+
+Return ONLY the valid JSON object with no wrapping blocks.`;
+
+  const text = await callTextAI(prompt, true);
+  return parseJSON(text || '{}');
 }

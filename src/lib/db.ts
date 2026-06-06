@@ -1,5 +1,24 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 
+export interface DesignTheme {
+  keywords: string[];
+  colors: {
+    dominant: string;
+    accent: string;
+    background: string;
+    text: string;
+  };
+  typography: {
+    headingFont?: string;
+    bodyFont?: string;
+    styleVibe?: string;
+  };
+  illustrationStyle?: string;
+  typesettingGuidelines?: string;
+  growthMemories?: string[];
+  extractedGuidelines?: string;
+}
+
 export interface Book {
   id: string;
   title: string;
@@ -13,6 +32,7 @@ export interface Book {
   coverLayoutType?: string;
   coverTextColor?: string;
   coverOverlayOpacity?: number;
+  designTheme?: DesignTheme;
   createdAt: number;
   updatedAt: number;
 }
