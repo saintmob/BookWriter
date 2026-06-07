@@ -140,7 +140,7 @@ export interface Proposal {
 
 export interface Outline {
   summary: string;
-  chapters: { title: string; description: string }[];
+  chapters: { title: string; description: string; level?: number }[];
 }
 
 function parseJSON(text: string) {
@@ -175,14 +175,21 @@ Return ONLY a JSON array of 3 objects, each with 'title', 'concept', 'targetAudi
 }
 
 export async function generateOutline(proposal: Proposal, language: string): Promise<Outline> {
-  const prompt = `Based on the following book proposal, generate a detailed summary and a chapter-by-chapter outline.
+  const prompt = `Based on the following book proposal, generate a detailed summary and a highly granular, structured, chapter-by-chapter nested outline.
+**CRITICAL STRUCTURE REQUIREMENT**: The outline must contain at least 3 levels of structural organization (Level 1: Volumes or Parts, Level 2: Core Chapters, Level 3: Detailed Sections or Subsections) to enable highly focused token-by-token writing of each small subunit.
+Level 1 (Parts) and Level 2 (Chapters) should act as structural containers/directories. Level 3 (Sections) will be where the actual extensive book manuscript content is written.
+Provide a dense, extensive table of contents containing at least 30-50 nodes in total to support creating a thick book (>100 pages).
+
 Title: ${proposal.title}
 Concept: ${proposal.concept}
 Target Audience: ${proposal.targetAudience}
 Tone: ${proposal.tone}
 Language: ${language}
 
-Return ONLY a JSON object with 'summary' (a comprehensive overview of the book) and 'chapters' (an array of objects with 'title' and 'description'). Do not include markdown formatting like \`\`\`json.`;
+Return ONLY a JSON object with 'summary' (a comprehensive overview of the book) and 'chapters' (a flat array in chronological preorder traversing the tree from Level 1, Level 2, down to Level 3). Do not include markdown formatting like \`\`\`json. Each item in 'chapters' MUST have:
+- 'title': The formatted title of the Volume/Chapter/Section.
+- 'description': What this specific node focuses on.
+- 'level': The hierarchical level (1 for Part/Volume, 2 for Chapter, 3 for Section/Subsection/Subunit).`;
 
   const text = await callTextAI(prompt, true);
   return parseJSON(text || '{}');
@@ -250,23 +257,35 @@ export async function generateChapterContent(
   chapterDescription: string,
   previousChapterContent: string | null,
   language: string,
-  designTheme?: any
+  designTheme?: any,
+  fullOutline?: { title: string; description: string; level?: number }[]
 ): Promise<string> {
-  let prompt = `Write the content for a chapter of a book.
+  let prompt = `Write the highly detailed, immersive content for a section of a book.
 Book Title: ${bookTitle}
 Book Summary: ${bookSummary}
-Chapter Title: ${chapterTitle}
-Chapter Description: ${chapterDescription}
-Language: ${language}`;
+Section Title: ${chapterTitle}
+Section Description: ${chapterDescription}
+Language: ${language}
+
+CRITICAL REQUIREMENT: Focus STRICTLY on generating a large amount of long-form, comprehensive, immersive classic text. Do NOT include any illustrations, markdown image tags, or placeholders. Your goal is to write the pure manuscript for a thick book (>100 pages). Deliver extensive detail and depth.`;
+
+  if (fullOutline && fullOutline.length > 0) {
+    prompt += `\n\nHere is the full Book Table of Contents (Outline) for structural guidance. You must focus ONLY on writing the specific Section requested above. Ensure continuity and avoid rambling into the scope of other sections:\n`;
+    fullOutline.forEach((item) => {
+      const indent = '  '.repeat((item.level || 2) - 1);
+      const marker = item.level === 1 ? '篇/Part' : item.level === 2 ? '章/Chapter' : '节/Section';
+      prompt += `${indent}- [${marker}] ${item.title}: ${item.description}\n`;
+    });
+  }
 
   if (designTheme && designTheme.extractedGuidelines) {
     prompt += `\nCreative Tone and Aesthetic Direction to integrate: ${designTheme.extractedGuidelines}`;
   }
 
-  prompt += `\n\nWrite engaging, well-structured content that fits the tone of the book. Use markdown formatting.`;
+  prompt += `\n\nWrite engaging, well-structured, extremely detailed content that fits the tone of the book. Use markdown formatting. Write as much relevant high-quality text as possible for this section.`;
 
   if (previousChapterContent) {
-    prompt += `\n\nFor context, here is the end of the previous chapter:\n${previousChapterContent.slice(-1000)}`;
+    prompt += `\n\nFor context, here is the end of the previous chapter:\n${previousChapterContent.slice(-1500)}`;
   }
 
   return await callTextAI(prompt, false);
@@ -647,11 +666,11 @@ export async function generateImage(prompt: string): Promise<string | null> {
 
 export interface ChatOutlineResponse {
   reply: string;
-  updatedOutline?: { title: string; description: string }[];
+  updatedOutline?: { title: string; description: string; level?: number }[];
 }
 
 export async function updateOutlineWithAI(
-  currentChapters: { title: string; description: string }[],
+  currentChapters: { title: string; description: string; level?: number }[],
   instruction: string,
   bookTitle: string,
   bookSummary: string,
@@ -678,7 +697,7 @@ If the user is asking a question or asking for advice (and not explicitly asking
 
 Return ONLY a JSON object with:
 - 'reply': Your message to the user. Use markdown formatting for readability (e.g., bolding, bullet points).
-- 'updatedOutline': The full updated list of chapters as a JSON array (only if a change was made). Each chapter must have 'title' and 'description'. If no changes are made to the outline, do not include this field.
+- 'updatedOutline': The full updated list of chapters as a JSON array (only if a change was made). Each chapter must have 'title', 'description', and 'level' (1 for Part/Volume, 2 for Chapter, 3 for Section/Subsection). If no changes are made to the outline, do not include this field.
 Do not include markdown formatting like \`\`\`json.`;
 
   const text = await callTextAI(prompt, true);
@@ -1202,4 +1221,121 @@ Return ONLY the valid JSON object with no wrapping blocks.`;
 
   const text = await callTextAI(prompt, true);
   return parseJSON(text || '{}');
+}
+
+// ==========================================
+// FACT-CHECKING & INFORMATION VERIFICATION ENGINE
+// ==========================================
+
+export interface FactCheckResult {
+  status: 'safe' | 'warning' | 'verified';
+  claim: string;
+  verdict: string;
+  sourceSuggestion?: string;
+}
+
+export interface FactCheckReport {
+  overallVerdict: string;
+  items: FactCheckResult[];
+}
+
+export async function factCheckChapterContent(
+  content: string,
+  chapterTitle: string,
+  bookTitle: string,
+  language: string
+): Promise<FactCheckReport> {
+  const state = useStore.getState();
+  const isGemini = state.textProvider === 'gemini';
+  
+  const prompt = `You are an expert investigative editor, content auditor, and professional book fact-checker. 
+Analyze the following book content thoroughly for historical accuracy, scientific correctness, names, dates, timeline consistency, mathematical formulas, geographical claims, and logical coherence.
+
+Book Title: ${bookTitle}
+Chapter Title: ${chapterTitle}
+Language: ${language}
+
+Chapter Content to investigate:
+"""
+${content}
+"""
+
+Please run a thorough, high-integrity factual and logical verification check. 
+Identify major dates, events, numbers, named entities, historical accounts, scientific assertions, or logical flow, and check them objectively.
+Return ONLY a valid, parseable JSON object with the following structure (do not append conversational wrappers):
+{
+  "overallVerdict": "Provide an elegant, comprehensive summary of the accuracy, soundness, and safety of this chapter's information in language: ${language === 'zh' ? 'Chinese' : 'English'}",
+  "items": [
+    {
+      "claim": "The specific statement/assertion found in the text",
+      "status": "One of: 'verified' (proven correct with evidence), 'safe' (logical, common sense, or highly plausible), or 'warning' (erroneous, contradictory, highly suspicious, or unverified claims)",
+      "verdict": "Detailed evidence-backed explanation correcting or verifying the claim. (In language: ${language === 'zh' ? 'Chinese' : 'English'})",
+      "sourceSuggestion": "Specific corrective phrasing or true historical data to inject, especially if a 'warning' is issued. (In language: ${language === 'zh' ? 'Chinese' : 'English'})"
+    }
+  ]
+}
+
+Ensure the items array contains at least 3-6 distinct checks covering the most crucial claims. Return ONLY the JSON object.`;
+
+  // Temporarily force web-search on for this request to make sure we leverage Google Search Grounding for outstanding fact-checking!
+  const oldWebSearch = state.webSearchEnabled;
+  if (isGemini) {
+    state.setWebSearchEnabled(true);
+  }
+  
+  try {
+    const text = await callTextAI(prompt, true);
+    return parseJSON(text || '{"overallVerdict": "Audit complete.", "items": []}');
+  } finally {
+    if (isGemini) {
+      state.setWebSearchEnabled(oldWebSearch);
+    }
+  }
+}
+
+export async function applyFactCheckCorrections(
+  content: string,
+  report: FactCheckReport,
+  chapterTitle: string,
+  language: string
+): Promise<string> {
+  const prompt = `You are a meticulous book editor and prose polisher. Help rewrite the following chapter content by correcting all the flagged warning/contradiction items listed in the Factcheck Report.
+Keep correct, safe, and poetic styling intact. Ensure the prose flows naturally and beautifully.
+
+Chapter Title: ${chapterTitle}
+Language: ${language}
+
+Original Chapter Content:
+"""
+${content}
+"""
+
+Fact-Check Audit Report:
+${JSON.stringify(report, null, 2)}
+
+Return ONLY the complete rewritten content in elegant markdown. Do not include any warning comments or conversational explanations. Just output the clean text.`;
+
+  const state = useStore.getState();
+  const provider = state.textProvider || 'openrouter';
+
+  if (provider === 'gemini') {
+    try {
+      const ai = getGeminiAi();
+      let model = state.geminiTextModel || 'gemini-3.5-flash';
+      if (model === 'gemini-3.1-flash-preview' || model === 'gemini-3-flash-preview') {
+        model = 'gemini-3.5-flash';
+      }
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: prompt,
+      });
+      return stripMarkdownCodeBlocks(response.text || content);
+    } catch (error: any) {
+      throw new Error(handleAIError(error, 'Gemini Apply Factcheck'));
+    }
+  } else {
+    // Fallback to openrouter or general chat
+    const text = await callTextAI(prompt, false);
+    return stripMarkdownCodeBlocks(text || content);
+  }
 }

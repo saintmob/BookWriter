@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book, FloatingImage } from '../lib/db';
-import { generateChapterContent, generateImage, proofreadChapter, applyProofreadChanges, ProofreadFeedback } from '../lib/ai';
-import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2, ChevronLeft, ChevronRight, ArrowLeft, PenLine, LayoutTemplate, Settings as SettingsIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, ZoomIn, ZoomOut, Grid, Columns } from 'lucide-react';
+import { generateChapterContent, generateImage, proofreadChapter, applyProofreadChanges, ProofreadFeedback, factCheckChapterContent, applyFactCheckCorrections, FactCheckReport } from '../lib/ai';
+import { Loader2, Sparkles, Image as ImageIcon, Check, Trash2, Edit2, Eye, ListPlus, Download, FileText, Printer, ChevronDown, MessageSquare, BookOpen, Wand2, ChevronLeft, ChevronRight, ArrowLeft, PenLine, LayoutTemplate, Settings as SettingsIcon, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, ZoomIn, ZoomOut, Grid, Columns, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { OutlineEditorModal } from './OutlineEditorModal';
@@ -16,6 +16,8 @@ import { BookCoverEditor } from './BookCoverEditor';
 import { DesignThemeEditor } from './DesignThemeEditor';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
+
+import { ChapterDirectoryView } from './ChapterDirectoryView';
 
 export function BookEditor() {
   const { t } = useTranslation();
@@ -50,6 +52,11 @@ export function BookEditor() {
   const [proofreadFeedback, setProofreadFeedback] = useState<ProofreadFeedback | null>(null);
   const [isProofreadModalOpen, setIsProofreadModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  const [isFactChecking, setIsFactChecking] = useState(false);
+  const [factCheckReport, setFactCheckReport] = useState<FactCheckReport | null>(null);
+  const [isFactCheckModalOpen, setIsFactCheckModalOpen] = useState(false);
+  const [isApplyingFactCheck, setIsApplyingFactCheck] = useState(false);
   
   const [content, setContent] = useState('');
   const [isOutlineEditorOpen, setIsOutlineEditorOpen] = useState(false);
@@ -207,7 +214,8 @@ export function BookEditor() {
         activeChapter.description,
         prevChapter?.content || null,
         language,
-        book.designTheme
+        book.designTheme,
+        chapters.map(c => ({ title: c.title, description: c.description, level: c.level || 2 }))
       );
       setContent(newContent);
       
@@ -303,6 +311,47 @@ export function BookEditor() {
       toast.error(error.message || t('chat_error') || 'Failed to apply changes');
     } finally {
       setIsApplyingChanges(false);
+    }
+  };
+
+  const handleFactCheck = async () => {
+    if (!activeChapter || !content) return;
+    setIsFactChecking(true);
+    setFactCheckReport(null);
+    setIsFactCheckModalOpen(true);
+    try {
+      const report = await factCheckChapterContent(content, activeChapter.title, book?.title || '', language);
+      setFactCheckReport(report);
+    } catch (error: any) {
+      console.error('Failed to run fact check', error);
+      toast.error(error.message || 'Fact checking failed. Please try again.');
+      setIsFactCheckModalOpen(false);
+    } finally {
+      setIsFactChecking(false);
+    }
+  };
+
+  const handleApplyFactCheckCorrections = async () => {
+    if (!activeChapter || !content || !factCheckReport) return;
+    setIsApplyingFactCheck(true);
+    try {
+      const newContent = await applyFactCheckCorrections(content, factCheckReport, activeChapter.title, language);
+      setContent(newContent);
+      
+      // Auto save
+      const updatedChapter = { ...activeChapter, content: newContent, updatedAt: Date.now() };
+      await db.saveChapter(updatedChapter);
+      setChapters(chapters.map(c => c.id === updatedChapter.id ? updatedChapter : c));
+      setActiveChapterState(updatedChapter);
+      
+      setIsFactCheckModalOpen(false);
+      setFactCheckReport(null);
+      toast.success(language === 'zh' ? '信息事实核对完成，已全量更新并校准至草稿文本中！' : 'Fact-check adjustments corrected successfully!');
+    } catch (error: any) {
+      console.error('Failed to apply factcheck corrections', error);
+      toast.error(error.message || 'Correction application failed.');
+    } finally {
+      setIsApplyingFactCheck(false);
     }
   };
 
@@ -513,20 +562,42 @@ export function BookEditor() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Print Container (Hidden by default, visible in print) */}
         <div id="print-container" className="hidden">
-          <h1 className="text-3xl font-bold mb-4">{book.title}</h1>
-          <p className="text-gray-600 mb-8 italic">{book.summary}</p>
-          {chapters.map((chapter, index) => (
-            <div key={chapter.id} className="mb-8 break-inside-avoid">
-              <h2 className="text-2xl font-bold mb-4">Chapter {index + 1}: {chapter.title}</h2>
-              {chapter.image && (
-                <img src={chapter.image} alt={chapter.title} className="w-full max-w-2xl mx-auto mb-4 rounded-lg" />
-              )}
-              <div className="prose max-w-none">
-                <MarkdownRenderer>{chapter.content || ''}</MarkdownRenderer>
+          <h1 className="text-4xl font-extrabold mb-6 text-center select-all">{book.title}</h1>
+          <p className="text-gray-605 text-lg mb-12 text-center italic">{book.summary}</p>
+          {chapters.map((chapter, index) => {
+            const level = chapter.level || 2;
+            const isPart = level === 1;
+            const isChapter = level === 2;
+            const isSection = level === 3;
+            
+            return (
+              <div key={chapter.id} className={cn(
+                "mb-8 break-inside-avoid select-all",
+                isPart ? "page-break-before mt-16 text-center border-b pb-8" : ""
+              )}>
+                {isPart ? (
+                  <h2 className="text-3xl font-serif font-bold text-emerald-800 dark:text-emerald-450 mb-3">{chapter.title}</h2>
+                ) : isChapter ? (
+                  <h3 className="text-2xl font-serif font-semibold text-zinc-900 mb-3 mt-6">{chapter.title}</h3>
+                ) : (
+                  <h4 className="text-xl font-sans font-medium text-zinc-700 mb-2 mt-4">{chapter.title}</h4>
+                )}
+                
+                {chapter.description && (
+                  <p className="text-xs text-gray-400 mb-4 italic font-sans">{chapter.description}</p>
+                )}
+                
+                {chapter.image && !isPart && (
+                  <img src={chapter.image} alt={chapter.title} className="w-full max-w-xl mx-auto mb-4 rounded-lg shadow-sm" />
+                )}
+                
+                <div className="prose max-w-none font-serif leading-relaxed text-gray-800">
+                  <MarkdownRenderer>{chapter.content || ''}</MarkdownRenderer>
+                </div>
+                {!isPart && <hr className="my-8 border-gray-200" />}
               </div>
-              <hr className="my-8 border-gray-200" />
-            </div>
-          ))}
+            );
+          })}
         </div>
 
       {/* Outline Sidebar - Floating drawer on mobile/tablet for perfect viewport adaptation */}
@@ -583,25 +654,43 @@ export function BookEditor() {
               <ListPlus className="w-4 h-4" />
             </button>
           </div>
-          {chapters.map((chapter) => (
-            <button
-              key={chapter.id}
-              onClick={() => {
-                setActiveView('chapter');
-                setActiveChapter(chapter.id);
-              }}
-              className={cn(
-                "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2",
-                activeView === 'chapter' && activeChapterId === chapter.id
-                  ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-400 font-medium"
-                  : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50"
-              )}
-            >
-              <span className="w-5 text-center text-xs opacity-50">{chapter.order + 1}</span>
-              <span className="truncate flex-1">{chapter.title}</span>
-              {chapter.content && <Check className="w-3 h-3 text-emerald-500" />}
-            </button>
-          ))}
+          {chapters.map((chapter) => {
+            const level = chapter.level || 2;
+            const isPart = level === 1;
+            const isChapter = level === 2;
+            const isSection = level === 3;
+            
+            return (
+              <button
+                key={chapter.id}
+                onClick={() => {
+                  setActiveView('chapter');
+                  setActiveChapter(chapter.id);
+                }}
+                className={cn(
+                  "w-full text-left transition-all flex items-center gap-2.5 rounded-lg select-none",
+                  isPart 
+                    ? "px-3 py-2 bg-gradient-to-r from-emerald-500/5 to-transparent text-emerald-900 dark:text-emerald-300 font-serif font-bold text-[11px] mt-4 mb-1.5 tracking-wide uppercase border-l-2 border-emerald-500"
+                    : isChapter
+                      ? "px-3 py-1.5 pl-6 text-zinc-800 dark:text-zinc-200 font-sans font-semibold text-xs mt-1"
+                      : "px-3 py-1 pl-10 text-zinc-500 dark:text-zinc-400 font-sans text-[11px]",
+                  activeView === 'chapter' && activeChapterId === chapter.id
+                    ? isPart
+                      ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/40 dark:text-emerald-300 border-l-[3px] border-emerald-600"
+                      : "bg-emerald-100/60 text-emerald-950 dark:bg-emerald-900/15 dark:text-emerald-300 font-medium"
+                    : "hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30"
+                )}
+              >
+                {!isPart && (
+                  <span className="w-3 text-left text-[10px] opacity-40 font-mono -ml-0.5">
+                    {level === 2 ? '章' : '•'}
+                  </span>
+                )}
+                <span className="truncate flex-1 font-serif text-left">{chapter.title}</span>
+                {chapter.content && <Check className="w-3 h-3 text-emerald-500 shrink-0" />}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex items-center justify-between p-2 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50">
@@ -684,6 +773,9 @@ export function BookEditor() {
             language={language}
           />
         ) : activeChapter && book ? (
+          (activeChapter.level || 2) < 3 ? (
+            <ChapterDirectoryView chapter={activeChapter} />
+          ) : (
           <TypesetLayoutEditor 
             key={activeChapter.id}
             chapter={activeChapter}
@@ -701,9 +793,12 @@ export function BookEditor() {
             onGenerateContent={handleGenerateContent}
             onGenerateImageOfPrompt={handleGenerateImageOfPrompt}
             onProofreadText={handleProofread}
+            onFactCheck={handleFactCheck}
+            isFactChecking={isFactChecking}
             bookTitle={book.title}
             language={language}
           />
+          )
         ) : (
           <div className="flex-1 flex items-center justify-center text-zinc-400 dark:text-zinc-650 bg-zinc-50 dark:bg-zinc-950">
             <div className="text-center space-y-3 font-serif">
@@ -834,6 +929,139 @@ export function BookEditor() {
                   <>
                     <Check className="w-4 h-4" />
                     {t('accept_changes')}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isSettingsOpen && (
+        <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      )}
+
+      {/* Fact-Check Information Verification Dialog Modal */}
+      {isFactCheckModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-zinc-200 dark:border-zinc-800 text-left animate-scale-up">
+            
+            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950/45 select-none">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 flex items-center justify-center">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold font-serif text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    {language === 'zh' ? '信息事实核对与常识校对' : 'Fact Check & Verification'}
+                  </h2>
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{activeChapter?.title}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsFactCheckModalOpen(false)}
+                className="text-zinc-400 hover:text-zinc-650 dark:hover:text-zinc-300 transition-colors p-2"
+                disabled={isApplyingFactCheck || isFactChecking}
+              >
+                {t('close')}
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              {isFactChecking ? (
+                <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                  <div className="relative">
+                    <Loader2 className="w-10 h-10 animate-spin text-emerald-500" />
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px]">🔍</span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-450 font-medium animate-pulse">
+                    {language === 'zh' ? '正在逐一校对文内年代、人物、公式与逻辑链（将联网搜索核实）...' : 'Running historical, scientific & logic checks (grounded on web search)...'}
+                  </p>
+                </div>
+              ) : factCheckReport ? (
+                <>
+                  <div className="bg-emerald-50/50 dark:bg-emerald-950/15 border border-emerald-500/15 p-4 rounded-xl leading-relaxed text-xs text-emerald-850 dark:text-emerald-300 font-serif">
+                    <span className="font-semibold block mb-1 text-emerald-900 dark:text-emerald-250">
+                      {language === 'zh' ? '💡 事实核对审计官总批：' : 'Fact-Check Executive Verdict:'}
+                    </span>
+                    {factCheckReport.overallVerdict}
+                  </div>
+
+                  <div>
+                    <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest mb-3 select-none">
+                      {language === 'zh' ? '🔍 展开细节校核报告' : 'Factual Claims Verified'}
+                    </h3>
+                    <ul className="space-y-3">
+                      {factCheckReport.items && factCheckReport.items.map((item, index) => {
+                        const isVerified = item.status === 'verified';
+                        const isWarning = item.status === 'warning';
+                        
+                        return (
+                          <li key={index} className="border border-zinc-150 dark:border-zinc-800 p-4 rounded-xl shadow-xs bg-zinc-50/30 dark:bg-zinc-950/30">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <span className={cn(
+                                "px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wide flex items-center gap-1",
+                                isVerified 
+                                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/10" 
+                                  : isWarning 
+                                    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/10" 
+                                    : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/10"
+                              )}>
+                                {isVerified ? '✓ Verified / 事实吻合' : isWarning ? '⚠ Warn / 需要指正' : '● Safe / 常识合理'}
+                              </span>
+                              
+                              <p className="font-semibold text-xs font-serif text-zinc-850 dark:text-zinc-250">
+                                {item.claim}
+                              </p>
+                            </div>
+                            
+                            <p className="text-xs text-zinc-600 dark:text-zinc-400 leading-relaxed font-sans mt-1.5 pl-1 pl-1">
+                              {item.verdict}
+                            </p>
+
+                            {item.sourceSuggestion && (
+                              <div className="mt-3 bg-white dark:bg-zinc-900 p-2.5 rounded-lg border border-dashed border-zinc-200 dark:border-zinc-800 text-xs text-zinc-500 dark:text-zinc-400 font-mono flex items-start gap-1">
+                                <span className="text-emerald-500 font-bold shrink-0">💡 {language === 'zh' ? '推荐修订：' : 'Suggested revision:'}</span>
+                                <span className="italic">{item.sourceSuggestion}</span>
+                              </div>
+                            )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                </>
+              ) : (
+                <div className="py-12 text-center text-zinc-400">
+                  <ShieldAlert className="w-12 h-12 text-zinc-350 mx-auto mb-2 animate-pulse" />
+                  <p>{language === 'zh' ? '暂无校对报告数据' : 'No audit reports generated'}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 flex justify-end gap-3 select-none">
+              <button
+                onClick={() => setIsFactCheckModalOpen(false)}
+                className="px-5 py-2.5 text-xs font-semibold text-zinc-600 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors"
+                disabled={isApplyingFactCheck || isFactChecking}
+              >
+                {language === 'zh' ? '保持原样' : 'Keep As Is'}
+              </button>
+              
+              <button
+                onClick={handleApplyFactCheckCorrections}
+                disabled={isApplyingFactCheck || isFactChecking || !factCheckReport || !factCheckReport.items?.some(i => i.status === 'warning')}
+                className="flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:hover:bg-emerald-600 shadow-md shadow-emerald-500/10 hover:shadow-emerald-500/20"
+              >
+                {isApplyingFactCheck ? (
+                  <>
+                    <Loader2 className="w-3 animate-spin" />
+                    {language === 'zh' ? '正在智能改写中...' : 'Applying corrections...'}
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    {language === 'zh' ? '一键修正并融入草稿' : 'One-click Correct Checked Claims'}
                   </>
                 )}
               </button>

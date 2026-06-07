@@ -76,6 +76,8 @@ interface ChapterChatProps {
   isGeneratingContent?: boolean;
   onProofreadText?: () => void;
   isProofreading?: boolean;
+  onFactCheck?: () => void;
+  isFactChecking?: boolean;
   onGenerateImageOfPrompt?: (prompt: string) => Promise<string | null>;
   onAddImageToLayout?: (url: string) => void;
 }
@@ -91,6 +93,8 @@ export function ChapterChat({
   isGeneratingContent,
   onProofreadText,
   isProofreading,
+  onFactCheck,
+  isFactChecking = false,
   onGenerateImageOfPrompt,
   onAddImageToLayout
 }: ChapterChatProps) {
@@ -279,6 +283,16 @@ export function ChapterChat({
             >
               {isProofreading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
               {language === 'zh' ? '润色文本' : 'Proofread'}
+            </button>
+          )}
+          {onFactCheck && (
+            <button
+              onClick={onFactCheck}
+              disabled={isFactChecking || isLoading || !content}
+              className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 bg-emerald-500/5 hover:bg-emerald-500/10 active:bg-emerald-500/15 text-emerald-650 dark:text-emerald-450 rounded-lg text-[10px] font-bold transition-all border border-emerald-500/15 whitespace-nowrap disabled:opacity-50"
+            >
+              {isFactChecking ? <Loader2 className="w-3 h-3 animate-spin" /> : <span>🛡️</span>}
+              {language === 'zh' ? '信息核对' : 'Fact Check'}
             </button>
           )}
           {onGenerateImageOfPrompt && onAddImageToLayout && (

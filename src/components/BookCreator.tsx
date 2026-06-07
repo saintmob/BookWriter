@@ -59,6 +59,7 @@ export function BookCreator() {
           order: i,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          level: outline.chapters[i].level || 2,
         });
       }
 

@@ -61,7 +61,8 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
       // Prepare simplified chapter list for AI
       const simplifiedChapters = chapters.map(c => ({
         title: c.title,
-        description: c.description
+        description: c.description,
+        level: c.level || 2
       }));
 
       const response = await updateOutlineWithAI(
@@ -86,7 +87,8 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
             image: existing ? existing.image : undefined,
             order: index,
             createdAt: existing ? existing.createdAt : Date.now(),
-            updatedAt: Date.now()
+            updatedAt: Date.now(),
+            level: item.level || existing?.level || 2
           };
         });
 
@@ -147,23 +149,50 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
             </div>
             
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {chapters.map((chapter, index) => (
-                <div key={chapter.id || index} className="bg-white dark:bg-zinc-800 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-zinc-100 dark:bg-zinc-700 rounded-full text-xs font-medium text-zinc-600 dark:text-zinc-300 mt-0.5">
-                      {index + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate" title={chapter.title}>
-                        {chapter.title}
-                      </h4>
-                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 line-clamp-2">
-                        {chapter.description}
-                      </p>
+              {chapters.map((chapter, index) => {
+                const level = chapter.level || 2;
+                const isPart = level === 1;
+                const isChapter = level === 2;
+                const isSection = level === 3;
+
+                return (
+                  <div 
+                    key={chapter.id || index} 
+                    className={cn(
+                      "p-3 rounded-lg border shadow-xs transition-transform duration-150 text-left",
+                      isPart 
+                        ? "bg-emerald-500/5 border-emerald-500/20 dark:border-emerald-500/20" 
+                        : isChapter 
+                          ? "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 ml-4 lg:ml-5" 
+                          : "bg-zinc-50/50 dark:bg-zinc-850 border-zinc-150 dark:border-zinc-800/80 ml-8 lg:ml-10"
+                    )}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <span className={cn(
+                        "flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full text-[10px] font-bold mt-0.5",
+                        isPart 
+                          ? "bg-emerald-600 text-white font-serif" 
+                          : isChapter 
+                            ? "bg-zinc-100 dark:bg-zinc-700 text-zinc-650 dark:text-zinc-350"
+                            : "bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-400"
+                      )}>
+                        {isPart ? '篇' : isChapter ? '章' : '节'}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h4 className={cn(
+                          "text-sm font-medium text-zinc-900 dark:text-zinc-100 truncate",
+                          isPart ? "font-serif text-emerald-800 dark:text-emerald-400 font-bold" : ""
+                        )} title={chapter.title}>
+                          {chapter.title}
+                        </h4>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-450 mt-1 line-clamp-2">
+                          {chapter.description}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex justify-between items-center">

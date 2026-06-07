@@ -30,7 +30,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
-  PanelRightOpen
+  PanelRightOpen,
+  ShieldCheck
 } from 'lucide-react';
 import { Book, Chapter, FloatingImage, PageLayout, TrimFormat, db } from '../lib/db';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -51,9 +52,11 @@ interface TypesetLayoutEditorProps {
   isGeneratingContent?: boolean;
   isGeneratingImage?: boolean;
   isProofreading?: boolean;
+  isFactChecking?: boolean;
   onGenerateContent?: () => Promise<void>;
   onGenerateImageOfPrompt?: (prompt: string) => Promise<string | null>;
   onProofreadText?: () => void;
+  onFactCheck?: () => void;
   bookTitle?: string;
   language?: string;
 }
@@ -72,13 +75,13 @@ const DEFAULT_LAYOUT: PageLayout = {
   marginBottom: 48,
   marginLeft: 48,
   marginRight: 48,
-  format: 'a4',
+  format: 'trade',
   fontSize: 16,
   lineHeight: 1.6,
   columns: 1,
   paperStyle: 'warm',
   justifyText: true,
-  firstLineIndent: 0,
+  firstLineIndent: 2,
   paragraphSpacing: 16,
   fontFamily: 'serif',
   dropCaps: false,
@@ -97,9 +100,11 @@ export function TypesetLayoutEditor({
   isGeneratingContent = false,
   isGeneratingImage = false,
   isProofreading = false,
+  isFactChecking = false,
   onGenerateContent,
   onGenerateImageOfPrompt,
   onProofreadText,
+  onFactCheck,
   bookTitle = '',
   language = 'en',
 }: TypesetLayoutEditorProps) {
@@ -445,9 +450,30 @@ export function TypesetLayoutEditor({
                 <span className="font-serif font-medium text-zinc-700 dark:text-zinc-300 truncate mr-2" title={currentLanguage === 'zh' ? '故事原稿草稿' : 'Story Workspace'}>
                   {currentLanguage === 'zh' ? '📝 故事原稿' : '📝 Story Source'}
                 </span>
-                <span className="font-mono bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 p-1 text-[10px] rounded shrink-0 whitespace-nowrap">
-                  {paragraphCount} Blks • {wordCount} Chars
-                </span>
+                
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={onGenerateContent}
+                    disabled={isGeneratingContent}
+                    className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 dark:hover:bg-emerald-900/60 rounded transition-colors disabled:opacity-50 font-semibold"
+                  >
+                    {isGeneratingContent ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                    <span>{currentLanguage === 'zh' ? '全新生成此节' : 'Generate'}</span>
+                  </button>
+                  {onFactCheck && (
+                     <button
+                       onClick={onFactCheck}
+                       disabled={isFactChecking}
+                       className="flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 dark:hover:bg-amber-900/60 rounded transition-colors disabled:opacity-50 font-semibold"
+                     >
+                       {isFactChecking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                       <span>{currentLanguage === 'zh' ? '事实核查' : 'Fact Check'}</span>
+                     </button>
+                  )}
+                  <span className="font-mono bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 p-1 px-2 text-[10px] rounded shrink-0 whitespace-nowrap hidden sm:inline-block">
+                    {paragraphCount} Blks • {wordCount} Chars
+                  </span>
+                </div>
               </div>
 
               {/* Textarea container */}
@@ -1867,6 +1893,8 @@ export function TypesetLayoutEditor({
                 isGeneratingContent={isGeneratingContent}
                 onProofreadText={onProofreadText}
                 isProofreading={isProofreading}
+                onFactCheck={onFactCheck}
+                isFactChecking={isFactChecking}
                 onGenerateImageOfPrompt={onGenerateImageOfPrompt}
                 onAddImageToLayout={(url) => {
                    const imgId = insertNewFloatingImage(url);

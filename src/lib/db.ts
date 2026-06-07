@@ -95,6 +95,7 @@ export interface Chapter {
   updatedAt: number;
   layout?: PageLayout;
   floatingImages?: FloatingImage[];
+  level?: number; // 1 = Part/Volume, 2 = Chapter, 3 = Section/Subsection
 }
 
 export interface ChatMessage {
