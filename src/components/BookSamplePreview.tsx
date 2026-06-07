@@ -5,6 +5,8 @@ import { X, ChevronLeft, ChevronRight, Printer, BookOpen, Minus, Plus, Maximize,
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { PagedjsPreview } from './PagedjsPreview';
 import { cn } from '../lib/utils';
+import { TOCPreview } from '../catalogue/TOCPreview';
+import { INITIAL_DESIGN_CONFIG } from '../catalogue/presets';
 
 interface BookSamplePreviewProps {
   isOpen: boolean;
@@ -37,6 +39,48 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
     square: { width: 864, height: 864 },
   };
   const formatData = FORMATS[baseLayout.format || 'a4'] || FORMATS.a4;
+
+  const [catalogueChapters, setCatalogueChapters] = useState<any[]>([]);
+
+  useEffect(() => {
+    const result: any[] = [];
+    let currentChapter: any = null;
+    let pageCounter = 12;
+
+    chapters.forEach((ch) => {
+      // In Pagedjs printing, we don't have accurate real page numbers until the very end,
+      // Pagedjs injects actual page numbers via CSS cross-references.
+      // But for visual preview matching the editor, we use mock numbers for now 
+      // or we can use Pagedjs target-counter via CSS if we convert it to anchors.
+      // For simplicity, we use the same mocked page logic as the editor.
+      if (ch.level === 1 || ch.level === 2) {
+        currentChapter = {
+          id: ch.id,
+          title: ch.title,
+          description: ch.description,
+          page: String(pageCounter),
+          sections: [],
+          imageSeed: result.length + 1
+        };
+        pageCounter += 10;
+        result.push(currentChapter);
+      } else if (ch.level === 3 && currentChapter) {
+        currentChapter.sections.push({
+          id: ch.id,
+          title: ch.title,
+          page: String(pageCounter + 2)
+        });
+        pageCounter += 5;
+      }
+    });
+
+    if (result.length === 0) {
+       result.push({
+          id: '1', title: 'No chapters yet', page: '1', sections: [], imageSeed: 1
+       })
+    }
+    setCatalogueChapters(result);
+  }, [chapters]);
 
   // Constants for Book Layout
   const SINGLE_PAGE_WIDTH = formatData.width;
@@ -541,6 +585,14 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                           <p className="text-lg italic opacity-80 max-w-xs mx-auto leading-relaxed !text-indent-0 !text-center">{book.summary}</p>
                        </div>
 
+                       <TOCPreview 
+                         bookInfo={{ title: book.title, subtitle: book.designTheme?.typography?.headingFont || 'Catalogue', author: book.coverAuthor || 'Author' }}
+                         chapters={catalogueChapters}
+                         config={book.catalogueConfig?.designConfig || INITIAL_DESIGN_CONFIG}
+                         selectedLayout={book.catalogueConfig?.selectedLayout || 'classic'}
+                         printMode={true}
+                       />
+
                        {chapters.map((chapter, idx) => (
                          <div key={chapter.id} className="chapter-start break-before-column" style={{ breakBefore: 'column' }} data-chapter-id={chapter.id} data-chapter-index={idx}>
                            {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
@@ -620,6 +672,14 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
            <div style={{ width: '3rem', height: '0.25rem', background: 'currentColor', opacity: 0.2, margin: '0 auto 2rem auto' }}></div>
            <p style={{ fontSize: '1.25rem', fontStyle: 'italic', opacity: 0.8, maxWidth: '20rem', margin: '0 auto' }}>{book.summary}</p>
         </div>
+
+        <TOCPreview 
+          bookInfo={{ title: book.title, subtitle: book.designTheme?.typography?.headingFont || 'Catalogue', author: book.coverAuthor || 'Author' }}
+          chapters={catalogueChapters}
+          config={book.catalogueConfig?.designConfig || INITIAL_DESIGN_CONFIG}
+          selectedLayout={book.catalogueConfig?.selectedLayout || 'classic'}
+          printMode={true}
+        />
 
         {chapters.map((chapter, idx) => (
           <div key={chapter.id} className="chapter-start" data-chapter-id={chapter.id} data-chapter-index={idx}>

@@ -1,0 +1,953 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useEffect, useRef, useState, useImperativeHandle, forwardRef } from 'react';
+import { BookInfo, ChapterItem, DesignConfig, FontFamily, ThemePreset } from './types';
+import { THEME_PALETTES, FONT_OPTIONS } from './presets';
+
+interface TOCPreviewProps {
+  bookInfo: BookInfo;
+  chapters: ChapterItem[];
+  config: DesignConfig;
+  selectedLayout: string;
+}
+
+export interface TOCPreviewHandle {
+  getCaptureElement: () => HTMLDivElement | null;
+}
+
+// Helper to convert chapter index to Chinese/Classical numeral prefix
+export function getChapterPrefix(index: number, style: string): string {
+  const chineseNums = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
+  const chineseTrad = ['壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖', '拾', '拾壹', '拾贰'];
+
+  switch (style) {
+    case 'NUM_01':
+      return String(index + 1).padStart(2, '0');
+    case 'CHAP_01':
+      return `Chapter ${String(index + 1).padStart(2, '0')}`;
+    case 'CHINESE_01':
+      return `第${chineseNums[index] || (index + 1)}章`;
+    case 'CHINESE_TRAD':
+      return `第${chineseTrad[index] || (index + 1)}章`;
+    case 'NONE':
+    default:
+      return '';
+  }
+}
+
+// Helper to format page numbers
+export function formatPageNumber(page: string, style: string, prefix: string): string {
+  if (!page) return '';
+  switch (style) {
+    case 'NUM_ONLY':
+      return page;
+    case 'CHAPTER_NUM':
+      return prefix ? `${prefix} — ${page}` : page;
+    case 'DOTS':
+      return `· ${page} ·`;
+    case 'RIGHT_VERTICAL':
+      return page;
+    case 'HIDDEN':
+    default:
+      return '';
+  }
+}
+
+// Helper to get abstract geometric gradient background based on chapter seed
+function getSeedGradient(seed: number): string {
+  const gradients = [
+    'linear-gradient(135deg, #1d22d3 0%, #ff5400 100%)', // Klein Blue to neon orange
+    'linear-gradient(135deg, #4a3728 0%, #cc9c4c 100%)', // Tobacco to Luxe gold
+    'linear-gradient(135deg, #0f172a 0%, #38bdf8 100%)', // Slate dark to ocean blue
+    'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)', // Rose to violet
+    'linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)', // Coral pink
+    'linear-gradient(135deg, #059669 0%, #34d399 100%)', // Emerald forest
+    'linear-gradient(135deg, #1e293b 0%, #475569 100%)'  // Brutalist grey
+  ];
+  return gradients[(seed - 1) % gradients.length] || gradients[0];
+}
+
+// Helper to get abstract decorative shape styles
+function getDecorativeShape(seed: number) {
+  const shapes = [
+    <div className="absolute inset-0 flex items-center justify-center opacity-15"><div className="w-20 h-20 rounded-full border border-current animate-spin-slow" /></div>,
+    <div className="absolute inset-0 flex items-center justify-center opacity-15"><div className="w-16 h-16 rotate-45 border border-current" /></div>,
+    <div className="absolute inset-0 flex items-center justify-center opacity-15"><div className="w-20 h-8 border border-current" /></div>,
+    <div className="absolute inset-0 flex items-center justify-center opacity-15"><div className="w-16 h-16 rounded-full border-t-2 border-r-2 border-current" /></div>
+  ];
+  return shapes[(seed - 1) % shapes.length] || shapes[0];
+}
+
+export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
+  ({ bookInfo, chapters, config, selectedLayout }, ref) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const paperRef = useRef<HTMLDivElement>(null);
+    const [scale, setScale] = useState(1);
+    const [containerSize, setContainerSize] = useState({ width: 600, height: 700 });
+
+    // Determine color variables based on selected theme
+    const themeColors = THEME_PALETTES[config.themePreset] || THEME_PALETTES.CREAM_PAPER;
+    const isCustom = config.themePreset === 'CUSTOM';
+    const primaryColor = isCustom ? config.customPrimaryColor : themeColors.primary;
+    const secondaryColor = isCustom ? `${config.customPrimaryColor}99` : themeColors.secondary;
+    const accentColor = isCustom ? config.customPrimaryColor : themeColors.accent;
+    const bgColor = isCustom ? config.customBgColor : themeColors.bg;
+    const textMainColor = isCustom ? config.customPrimaryColor : themeColors.text;
+
+    // Define pixel equivalents in 96 DPI for target layout dimension in standard rendering
+    // 1mm = 3.779527559px; We choose a crisp baseline scale (e.g. 1mm = 3.2px or 4px for screen view)
+    const MM_TO_PX = 3.5;
+    let targetWidthMm = 210; // A4 default
+    let targetHeightMm = 297;
+
+    if (config.pageSize === 'A4_PORTRAIT') {
+      targetWidthMm = 210;
+      targetHeightMm = 297;
+    } else if (config.pageSize === 'A5_PORTRAIT') {
+      targetWidthMm = 148;
+      targetHeightMm = 210;
+    } else if (config.pageSize === 'SQUARE') {
+      targetWidthMm = 210;
+      targetHeightMm = 210;
+    } else {
+      targetWidthMm = config.customWidth || 170;
+      targetHeightMm = config.customHeight || 240;
+    }
+
+    const paperPxWidth = Math.round(targetWidthMm * MM_TO_PX);
+    const paperPxHeight = Math.round(targetHeightMm * MM_TO_PX);
+
+    // Dynamic resize handler: scale down custom paper block to perfectly fit parent preview container
+    useEffect(() => {
+      const resizeObserver = new ResizeObserver((entries) => {
+        if (!entries || entries.length === 0) return;
+        const { width, height } = entries[0].contentRect;
+        setContainerSize({ width: width || 600, height: height || 700 });
+      });
+
+      if (containerRef.current) {
+        resizeObserver.observe(containerRef.current);
+      }
+
+      return () => resizeObserver.disconnect();
+    }, []);
+
+    useEffect(() => {
+      // Calculate optimized scale factor
+      const horizontalScale = (containerSize.width - 40) / paperPxWidth;
+      const verticalScale = (containerSize.height - 40) / paperPxHeight;
+      const bestScale = Math.min(horizontalScale, verticalScale, 1.2); // cap scale at 1.2
+      setScale(bestScale);
+    }, [containerSize, paperPxWidth, paperPxHeight]);
+
+    // Expose the raw paper node for capture tool
+    useImperativeHandle(ref, () => ({
+      getCaptureElement: () => paperRef.current
+    }));
+
+    // Font family CSS class assignment
+    const getFontClass = (f: FontFamily): string => {
+      switch (f) {
+        case 'SERIF': return 'font-serif';
+        case 'SANS': return 'font-sans';
+        case 'DISPLAY': return 'font-display';
+        case 'MONO': return 'font-mono';
+        default: return 'font-serif';
+      }
+    };
+
+    const fontClass = getFontClass(config.fontFamily);
+
+    // Padding & density spacers mapping
+    const getPaddingClass = (paddingMm: number) => {
+      return { padding: `${paddingMm * MM_TO_PX}px` };
+    };
+
+    const getChapterGap = (density: string) => {
+      switch (density) {
+        case 'LOOSE': return 'space-y-8';
+        case 'COMPACT': return 'space-y-3';
+        case 'STANDARD':
+        default: return 'space-y-5';
+      }
+    };
+
+    const getSectionGap = (density: string) => {
+      switch (density) {
+        case 'LOOSE': return 'space-y-2 mt-2 ml-4';
+        case 'COMPACT': return 'space-y-0.5 mt-0.5 ml-2';
+        case 'STANDARD':
+        default: return 'space-y-1 mt-1 ml-3';
+      }
+    };
+
+    // Styling configurations passed dynamically as inline styles to bypass Tailwind static color restrictions
+    const designStyle = {
+      color: textMainColor,
+      fontFamily: fontClass,
+      '--paper-bg': bgColor,
+      backgroundColor: bgColor,
+      width: `${paperPxWidth}px`,
+      height: `${paperPxHeight}px`
+    } as React.CSSProperties;
+
+    // Inside the page styling, let's render margins guide if showMargins is true
+    const marginGuideStyle: React.CSSProperties = {
+      position: 'absolute',
+      left: `${config.pagePadding * MM_TO_PX}px`,
+      right: `${config.pagePadding * MM_TO_PX}px`,
+      top: `${config.pagePadding * MM_TO_PX}px`,
+      bottom: `${config.pagePadding * MM_TO_PX}px`,
+      border: config.showMargins ? '1px dashed rgba(162, 115, 68, 0.2)' : 'none',
+      pointerEvents: 'none',
+      zIndex: 40
+    };
+
+    // -----------------------------------------------------------------
+    // LAYOUT 1: CLASSIC (经典书籍目录)
+    // -----------------------------------------------------------------
+    const renderClassicLayout = () => {
+      const charGap = getChapterGap(config.density);
+      const secGap = getSectionGap(config.density);
+
+      return (
+        <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
+          <div>
+            {/* Header section with book info */}
+            <div className="flex justify-between items-baseline border-b border-stone-200 pb-3 mb-8">
+              <span className="text-xs uppercase tracking-widest font-sans opacity-60 truncate max-w-[65%]">
+                {bookInfo.title}
+              </span>
+              <span className="text-xs font-serif italic opacity-60">CONTENTS</span>
+            </div>
+
+            {/* Document Header Title */}
+            <div className="text-center mb-12">
+              <h1 className="text-3xl font-semibold tracking-wide font-serif mb-2">目录</h1>
+              <p className="text-xs uppercase tracking-widest text-stone-400 font-mono">Table of Contents</p>
+              <div className="w-12 h-[1px] bg-stone-300 mx-auto mt-4" style={{ backgroundColor: primaryColor }} />
+            </div>
+
+            {/* Core Chapters */}
+            <div className={`${charGap}`}>
+              {chapters.map((ch, idx) => {
+                const prefix = getChapterPrefix(idx, config.prefixStyle);
+                const showPrefix = config.prefixStyle !== 'NONE';
+                const formattedPage = formatPageNumber(ch.page, config.numberStyle, prefix);
+
+                return (
+                  <div key={ch.id} className="group">
+                    {/* Chapter Title Row */}
+                    <div className="flex items-end justify-between text-sm md:text-base font-semibold">
+                      <div className="flex items-baseline max-w-[85%]">
+                        {showPrefix && (
+                          <span className="mr-3 font-mono text-xs tracking-wider uppercase opacity-80" style={{ color: accentColor }}>
+                            {prefix}
+                          </span>
+                        )}
+                        <span className="hover:opacity-85 duration-150 truncate">{ch.title}</span>
+                      </div>
+                      
+                      {/* Dotted Leader Line */}
+                      {config.numberStyle !== 'HIDDEN' && (
+                        <div className="flex-1 mx-3 border-b border-dotted mb-1 opacity-40 group-hover:opacity-100 duration-150" style={{ borderColor: primaryColor }} />
+                      )}
+
+                      {config.numberStyle !== 'HIDDEN' && (
+                        <span className="font-mono text-sm font-medium pr-1" style={{ color: accentColor }}>
+                          {formattedPage}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Optional chapter description */}
+                    {ch.description && config.density !== 'COMPACT' && (
+                      <p className="text-[11px] leading-relaxed italic text-stone-400 mt-1 max-w-[80%] pl-8">
+                        {ch.description}
+                      </p>
+                    )}
+
+                    {/* Indented Sections */}
+                    {ch.sections.length > 0 && (
+                      <div className={`${secGap} pl-8`}>
+                        {ch.sections.map((sec) => (
+                          <div key={sec.id} className="flex items-baseline justify-between text-xs opacity-75 hover:opacity-100 duration-100">
+                            <span className="text-stone-600 truncate max-w-[80%] before:content-['—'] before:mr-2 before:opacity-30">
+                              {sec.title}
+                            </span>
+                            {config.numberStyle !== 'HIDDEN' && (
+                              <span className="font-mono text-xs text-stone-400 pl-2">
+                                {sec.page}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Footer of Classic Layout */}
+          <div className="flex justify-between items-center text-[10px] font-mono text-stone-400 border-t border-stone-100 pt-4 mt-8">
+            <span>{bookInfo.author}</span>
+            <span>INDEX 01</span>
+          </div>
+        </div>
+      );
+    };
+
+
+    // -----------------------------------------------------------------
+    // LAYOUT 2: MODERN MINIMAL (现代极简目录)
+    // -----------------------------------------------------------------
+    const renderMinimalLayout = () => {
+      const charGap = getChapterGap(config.density);
+      const secGap = getSectionGap(config.density);
+
+      return (
+        <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
+          <div>
+            {/* Header: Clean thin title */}
+            <div className="mb-14">
+              <span className="text-[10px] uppercase tracking-widest font-mono opacity-40 block mb-2">Book Index</span>
+              <h1 className="text-xl tracking-tight font-light opacity-80" style={{ color: secondaryColor }}>
+                {bookInfo.title}
+              </h1>
+            </div>
+
+            {/* Huge Contents Indicator */}
+            <div className="mb-12">
+              <span className="text-6xl font-light tracking-tighter opacity-10 block pr-8 -ml-1">
+                CONTENTS
+              </span>
+            </div>
+
+            {/* Content List */}
+            <div className={`${charGap} border-l border-stone-100 pl-4`} style={{ borderColor: `${primaryColor}15` }}>
+              {chapters.map((ch, idx) => {
+                const prefix = getChapterPrefix(idx, config.prefixStyle);
+                const showPrefix = config.prefixStyle !== 'NONE';
+
+                return (
+                  <div key={ch.id} className="relative">
+                    {/* Floating mini page marker */}
+                    {config.numberStyle !== 'HIDDEN' && (
+                      <span className="absolute -left-12 top-0.5 text-xs font-mono tracking-widest opacity-60 text-right w-6" style={{ color: accentColor }}>
+                        {ch.page}
+                      </span>
+                    )}
+
+                    <div>
+                      <h4 className="font-medium text-sm tracking-wide">
+                        {showPrefix && (
+                          <span className="mr-3 text-xs opacity-40 font-mono font-light">
+                            {prefix}
+                          </span>
+                        )}
+                        <span className="opacity-90">{ch.title}</span>
+                      </h4>
+
+                      {ch.description && config.density === 'LOOSE' && (
+                        <p className="text-[10px] leading-relaxed text-stone-400 mt-1 max-w-[85%] font-light">
+                          {ch.description}
+                        </p>
+                      )}
+
+                      {/* Sections: Flat minimalist display */}
+                      {ch.sections.length > 0 && (
+                        <div className={`${secGap} text-[11px] text-stone-500`}>
+                          {ch.sections.map((sec) => (
+                            <span key={sec.id} className="inline-block mr-4 opacity-75 hover:opacity-100">
+                              <span className="font-mono text-[9px] mr-1 text-stone-400">{sec.page}</span>
+                              {sec.title}
+                              <span className="ml-3 opacity-30 select-none">/</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="text-[9px] font-mono text-stone-300 flex justify-between">
+            <span>{bookInfo.subtitle}</span>
+            <span>© {new Date().getFullYear()}</span>
+          </div>
+        </div>
+      );
+    };
+
+
+    // -----------------------------------------------------------------
+    // LAYOUT 3: MAGAZINE (杂志感目录)
+    // -----------------------------------------------------------------
+    const renderMagazineLayout = () => {
+      // Divided into elegant split grids or columns
+      return (
+        <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
+          <div>
+            {/* Rich Magazine Banner */}
+            <div className="grid grid-cols-3 gap-4 border-b-2 border-current pb-4 mb-8">
+              <div className="col-span-2">
+                <p className="text-[10px] font-mono tracking-wider uppercase opacity-65">EDITORIAL PORTFOLIO</p>
+                <h1 className="text-3xl font-black uppercase tracking-tighter mt-1">
+                  CONTENTS
+                </h1>
+              </div>
+              <div className="text-right flex flex-col justify-end">
+                <span className="text-xs uppercase font-extrabold px-3 py-1 text-white inline-block self-end" style={{ backgroundColor: accentColor }}>
+                  ISSUE #04
+                </span>
+                <span className="text-[9px] font-mono opacity-50 mt-1">VOL. 26</span>
+              </div>
+            </div>
+
+            {/* Featured Article Layout Block */}
+            <div className="grid grid-cols-12 gap-6">
+              {/* Left Column: List of items */}
+              <div className="col-span-12 space-y-6">
+                {chapters.map((ch, idx) => {
+                  const prefix = getChapterPrefix(idx, config.prefixStyle);
+                  const showPrefix = config.prefixStyle !== 'NONE';
+
+                  return (
+                    <div key={ch.id} className="grid grid-cols-12 gap-2 border-b border-stone-100 pb-4 group">
+                      {/* Big Bold Numeral Column */}
+                      <div className="col-span-2 flex flex-col justify-start">
+                        {config.numberStyle !== 'HIDDEN' && (
+                          <span className="text-3xl font-black font-mono leading-none group-hover:scale-110 duration-250 tracking-tighter" style={{ color: accentColor }}>
+                            {ch.page}
+                          </span>
+                        )}
+                        {showPrefix && (
+                          <span className="text-[9px] font-mono uppercase opacity-40 tracking-wider mt-1 block">
+                            {prefix}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Content Info Column */}
+                      <div className="col-span-10">
+                        <h3 className="text-sm font-bold tracking-tight uppercase leading-snug group-hover:opacity-85 duration-100">
+                          {ch.title}
+                        </h3>
+                        {ch.subtitle && (
+                          <p className="text-[10px] italic text-stone-400 tracking-wide mt-0.5">
+                            {ch.subtitle}
+                          </p>
+                        )}
+                        {ch.description && config.density !== 'COMPACT' && (
+                          <p className="text-[11px] leading-relaxed text-stone-500 mt-1 mb-2 font-serif opacity-95">
+                            {ch.description}
+                          </p>
+                        )}
+
+                        {/* Sections row with colored dot */}
+                        {ch.sections.length > 0 && (
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                            {ch.sections.map((sec) => (
+                              <div key={sec.id} className="text-[10px] bg-stone-50 px-2 py-0.5 rounded flex items-center gap-1.5 opacity-80 hover:opacity-100 border border-stone-100">
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
+                                <span className="font-mono text-stone-400">{sec.page}</span>
+                                <span className="text-stone-600 font-medium">{sec.title}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center text-[10px] font-mono border-t pt-3 border-stone-300 opacity-60">
+            <span>{bookInfo.title}</span>
+            <span>PAGE 03</span>
+          </div>
+        </div>
+      );
+    };
+
+
+    // -----------------------------------------------------------------
+    // LAYOUT 4: POSTER (海报错位目录)
+    // -----------------------------------------------------------------
+    const renderPosterLayout = () => {
+      return (
+        <div className="h-full flex flex-col justify-between relative overflow-hidden" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
+          {/* Rotated structural background giant word */}
+          <div className="absolute -left-10 top-20 text-[100px] font-black tracking-widest text-stone-100 select-none rotate-90 origin-top-left pointer-events-none uppercase opacity-[0.06]" style={{ color: `${accentColor}10` }}>
+            INDEX
+          </div>
+
+          <div>
+            {/* Header with visual weight */}
+            <div className="mb-14 relative z-10">
+              <div className="w-10 h-1.5 mb-3" style={{ backgroundColor: accentColor }} />
+              <h1 className="text-4xl font-extrabold tracking-tight font-display mb-1">
+                {bookInfo.title}
+              </h1>
+              <p className="text-xs uppercase tracking-widest font-mono opacity-50 mt-1">
+                {bookInfo.subtitle}
+              </p>
+            </div>
+
+            {/* Poster Alternating Chapters */}
+            <div className="space-y-6 relative z-10">
+              {chapters.map((ch, idx) => {
+                const prefix = getChapterPrefix(idx, config.prefixStyle);
+                const isEven = idx % 2 === 1;
+
+                return (
+                  <div
+                    key={ch.id}
+                    className={`flex ${isEven ? 'justify-end' : 'justify-start'} group duration-200`}
+                  >
+                    <div className="w-[85%] border-t border-current pt-2" style={{ color: primaryColor }}>
+                      <div className="flex justify-between items-baseline mb-1">
+                        <span className="text-stone-400 font-mono text-[10px] tracking-widest uppercase">
+                          {prefix || `INDEX ${idx + 1}`}
+                        </span>
+                        {config.numberStyle !== 'HIDDEN' && (
+                          <span className="text-lg font-black font-mono" style={{ color: accentColor }}>
+                            {ch.page}
+                          </span>
+                        )}
+                      </div>
+
+                      <h2 className="text-base font-bold tracking-tight uppercase group-hover:translate-x-1 duration-150">
+                        {ch.title}
+                      </h2>
+
+                      {/* Display subchapters side-by-side inside poster */}
+                      {ch.sections.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-stone-500 font-mono">
+                          {ch.sections.map((sec) => (
+                            <span key={sec.id} className="hover:text-stone-900 duration-100">
+                              <span className="mr-1 underline" style={{ textDecorationColor: `${accentColor}50` }}>{sec.page}</span>
+                              {sec.title}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-end relative z-10 text-[9px] font-mono opacity-40">
+            <span>{bookInfo.author}</span>
+            <span>CATALOG 2026</span>
+          </div>
+        </div>
+      );
+    };
+
+
+    // -----------------------------------------------------------------
+    // LAYOUT 5: GRID SYSTEM (网格系统目录)
+    // -----------------------------------------------------------------
+    const renderGridLayout = () => {
+      return (
+        <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
+          <div>
+            {/* Structured blueprint details */}
+            <div className="grid grid-cols-4 gap-2 text-[9px] font-mono uppercase opacity-50 border-b pb-4 mb-6">
+              <div>
+                <span className="block text-stone-400">Scale:</span>
+                <span className="font-semibold text-stone-800">1 : 1.25</span>
+              </div>
+              <div>
+                <span className="block text-stone-400">Type:</span>
+                <span className="font-semibold text-stone-800">Grid Catalog</span>
+              </div>
+              <div className="col-span-2 text-right">
+                <span className="block text-stone-400">Document Source:</span>
+                <span className="font-semibold text-stone-800 truncate block">{bookInfo.title}</span>
+              </div>
+            </div>
+
+            {/* Huge Grid Headline */}
+            <div className="mb-6 flex justify-between items-baseline">
+              <h1 className="text-xl font-bold tracking-wide font-mono">GRID SCHEMA SPEC.</h1>
+              <span className="text-xs font-mono font-bold" style={{ color: accentColor }}>[00 / INDEX]</span>
+            </div>
+
+            {/* Clean grid boxes */}
+            <div className="grid grid-cols-2 gap-px bg-stone-300 border border-stone-300 rounded overflow-hidden">
+              {chapters.map((ch, idx) => {
+                const prefix = getChapterPrefix(idx, config.prefixStyle);
+                const showPrefix = config.prefixStyle !== 'NONE';
+
+                return (
+                  <div
+                    key={ch.id}
+                    className="p-4 bg-white hover:bg-stone-50 duration-150 flex flex-col justify-between h-36"
+                    style={{ backgroundColor: bgColor }}
+                  >
+                    <div>
+                      {/* Grid Box Top Row */}
+                      <div className="flex justify-between items-start text-[10px] font-mono">
+                        <span style={{ color: accentColor }} className="font-bold">
+                          {showPrefix ? prefix : `0${idx + 1}`}
+                        </span>
+                        {config.numberStyle !== 'HIDDEN' && (
+                          <span className="text-stone-400 font-medium">PG.{ch.page}</span>
+                        )}
+                      </div>
+
+                      {/* Main Title */}
+                      <h3 className="text-xs font-bold leading-snug tracking-tight uppercase line-clamp-2 mt-2">
+                        {ch.title}
+                      </h3>
+                    </div>
+
+                    {/* Footer sections preview of grid cell */}
+                    {ch.sections.length > 0 && (
+                      <div className="border-t pt-1.5 border-stone-100">
+                        <p className="text-[9px] font-mono text-stone-400 truncate">
+                          {ch.sections[0].title} — {ch.sections[0].page}p
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center text-[9px] font-mono mt-4 pt-4 border-t opacity-40">
+            <span>{bookInfo.author}</span>
+            <span>SYSTEM v1.02</span>
+          </div>
+        </div>
+      );
+    };
+
+
+    // -----------------------------------------------------------------
+    // LAYOUT 6: TIMELINE (时间轴目录)
+    // -----------------------------------------------------------------
+    const renderTimelineLayout = () => {
+      const charGap = getChapterGap(config.density);
+
+      return (
+        <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
+          <div>
+            {/* Timeline Header */}
+            <div className="mb-10 text-center relative">
+              <span className="text-[10px] uppercase tracking-[0.2em] font-mono opacity-50 block mb-1">CHRONOLOGICAL SUMMARY</span>
+              <h1 className="text-2xl font-light font-serif">{bookInfo.title}</h1>
+              <p className="text-xs italic text-stone-400 mt-1">时空之镜 · 目录索引</p>
+              <div className="w-8 h-[2px] bg-stone-200 mx-auto mt-3" style={{ backgroundColor: accentColor }} />
+            </div>
+
+            {/* Timeline Grid Flow */}
+            <div className={`relative pl-8 ${charGap}`}>
+              {/* Vertical line rail */}
+              <div
+                className="absolute left-[11.5px] top-2 bottom-2 w-[1px] opacity-25"
+                style={{ backgroundColor: primaryColor }}
+              />
+
+              {chapters.map((ch, idx) => {
+                const prefix = getChapterPrefix(idx, config.prefixStyle);
+                const showPrefix = config.prefixStyle !== 'NONE';
+
+                return (
+                  <div key={ch.id} className="relative group">
+                    {/* Ring timeline marker circle */}
+                    <div
+                      className="absolute -left-[31px] top-1.5 w-6 h-6 rounded-full border bg-white flex items-center justify-center scale-90 group-hover:scale-105 duration-200"
+                      style={{
+                        borderColor: accentColor,
+                        backgroundColor: bgColor,
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+                      }}
+                    >
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />
+                    </div>
+
+                    {/* Node details */}
+                    <div>
+                      <div className="flex items-baseline gap-2">
+                        {config.numberStyle !== 'HIDDEN' && (
+                          <span className="font-mono text-xs font-bold" style={{ color: accentColor }}>
+                            {ch.page}p
+                          </span>
+                        )}
+                        <span className="text-[9px] font-mono text-stone-400">/</span>
+                        {showPrefix && (
+                          <span className="text-[10px] font-mono tracking-wider text-stone-400">
+                            {prefix}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="font-bold text-sm tracking-tight hover:opacity-85 duration-100 mt-0.5">
+                        {ch.title}
+                      </h3>
+
+                      {ch.description && config.density !== 'COMPACT' && (
+                        <p className="text-[10px] text-stone-400 leading-relaxed max-w-[90%] mt-1 italic font-serif">
+                          {ch.description}
+                        </p>
+                      )}
+
+                      {/* Floating node minor sections */}
+                      {ch.sections.length > 0 && (
+                        <ul className="mt-2 space-y-1 border-l border-stone-100 pl-3">
+                          {ch.sections.map((sec) => (
+                            <li key={sec.id} className="text-[10px] text-stone-500 flex justify-between max-w-[80%]">
+                              <span>{sec.title}</span>
+                              {config.numberStyle !== 'HIDDEN' && (
+                                <span className="font-mono text-stone-400">{sec.page}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center text-[9px] font-mono opacity-30 pt-4 border-t">
+            <span>{bookInfo.author}</span>
+            <span>CHRONOLOGY AXIS 2026</span>
+          </div>
+        </div>
+      );
+    };
+
+
+    // -----------------------------------------------------------------
+    // LAYOUT 7: IMAGE-TEXT (图文混排目录)
+    // -----------------------------------------------------------------
+    const renderImageTextLayout = () => {
+      return (
+        <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
+          <div>
+            {/* High-end design layout header */}
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                <h1 className="text-xl font-bold uppercase tracking-tight font-sans">
+                  EXHIBIT INDEX
+                </h1>
+                <p className="text-[10px] font-mono opacity-50 uppercase tracking-widest mt-0.5">
+                  Visual Gallery List
+                </p>
+              </div>
+              <div className="text-right text-[9px] font-mono uppercase opacity-50">
+                <span>{bookInfo.title.substring(0, 16)}...</span>
+              </div>
+            </div>
+
+            {/* Visual Book Catalog items */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-6">
+              {chapters.map((ch, idx) => {
+                const prefix = getChapterPrefix(idx, config.prefixStyle);
+                const showPrefix = config.prefixStyle !== 'NONE';
+
+                return (
+                  <div key={ch.id} className="group cursor-pointer">
+                    {/* Exquisite abstract geometry cards pretending to be premium photographs */}
+                    <div
+                      className="relative w-full h-[65px] rounded overflow-hidden mb-2.5 shadow-sm group-hover:shadow duration-200 transition-all flex items-end p-2 text-white"
+                      style={{ background: getSeedGradient(ch.imageSeed || idx + 1) }}
+                    >
+                      {getDecorativeShape(ch.imageSeed || idx + 1)}
+
+                      {/* Floating overlay indicators */}
+                      <div className="absolute inset-0 bg-black/10 mix-blend-multiply" />
+                      <div className="relative z-10 w-full flex justify-between items-end">
+                        <span className="text-[9px] font-mono font-semibold tracking-widest uppercase text-white/85 bg-black/20 px-1 py-0.5 rounded">
+                          {showPrefix ? prefix : `0${idx + 1}`}
+                        </span>
+                        {config.numberStyle !== 'HIDDEN' && (
+                          <span className="text-xs font-mono font-black tracking-tighter text-white">
+                            P.{ch.page}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Descriptions below */}
+                    <h4 className="text-xs font-bold leading-tight uppercase group-hover:opacity-85 duration-100 truncate">
+                      {ch.title}
+                    </h4>
+
+                    {ch.sections.length > 0 && (
+                      <p className="text-[9px] text-stone-400 font-mono mt-0.5 truncate uppercase">
+                        {ch.sections.map(s => s.title).join(' / ')}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center text-[9px] font-mono border-t pt-3 mt-4 opacity-40">
+            <span>{bookInfo.author}</span>
+            <span>GALLERY CATALOG v1</span>
+          </div>
+        </div>
+      );
+    };
+
+
+    // -----------------------------------------------------------------
+    // LAYOUT 8: EXPERIMENTAL (实验性目录)
+    // -----------------------------------------------------------------
+    const renderExperimentalLayout = () => {
+      return (
+        <div className="h-full flex flex-col justify-between relative overflow-hidden" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
+          {/* Subtle design crop marks in the corners */}
+          <div className="absolute top-2 left-2 text-[9px] font-mono opacity-25 select-none">[+] CROP_L_TOP</div>
+          <div className="absolute top-2 right-2 text-[9px] font-mono opacity-25 select-none">CROP_R_TOP [+]</div>
+          <div className="absolute bottom-2 left-2 text-[9px] font-mono opacity-25 select-none">[+] CROP_L_BOT</div>
+          <div className="absolute bottom-2 right-2 text-[9px] font-mono opacity-25 select-none">CROP_R_BOT [+]</div>
+
+          <div>
+            {/* Header: Disordered design */}
+            <div className="mb-10 relative">
+              <div className="absolute top-0 right-0 border-r-2 border-b-2 border-current w-12 h-12" style={{ color: accentColor }} />
+              <span className="inline-block bg-black text-white px-2 py-0.5 text-[9px] font-mono font-bold leading-none mb-3 rotate-[-3deg]" style={{ backgroundColor: accentColor }}>
+                AVANT-GARDE SPECS
+              </span>
+              <h1 className="text-3xl font-black italic tracking-widest font-mono uppercase mt-1">
+                KINETIC
+              </h1>
+              <h2 className="text-sm font-bold uppercase tracking-tighter opacity-80" style={{ color: secondaryColor }}>
+                INDEX OF WORKFLOWS
+              </h2>
+            </div>
+
+            {/* Scattered index rows */}
+            <div className="space-y-4">
+              {chapters.map((ch, idx) => {
+                const prefix = getChapterPrefix(idx, config.prefixStyle);
+                const isDiagonal = idx % 3 === 2;
+                const isShifted = idx % 3 === 1;
+
+                return (
+                  <div
+                    key={ch.id}
+                    className={`relative p-2 border-b-[0.5px] border-stone-200 group hover:border-black max-w-[95%] duration-150 ${
+                      isDiagonal ? 'rotate-[-0.5deg] translate-x-2' : isShifted ? 'translate-x-4' : ''
+                    }`}
+                  >
+                    {/* Visual overlapping giant number in backgrounds */}
+                    {config.numberStyle !== 'HIDDEN' && (
+                      <span className="absolute right-2 -bottom-2 text-4xl font-mono font-black text-stone-100 select-none group-hover:text-stone-200 transition-colors pointer-events-none opacity-[0.4]" style={{ color: `${accentColor}12` }}>
+                        #{ch.page}
+                      </span>
+                    )}
+
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-[9px] bg-black text-white px-1 leading-none uppercase" style={{ backgroundColor: accentColor }}>
+                        {prefix || `INDEX_0${idx + 1}`}
+                      </span>
+                      {config.numberStyle !== 'HIDDEN' && (
+                        <span className="text-xs font-mono font-bold" style={{ color: accentColor }}>
+                          {ch.page}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="text-xs font-black uppercase text-stone-800 tracking-tight mt-1 truncate">
+                      {ch.title}
+                    </h3>
+
+                    {ch.sections.length > 0 && (
+                      <div className="mt-1 flex gap-2 text-[9.5px] font-mono text-stone-400 group-hover:text-stone-600 duration-100">
+                        {ch.sections.map((sec) => (
+                          <span key={sec.id} className="before:content-['*'] before:mr-1">
+                            {sec.title}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex justify-between items-center text-[8.5px] font-mono bg-stone-100 p-2 rounded max-w-full truncate">
+            <span>SOURCE: {bookInfo.title.substring(0, 15)}...</span>
+            <span style={{ color: accentColor }} className="font-bold">SYSTEM ACTIVE</span>
+          </div>
+        </div>
+      );
+    };
+
+    // Routing Layout Component
+    const renderLayout = () => {
+      switch (selectedLayout) {
+        case 'minimal':
+          return renderMinimalLayout();
+        case 'magazine':
+          return renderMagazineLayout();
+        case 'poster':
+          return renderPosterLayout();
+        case 'grid':
+          return renderGridLayout();
+        case 'timeline':
+          return renderTimelineLayout();
+        case 'imagetext':
+          return renderImageTextLayout();
+        case 'experimental':
+          return renderExperimentalLayout();
+        case 'classic':
+        default:
+          return renderClassicLayout();
+      }
+    };
+
+    return (
+      <div
+        ref={containerRef}
+        className="w-full h-full flex items-center justify-center overflow-auto p-4 designer-grid relative"
+      >
+        {/* Paper Container representation with scaling support */}
+        <div
+          ref={paperRef}
+          id="print-area"
+          style={{
+            ...designStyle,
+            transform: `scale(${scale})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.15s ease-out',
+            boxShadow: '0 25px 50px -12px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.03)'
+          }}
+          className={`relative shrink-0 overflow-hidden ${config.paperTexture ? 'paper-grain' : ''}`}
+        >
+          {/* Inner crop margined box */}
+          <div style={marginGuideStyle} />
+
+          {/* Actual content loaded */}
+          {renderLayout()}
+        </div>
+      </div>
+    );
+  }
+);
+
+TOCPreview.displayName = 'TOCPreview';

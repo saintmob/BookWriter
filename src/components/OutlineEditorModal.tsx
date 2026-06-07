@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { X, Send, Loader2, Sparkles, AlertCircle, Check, RotateCcw, Save } from 'lucide-react';
+import { X, Send, Loader2, Sparkles, AlertCircle, Check, RotateCcw, Save, FileText, Bot } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { updateOutlineWithAI } from '../lib/ai';
 import { Chapter } from '../lib/db';
@@ -9,6 +9,7 @@ import { cn } from '../lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { BatchOutlineEditor } from './BatchOutlineEditor';
 
 interface OutlineEditorModalProps {
   isOpen: boolean;
@@ -27,6 +28,10 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
   const { t } = useTranslation();
   const { books, language } = useStore();
   const book = books.find(b => b.id === bookId);
+  const isZh = language === 'zh';
+  
+  // View mode
+  const [viewMode, setViewMode] = useState<'ai' | 'batch'>('ai');
   
   // Local state for chapters (preview)
   const [chapters, setChapters] = useState<Chapter[]>(initialChapters);
@@ -46,8 +51,10 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
   }, [isOpen, initialChapters, t]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (viewMode === 'ai') {
+       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, viewMode]);
 
   const handleSendMessage = async () => {
     if (!input.trim() || isProcessing || !book) return;
@@ -213,18 +220,48 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
             </div>
           </div>
 
-          {/* Right Panel: AI Chat */}
+          {/* Right Panel: AI Chat or Batch Edit */}
           <div className="w-full md:w-96 flex flex-col bg-white dark:bg-zinc-900 h-1/2 md:h-auto border-t md:border-t-0 md:border-l border-zinc-200 dark:border-zinc-800">
-            <div className="hidden md:flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
-              <h3 className="font-medium text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-emerald-500" />
-                {t('ai_assistant')}
-              </h3>
-              <button onClick={onClose} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300">
+            <div className="hidden md:flex items-center justify-between p-3 border-b border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
+                <button
+                  onClick={() => setViewMode('ai')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shadow-sm",
+                    viewMode === 'ai'
+                      ? "bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400"
+                      : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 shadow-none border border-transparent"
+                  )}
+                >
+                  <Bot className="w-4 h-4" />
+                  {isZh ? '对话模式' : 'AI Chat'}
+                </button>
+                <button
+                  onClick={() => setViewMode('batch')}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shadow-sm",
+                    viewMode === 'batch'
+                      ? "bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400"
+                      : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 shadow-none border border-transparent"
+                  )}
+                >
+                  <FileText className="w-4 h-4" />
+                  {isZh ? '批量编辑' : 'Batch Edit'}
+                </button>
+              </div>
+              <button onClick={onClose} className="text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 mr-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {viewMode === 'batch' ? (
+              <BatchOutlineEditor 
+                chapters={chapters} 
+                onImport={(nc) => setChapters(nc)} 
+                bookTitle={book?.title || 'Book Title'} 
+              />
+            ) : (
+              <>
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-zinc-50 dark:bg-zinc-950/50">
               {messages.map((msg, idx) => (
                 <div
@@ -285,6 +322,8 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
                 {t('ai_can_make_mistakes')}
               </p>
             </div>
+              </>
+            )}
           </div>
         </motion.div>
       </div>

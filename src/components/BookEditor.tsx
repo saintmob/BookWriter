@@ -14,6 +14,7 @@ import { BookSamplePreview } from './BookSamplePreview';
 import { TypesetLayoutEditor } from './TypesetLayoutEditor';
 import { BookCoverEditor } from './BookCoverEditor';
 import { DesignThemeEditor } from './DesignThemeEditor';
+import { BookCatalogueEditor } from './BookCatalogueEditor';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 
@@ -43,7 +44,7 @@ export function BookEditor() {
   const [book, setBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [activeChapter, setActiveChapterState] = useState<Chapter | null>(null);
-  const [activeView, setActiveView] = useState<'chapter' | 'cover' | 'theme'>('chapter');
+  const [activeView, setActiveView] = useState<'chapter' | 'cover' | 'theme' | 'catalogue'>('chapter');
   
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -636,7 +637,23 @@ export function BookEditor() {
               <Sparkles className={cn("w-4 h-4", activeView === 'theme' ? "text-white" : "text-indigo-500 animate-pulse")} />
               <div className="flex-1 text-left">
                 <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '核心美学' : 'STYLE BANK'}</span>
-                <span className="block -mt-1 font-semibold">{language === 'zh' ? '设计风格风格提取' : 'Design Theme & Style'}</span>
+                <span className="block -mt-1 font-semibold">{language === 'zh' ? '设计风格提取' : 'Design Theme & Style'}</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveView('catalogue')}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm border",
+                activeView === 'catalogue'
+                  ? "bg-emerald-600 border-emerald-500 text-white font-semibold"
+                  : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+              )}
+            >
+              <LayoutTemplate className={cn("w-4 h-4", activeView === 'catalogue' ? "text-white" : "text-emerald-500")} />
+              <div className="flex-1 text-left">
+                <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '目录页' : 'CONTENTS'}</span>
+                <span className="block -mt-1 font-semibold">{language === 'zh' ? '排版设计与预览' : 'Catalogue & TOC'}</span>
               </div>
             </button>
           </div>
@@ -771,6 +788,13 @@ export function BookEditor() {
             book={book}
             onUpdateBook={setBook}
             language={language}
+          />
+        ) : activeView === 'catalogue' && book ? (
+          <BookCatalogueEditor
+            book={book}
+            chapters={chapters}
+            language={language}
+            onUpdateBook={setBook}
           />
         ) : activeChapter && book ? (
           (activeChapter.level || 2) < 3 ? (

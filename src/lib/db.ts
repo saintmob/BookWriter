@@ -33,6 +33,7 @@ export interface Book {
   coverTextColor?: string;
   coverOverlayOpacity?: number;
   designTheme?: DesignTheme;
+  catalogueConfig?: any;
   createdAt: number;
   updatedAt: number;
 }
