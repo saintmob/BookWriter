@@ -16,7 +16,7 @@ interface MarkdownRendererProps {
   onImageDoubleClick?: (id: string) => void;
   onImageDragStart?: (e: React.MouseEvent, id: string) => void;
   showBlockIndices?: boolean;
-  sceneBreakStyle?: 'asterism' | 'dots' | 'line' | 'space';
+  sceneBreakStyle?: 'asterism' | 'dots' | 'line' | 'space' | 'fleuron';
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ 
@@ -180,7 +180,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         blockquote(props) { return renderWithImages('blockquote', props); },
         hr(props) {
           const idx = elementIndex++;
-          if (sceneBreakStyle === 'asterism') {
+          if (sceneBreakStyle === 'fleuron') {
+            return <div className="text-center font-serif text-2xl my-6 text-zinc-500 opacity-60 pointer-events-none select-none">&#10087;</div>;
+          } else if (sceneBreakStyle === 'asterism') {
             return <div className="text-center font-serif text-2xl my-6 tracking-[1em] text-zinc-500 opacity-60 pointer-events-none select-none">&#10086; &#10086; &#10086;</div>;
           } else if (sceneBreakStyle === 'dots') {
             return <div className="text-center text-xl my-6 tracking-[1em] text-zinc-500 opacity-60 pointer-events-none select-none">&#8226; &#8226; &#8226;</div>;

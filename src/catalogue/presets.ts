@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BookInfo, ChapterItem, DesignConfig } from '../types';
+import { BookInfo, ChapterItem, DesignConfig } from './types';
 
 export const INITIAL_BOOK_INFO: BookInfo = {
   title: '筑物之美：现代主义建筑的叙事与光影',

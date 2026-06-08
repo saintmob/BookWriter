@@ -206,30 +206,49 @@ export async function extractDesignThemeStyle(
     ? `\nExisting Style Guidelines to grow upon (you should maintain, evolve, and refine these instead of overwriting completely): ${JSON.stringify(existingTheme)}\n` 
     : '';
     
-  const prompt = `You are a world-class book layout designer, typographer, and art director.
-Extract or evolve a highly cohesive, professional design theme/style guideline for the book "${bookTitle}".
+  const prompt = `You are a world-class book layout designer, typographer, art director, and literary analyst.
+Extract or evolve a highly cohesive, professional design theme structure and the Book DNA for the book "${bookTitle}".
 Book Summary: ${bookSummary}
 User Intent / Inspiration / Material details provided: ${userInspirations}
 ${existingStr}
 
 You must return a cohesive JSON object representing the design theme structure. Ensure:
 1. "keywords": 3-5 concise, atmospheric style keywords (e.g. ["Classic Detective", "Nostalgic Vintage", "Chiaroscuro Silhouette"]).
-2. "colors": A structured color palette:
+2. "dna": The Book DNA distilled from the concepts:
+   - "theme": The core thematic underpinning of the book.
+   - "tension": The central conflict, contradiction, or tension.
+   - "archetypes": Array of strings representing underlying mythic or literary archetypes present.
+   - "emotion_curve": A brief description of the overarching emotional journey or pacing curve.
+   - "metaphor": The central visual or conceptual metaphor.
+   - "narrative_direction": Time and narrative direction strategy.
+3. "designConcept": An overarching design concept from an art director/architect's perspective, representing the structural and emotional metaphor of the publication.
+4. "readingExperience": "Reading experience design". Think like a director/scriptwriter. Treat the reading process as dramatic perception. Plan the experience from opening the cover to the end, covering material (paper texture), structure (layout rhythm), craftsmanship, five senses, content presentation sequence, and other functional arrangements.
+5. "colors": A structured color palette:
    - "dominant": A dark/rich color hex code representing the main visual accent color of the design (not white).
    - "accent": A bright, high-contrast accent color hex code (e.g. for highlights, lines, or details).
    - "background": A soft, elegant paper/background hex code (e.g. warm ivory "#FBF9F4", vintage charcoal "#18181A", classic craft "#F2EADB").
    - "text": A high-contrast readable text color hex code matching the background color (e.g. deep charcoal "#1C1917" on light backgrounds, or ivory "#F5F5F4" on dark backgrounds).
-3. "typography": Recommendations wrapping:
+6. "typography": Recommendations wrapping:
    - "headingFont": Elegant heading font character/vibe description.
    - "bodyFont": Readable body font character/vibe description.
    - "styleVibe": One cohesive style name (e.g., "Vintage Academic Monolith", "Minimalist Cyberpunk").
-4. "illustrationStyle": A refined illustration style template/prompt. It must describe an artistic medium and aesthetics (textures, lighting, composition) suitable for image generator engines (like "stippling ink sketch, high-contrast chiaroscuro shadows, classic vintage gothic engraving, delicate paper textures").
-5. "typesettingGuidelines": Specific, actionable book design/DTP advice (e.g., margins, line heights, drop caps enable, columns recommendation, drop caps suggestions).
-6. "extractedGuidelines": A brief, highly refined editorial description (1-2 paragraphs) of this style model's design philosophy, detailing why these aesthetic configurations was chosen and how it pairs with the book's narrative.
+7. "illustrationStyle": A refined illustration style template/prompt. It must describe an artistic medium and aesthetics (textures, lighting, composition) suitable for image generator engines.
+8. "typesettingGuidelines": Specific, actionable book design/DTP advice (e.g., margins, line heights, columns recommendation, drop caps suggestions).
+9. "extractedGuidelines": A brief, highly refined editorial description (1-2 paragraphs) of this style model's design philosophy, detailing why these aesthetic configurations was chosen and how it pairs with the book's narrative.
 
 Return ONLY a valid JSON object matching the structures shown below with no extra markdown blocks or conversational text.
 {
   "keywords": ["..."],
+  "dna": {
+    "theme": "...",
+    "tension": "...",
+    "archetypes": ["..."],
+    "emotion_curve": "...",
+    "metaphor": "...",
+    "narrative_direction": "..."
+  },
+  "designConcept": "...",
+  "readingExperience": "...",
   "colors": {
     "dominant": "#HEX",
     "accent": "#HEX",
@@ -244,7 +263,8 @@ Return ONLY a valid JSON object matching the structures shown below with no extr
   "illustrationStyle": "...",
   "typesettingGuidelines": "...",
   "extractedGuidelines": "..."
-}`;
+}
+Please output the JSON text mainly in the requested language: ${language}.`;
 
   const text = await callTextAI(prompt, true);
   return parseJSON(text || '{}');
@@ -1208,19 +1228,64 @@ Return exactly a structured JSON object with the following properties:
   "marginLeft": "numeric in pixels (e.g. 36, 48, 64, 80)",
   "marginRight": "numeric in pixels (e.g. 36, 48, 64, 80)",
   "format": "one of: 'a4' | 'letter' | 'trade' | 'pocket' | 'landscape' | 'square'",
-  "chapterTitleStyle": "one of: 'hidden' | 'classical' | 'modern' | 'minimal'",
-  "sceneBreakStyle": "one of: 'asterism' | 'dots' | 'line' | 'space'",
+  "chapterTitleStyle": "one of: 'hidden' | 'classical' | 'modern' | 'minimal' | 'ornate' | 'bold'",
+  "sceneBreakStyle": "one of: 'asterism' | 'dots' | 'line' | 'space' | 'fleuron'",
   "dropCaps": "boolean (true or false)",
+  "dropCapsStyle": "one of: 'standard' | 'gothic' | 'minimal' | 'modern' (Only omit if dropCaps is false)",
+  "dnaTensionStyle": "one of: 'normal' | 'fractured' | 'rigid' | 'fluid' | 'compressed'. Maps the Book DNA tension curve to structural spacing aesthetics.",
   "justifyText": "boolean (true or false)",
   "firstLineIndent": "numeric in scale (0, 1, or 2 representing indent tabs)",
   "paragraphSpacing": "numeric (e.g. 8, 12, 16, 20)",
-  "visualExplanation": "An organic, architectural briefing (1-2 sentences) of how this geometric wireframe maps columns, spacing, and image alignment to achieve perfect balance."
+  "visualExplanation": "An organic, architectural briefing (1-2 sentences) of how this geometric wireframe maps columns, spacing, and image alignment to achieve perfect balance, incorporating the Book DNA tension."
 }
 
 Return ONLY the valid JSON object with no wrapping blocks.`;
 
   const text = await callTextAI(prompt, true);
   return parseJSON(text || '{}');
+}
+
+export async function parseAndAnalyzeMultipleLayoutsFromIntent(
+  layoutReferenceDescription: string,
+  language: string = 'zh'
+): Promise<any[]> {
+  const prompt = `You are a professional typesetter, layout editor, and grid structure architect.
+Analyze the following description of a page layout or reference layout pattern: '${layoutReferenceDescription}'.
+
+Synthesize a batch of exactly 3 different, distinct layout interpretations (e.g., '雅致古典款', '现代双栏款', '简约留白款') representing various structural styles matching the user's intent.
+Each layout can have different column counts, margin densities, drop cap options, paper styles, and sizes.
+
+Return exactly a JSON array of exactly 3 objects. Format:
+[
+  {
+    "name": "Descriptive, elegant template name in Chinese/English based on language",
+    "headerPos": "one of: 'hidden' | 'top-center' | 'top-outside' | 'bottom-center' | 'bottom-outside'",
+    "columns": 1, 2, or 3 (numeric),
+    "paperStyle": "one of: 'warm' | 'white' | 'dark' | 'kraft' | 'vintage' | 'glossy' | 'newsprint'",
+    "fontSize": numeric (e.g. 14, 15, 16, 17, 18),
+    "lineHeight": numeric (e.g. 1.5, 1.6, 1.7, 1.8),
+    "marginTop": numeric in pixels (e.g. 36, 48, 64, 80),
+    "marginBottom": numeric in pixels (e.g. 36, 48, 64, 80),
+    "marginLeft": numeric in pixels (e.g. 36, 48, 64, 80),
+    "marginRight": numeric in pixels (e.g. 36, 48, 64, 80),
+    "format": "one of: 'a4' | 'letter' | 'trade' | 'pocket' | 'landscape' | 'square'",
+    "chapterTitleStyle": "one of: 'hidden' | 'classical' | 'modern' | 'minimal' | 'ornate' | 'bold'",
+    "sceneBreakStyle": "one of: 'asterism' | 'dots' | 'line' | 'space' | 'fleuron'",
+    "dropCaps": boolean (true or false),
+    "dropCapsStyle": "one of: 'standard' | 'gothic' | 'minimal' | 'modern'",
+    "dnaTensionStyle": "one of: 'normal' | 'fractured' | 'rigid' | 'fluid' | 'compressed'",
+    "justifyText": boolean (true or false),
+    "firstLineIndent": numeric (0, 1, or 2),
+    "paragraphSpacing": numeric (e.g. 8, 12, 16, 20),
+    "visualExplanation": "1-2 sentence description of how this custom option matches the user intent."
+  },
+  ... (two more objects of different structural designs)
+]
+
+Return ONLY the valid JSON array of objects with no markdown markup or container blocks.`;
+
+  const text = await callTextAI(prompt, true);
+  return parseJSON(text || '[]');
 }
 
 // ==========================================

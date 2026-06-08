@@ -45,32 +45,38 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   useEffect(() => {
     const result: any[] = [];
     let currentChapter: any = null;
+    const pageMap: Record<string, number> = {};
     let pageCounter = 12;
 
+    // Calculate deterministic starting pages for all chapters
     chapters.forEach((ch) => {
-      // In Pagedjs printing, we don't have accurate real page numbers until the very end,
-      // Pagedjs injects actual page numbers via CSS cross-references.
-      // But for visual preview matching the editor, we use mock numbers for now 
-      // or we can use Pagedjs target-counter via CSS if we convert it to anchors.
-      // For simplicity, we use the same mocked page logic as the editor.
+      pageMap[ch.id] = pageCounter;
+      if (ch.level === 1) {
+        pageCounter += 2;
+      } else {
+        const charCount = ch.content?.length || 0;
+        const estPages = Math.max(1, Math.ceil(charCount / 500));
+        pageCounter += estPages;
+      }
+    });
+
+    chapters.forEach((ch) => {
       if (ch.level === 1 || ch.level === 2) {
         currentChapter = {
           id: ch.id,
           title: ch.title,
           description: ch.description,
-          page: String(pageCounter),
+          page: String(pageMap[ch.id]),
           sections: [],
           imageSeed: result.length + 1
         };
-        pageCounter += 10;
         result.push(currentChapter);
       } else if (ch.level === 3 && currentChapter) {
         currentChapter.sections.push({
           id: ch.id,
           title: ch.title,
-          page: String(pageCounter + 2)
+          page: String(pageMap[ch.id])
         });
-        pageCounter += 5;
       }
     });
 
@@ -245,6 +251,13 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
       line-height: ${baseLayout.lineHeight || 1.6};
       text-align: ${baseLayout.justifyText !== false ? 'justify' : 'left'};
       hyphens: ${baseLayout.hyphenation ? 'auto' : 'none'};
+      letter-spacing: ${
+        baseLayout.dnaTensionStyle === 'rigid' ? '-0.01em' : 
+        baseLayout.dnaTensionStyle === 'fluid' ? '0.02em' : 
+        baseLayout.dnaTensionStyle === 'fractured' ? '0.04em' : 
+        baseLayout.dnaTensionStyle === 'compressed' ? '-0.03em' : 'normal'
+      };
+      word-spacing: ${baseLayout.dnaTensionStyle === 'fractured' ? '0.15em' : 'normal'};
       --paragraph-spacing: ${baseLayout.paragraphSpacing || 16}px;
       --first-line-indent: ${baseLayout.firstLineIndent || 0}em;
     }
@@ -256,9 +269,11 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
     ${baseLayout.dropCaps ? `
       .book-content-wrapper p:first-of-type::first-letter {
          float: left;
-         font-size: 3em;
-         font-weight: bold;
-         padding-right: 8px;
+         font-size: ${baseLayout.dropCapsStyle === 'gothic' ? '3.8em' : baseLayout.dropCapsStyle === 'minimal' ? '3.2em' : '3em'};
+         font-weight: ${baseLayout.dropCapsStyle === 'gothic' || baseLayout.dropCapsStyle === 'standard' ? 'bold' : baseLayout.dropCapsStyle === 'minimal' ? '300' : '900'};
+         font-family: ${baseLayout.dropCapsStyle === 'gothic' ? 'Georgia, serif' : baseLayout.dropCapsStyle === 'modern' ? 'ui-sans-serif, sans-serif' : 'inherit'};
+         padding-right: ${baseLayout.dropCapsStyle === 'minimal' ? '12px' : '8px'};
+         padding-top: ${baseLayout.dropCapsStyle === 'modern' ? '4px' : '0'};
          line-height: 0.8;
       }
     ` : ''}
@@ -575,6 +590,11 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                       fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
                       '--paragraph-spacing': `${baseLayout.paragraphSpacing ?? 16}px`,
                       '--first-line-indent': `${baseLayout.firstLineIndent ?? 0}em`,
+                      letterSpacing: baseLayout.dnaTensionStyle === 'rigid' ? '-0.01em' : 
+                                     baseLayout.dnaTensionStyle === 'fluid' ? '0.02em' : 
+                                     baseLayout.dnaTensionStyle === 'fractured' ? '0.04em' : 
+                                     baseLayout.dnaTensionStyle === 'compressed' ? '-0.03em' : 'normal',
+                      wordSpacing: baseLayout.dnaTensionStyle === 'fractured' ? '0.15em' : 'normal',
                     } as React.CSSProperties}
                   >
                      {/* Title Page */}
@@ -600,16 +620,22 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                                 "mb-12",
                                 baseLayout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
                                 baseLayout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-inherit pb-4 mb-10" : 
+                                baseLayout.chapterTitleStyle === 'ornate' ? "text-center mt-16 mb-20 border-y py-4 border-inherit" :
+                                baseLayout.chapterTitleStyle === 'bold' ? "text-left mt-8 mb-16" :
                                 "text-left" // minimal
                               )}>
+                                {baseLayout.chapterTitleStyle === 'ornate' && <div className="text-center text-xl opacity-50 mb-2">❦</div>}
                                 <h2 className={cn(
                                   "!m-0 !border-none leading-tight",
                                   baseLayout.chapterTitleStyle === 'classical' ? "!text-4xl !font-normal !font-serif" : 
                                   baseLayout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
+                                  baseLayout.chapterTitleStyle === 'ornate' ? "!text-4xl !font-serif italic tracking-widest uppercase" :
+                                  baseLayout.chapterTitleStyle === 'bold' ? "!text-6xl !font-sans font-black tracking-tighter uppercase" :
                                   "!text-2xl !font-serif italic"
                                 )}>
                                   {chapter.title}
                                 </h2>
+                                {baseLayout.chapterTitleStyle === 'ornate' && <div className="text-center text-xl opacity-50 mt-2">❦</div>}
                               </div>
                            ) : (null)}
                            

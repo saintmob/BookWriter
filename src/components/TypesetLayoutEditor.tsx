@@ -636,11 +636,22 @@ export function TypesetLayoutEditor({
                       fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
                       '--paragraph-spacing': `${layout.paragraphSpacing ?? 16}px`,
                       '--first-line-indent': `${layout.firstLineIndent ?? 0}em`,
+                      letterSpacing: layout.dnaTensionStyle === 'rigid' ? '-0.01em' : 
+                                     layout.dnaTensionStyle === 'fluid' ? '0.02em' : 
+                                     layout.dnaTensionStyle === 'fractured' ? '0.04em' : 
+                                     layout.dnaTensionStyle === 'compressed' ? '-0.03em' : 'normal',
+                      wordSpacing: layout.dnaTensionStyle === 'fractured' ? '0.15em' : 'normal',
                     } as React.CSSProperties}
                     className={cn(
                       "prose max-w-none break-words",
                       paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
-                      layout.dropCaps && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
+                      
+                      // Drop Caps variants
+                      layout.dropCaps && layout.dropCapsStyle === 'gothic' && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-6xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:mt-1 prose-p:first-of-type:first-letter:font-serif",
+                      layout.dropCaps && layout.dropCapsStyle === 'minimal' && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-light prose-p:first-of-type:first-letter:pr-3 prose-p:first-of-type:first-letter:-mt-1",
+                      layout.dropCaps && layout.dropCapsStyle === 'modern' && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-black prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:pt-1 prose-p:first-of-type:first-letter:font-sans",
+                      layout.dropCaps && (!layout.dropCapsStyle || layout.dropCapsStyle === 'standard') && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
+                      
                       "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
                     )}
                   >
@@ -649,16 +660,22 @@ export function TypesetLayoutEditor({
                         "mb-12",
                         layout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
                         layout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-zinc-900 dark:border-zinc-100 pb-4 mb-10" : 
+                        layout.chapterTitleStyle === 'ornate' ? "text-center mt-16 mb-20 border-y py-4 border-zinc-300 dark:border-zinc-700" :
+                        layout.chapterTitleStyle === 'bold' ? "text-left mt-8 mb-16" :
                         "text-left" // minimal
                       )}>
+                        {layout.chapterTitleStyle === 'ornate' && <div className="text-center text-xl text-zinc-300 dark:text-zinc-600 mb-2">❦</div>}
                         <h1 className={cn(
                           "!m-0 !border-none leading-tight",
                           layout.chapterTitleStyle === 'classical' ? "!text-4xl !font-normal !font-serif" : 
                           layout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
+                          layout.chapterTitleStyle === 'ornate' ? "!text-4xl !font-serif italic tracking-widest uppercase" :
+                          layout.chapterTitleStyle === 'bold' ? "!text-6xl !font-sans font-black tracking-tighter uppercase" :
                           "!text-2xl !font-serif italic"
                         )}>
                           {chapter.title || 'Untitled Chapter'}
                         </h1>
+                        {layout.chapterTitleStyle === 'ornate' && <div className="text-center text-xl text-zinc-300 dark:text-zinc-600 mt-2">❦</div>}
                       </div>
                     ) : (null)}
                     
@@ -1643,6 +1660,8 @@ export function TypesetLayoutEditor({
                             <option value="classical">Classical Center</option>
                             <option value="modern">Modern Bold</option>
                             <option value="minimal">Minimal Inline</option>
+                            <option value="ornate">Ornate Deco</option>
+                            <option value="bold">Bold Gigantic</option>
                           </select>
                         </div>
                         <div>
@@ -1655,7 +1674,37 @@ export function TypesetLayoutEditor({
                             <option value="line">Line (___)</option>
                             <option value="asterism">Asterism (❦ ❦ ❦)</option>
                             <option value="dots">Dots (• • •)</option>
+                            <option value="fleuron">Fleuron (❧)</option>
                             <option value="space">Space Empty</option>
+                          </select>
+                        </div>
+                        {layout.dropCaps && (
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-zinc-400 block mb-1">{currentLanguage === 'zh' ? '首字下沉变体' : 'Drop Caps Style'}</label>
+                            <select 
+                              value={layout.dropCapsStyle || 'standard'}
+                              onChange={e => handleLayoutChange('dropCapsStyle', e.target.value)}
+                              className="w-full text-xs p-2 bg-white dark:bg-zinc-950 rounded-md border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300"
+                            >
+                              <option value="standard">Standard Solid</option>
+                              <option value="gothic">Gothic / Ornate</option>
+                              <option value="minimal">Minimal Thin</option>
+                              <option value="modern">Modern Geometric</option>
+                            </select>
+                          </div>
+                        )}
+                        <div>
+                          <label className="text-[10px] uppercase font-bold text-indigo-400 block mb-1">{currentLanguage === 'zh' ? '段落张力排布' : 'DNA Tension Flow'}</label>
+                          <select 
+                            value={layout.dnaTensionStyle || 'normal'}
+                            onChange={e => handleLayoutChange('dnaTensionStyle', e.target.value)}
+                            className="w-full text-xs p-2 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-md text-indigo-900 dark:text-indigo-200 font-medium"
+                          >
+                            <option value="normal">Normal (Balanced)</option>
+                            <option value="fractured">Fractured (High tension)</option>
+                            <option value="rigid">Rigid (Authoritative)</option>
+                            <option value="fluid">Fluid (Relaxed flow)</option>
+                            <option value="compressed">Compressed (Urgent)</option>
                           </select>
                         </div>
                       </div>

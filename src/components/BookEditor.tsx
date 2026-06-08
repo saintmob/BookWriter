@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { db, Chapter, Book, FloatingImage } from '../lib/db';
@@ -202,6 +202,27 @@ export function BookEditor() {
 
     return () => clearTimeout(timer);
   }, [content, activeChapter]);
+
+  // Real-time page number calculation based on actual content length
+  const chapterPageMap = useMemo(() => {
+    const pageMap: Record<string, number> = {};
+    let pageCounter = 12; // Base page after Front Matter & Catalogue
+
+    chapters.forEach((ch) => {
+      pageMap[ch.id] = pageCounter;
+      
+      if (ch.level === 1) {
+        // Parts/Volumes start a new main section (takes 2 pages)
+        pageCounter += 2;
+      } else {
+        const charCount = ch.content?.length || 0;
+        // Standard paper page typically has 500 characters
+        const estPages = Math.max(1, Math.ceil(charCount / 500));
+        pageCounter += estPages;
+      }
+    });
+    return pageMap;
+  }, [chapters]);
 
   const handleGenerateContent = async () => {
     if (!book || !activeChapter) return;
@@ -610,6 +631,22 @@ export function BookEditor() {
           {/* Cover & Theme Entrance */}
           <div className="px-1 mb-4 select-none flex flex-col gap-2">
             <button
+              onClick={() => setActiveView('theme')}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm border",
+                activeView === 'theme'
+                  ? "bg-indigo-600 border-indigo-500 text-white font-semibold"
+                  : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
+              )}
+            >
+              <Sparkles className={cn("w-4 h-4", activeView === 'theme' ? "text-white" : "text-indigo-500 animate-pulse")} />
+              <div className="flex-1 text-left">
+                <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '核心架构' : 'CORE CONCEPT'}</span>
+                <span className="block -mt-1 font-semibold">{language === 'zh' ? '书籍原则' : 'Book Principles'}</span>
+              </div>
+            </button>
+
+            <button
               onClick={() => setActiveView('cover')}
               className={cn(
                 "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm border",
@@ -621,23 +658,7 @@ export function BookEditor() {
               <ImageIcon className={cn("w-4 h-4", activeView === 'cover' ? "text-white" : "text-purple-500")} />
               <div className="flex-1 text-left">
                 <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '设计' : 'DESIGN'}</span>
-                <span className="block -mt-1 font-semibold">{language === 'zh' ? '全书封面设计' : 'Book Cover Design'}</span>
-              </div>
-            </button>
-
-            <button
-              onClick={() => setActiveView('theme')}
-              className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all shadow-sm border",
-                activeView === 'theme'
-                  ? "bg-indigo-600 border-indigo-500 text-white font-semibold"
-                  : "text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/50 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900"
-              )}
-            >
-              <Sparkles className={cn("w-4 h-4", activeView === 'theme' ? "text-white" : "text-indigo-500 animate-pulse")} />
-              <div className="flex-1 text-left">
-                <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '核心美学' : 'STYLE BANK'}</span>
-                <span className="block -mt-1 font-semibold">{language === 'zh' ? '设计风格提取' : 'Design Theme & Style'}</span>
+                <span className="block -mt-1 font-semibold">{language === 'zh' ? '封面设计' : 'Cover Design'}</span>
               </div>
             </button>
 
@@ -652,8 +673,8 @@ export function BookEditor() {
             >
               <LayoutTemplate className={cn("w-4 h-4", activeView === 'catalogue' ? "text-white" : "text-emerald-500")} />
               <div className="flex-1 text-left">
-                <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '目录页' : 'CONTENTS'}</span>
-                <span className="block -mt-1 font-semibold">{language === 'zh' ? '排版设计与预览' : 'Catalogue & TOC'}</span>
+                <span className="block text-xs uppercase tracking-wider opacity-60 text-[9px] font-semibold">{language === 'zh' ? '结构' : 'STRUCTURE'}</span>
+                <span className="block -mt-1 font-semibold">{language === 'zh' ? '目录设计' : 'Catalogue Design'}</span>
               </div>
             </button>
           </div>
@@ -685,12 +706,12 @@ export function BookEditor() {
                   setActiveChapter(chapter.id);
                 }}
                 className={cn(
-                  "w-full text-left transition-all flex items-center gap-2.5 rounded-lg select-none",
+                  "w-full text-left transition-all flex items-center rounded-lg select-none gap-1",
                   isPart 
-                    ? "px-3 py-2 bg-gradient-to-r from-emerald-500/5 to-transparent text-emerald-900 dark:text-emerald-300 font-serif font-bold text-[11px] mt-4 mb-1.5 tracking-wide uppercase border-l-2 border-emerald-500"
+                    ? "px-3 py-2 bg-gradient-to-r from-emerald-500/5 to-transparent text-emerald-900 dark:text-emerald-300 font-serif font-bold text-[11px] mt-4 mb-1.5 tracking-wide uppercase border-l-2 border-emerald-500 pr-3"
                     : isChapter
-                      ? "px-3 py-1.5 pl-6 text-zinc-800 dark:text-zinc-200 font-sans font-semibold text-xs mt-1"
-                      : "px-3 py-1 pl-10 text-zinc-500 dark:text-zinc-400 font-sans text-[11px]",
+                      ? "px-3 py-1.5 pl-6 pr-3 text-zinc-800 dark:text-zinc-200 font-sans font-semibold text-xs mt-1"
+                      : "px-3 py-1 pl-10 pr-3 text-zinc-500 dark:text-zinc-400 font-sans text-[11px]",
                   activeView === 'chapter' && activeChapterId === chapter.id
                     ? isPart
                       ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/40 dark:text-emerald-300 border-l-[3px] border-emerald-600"
@@ -699,11 +720,13 @@ export function BookEditor() {
                 )}
               >
                 {!isPart && (
-                  <span className="w-3 text-left text-[10px] opacity-40 font-mono -ml-0.5">
+                  <span className="w-3 text-left text-[10px] opacity-40 font-mono -ml-0.5 shrink-0">
                     {level === 2 ? '章' : '•'}
                   </span>
                 )}
-                <span className="truncate flex-1 font-serif text-left">{chapter.title}</span>
+                <span className="truncate font-serif text-left max-w-[150px] shrink-0">{chapter.title}</span>
+                <span className="flex-1 border-b border-dotted border-zinc-300/60 dark:border-zinc-700/60 mx-1 mb-1 opacity-70" />
+                <span className="text-[10px] font-mono opacity-50 shrink-0 select-none mr-1">({chapterPageMap[chapter.id]})</span>
                 {chapter.content && <Check className="w-3 h-3 text-emerald-500 shrink-0" />}
               </button>
             );

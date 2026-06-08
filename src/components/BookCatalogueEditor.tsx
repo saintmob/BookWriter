@@ -41,12 +41,20 @@ export function BookCatalogueEditor({ book, chapters, language, onUpdateBook }: 
   const catalogueChapters = useMemo(() => {
     const result: ChapterItem[] = [];
     let currentChapter: ChapterItem | null = null;
+    const pageMap: Record<string, number> = {};
     let pageCounter = 12;
 
-    const generatePageFn = () => {
-      pageCounter += Math.floor(Math.random() * 20) + 10;
-      return String(pageCounter);
-    };
+    // Calculate deterministic starting pages for all chapters
+    chapters.forEach((ch) => {
+      pageMap[ch.id] = pageCounter;
+      if (ch.level === 1) {
+        pageCounter += 2;
+      } else {
+        const charCount = ch.content?.length || 0;
+        const estPages = Math.max(1, Math.ceil(charCount / 500));
+        pageCounter += estPages;
+      }
+    });
 
     chapters.forEach((ch) => {
       if (ch.level === 1 || ch.level === 2) {
@@ -54,7 +62,7 @@ export function BookCatalogueEditor({ book, chapters, language, onUpdateBook }: 
           id: ch.id,
           title: ch.title,
           description: ch.description,
-          page: generatePageFn(),
+          page: String(pageMap[ch.id]),
           sections: [],
           imageSeed: result.length + 1
         };
@@ -63,7 +71,7 @@ export function BookCatalogueEditor({ book, chapters, language, onUpdateBook }: 
         currentChapter.sections.push({
           id: ch.id,
           title: ch.title,
-          page: generatePageFn()
+          page: String(pageMap[ch.id])
         });
       }
     });
@@ -74,7 +82,7 @@ export function BookCatalogueEditor({ book, chapters, language, onUpdateBook }: 
        })
     }
     return result;
-  }, [chapters]);
+  }, [chapters, isZh]);
 
   const bookInfo: BookInfo = {
     title: book.title || 'Untitled',

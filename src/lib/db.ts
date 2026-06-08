@@ -1,12 +1,22 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 
 export interface DesignTheme {
+  designConcept?: string;
+  readingExperience?: string;
   keywords: string[];
   colors: {
     dominant: string;
     accent: string;
     background: string;
     text: string;
+  };
+  dna?: {
+    theme: string;
+    tension: string;
+    archetypes: string[];
+    emotion_curve: string;
+    metaphor: string;
+    narrative_direction: string;
   };
   typography: {
     headingFont?: string;
@@ -79,9 +89,11 @@ export interface PageLayout {
   fontFamily?: string;
   dropCaps?: boolean;
   headerPos?: 'hidden' | 'top-center' | 'top-outside' | 'bottom-center' | 'bottom-outside';
-  chapterTitleStyle?: 'hidden' | 'classical' | 'modern' | 'minimal';
-  sceneBreakStyle?: 'asterism' | 'dots' | 'line' | 'space';
+  chapterTitleStyle?: 'hidden' | 'classical' | 'modern' | 'minimal' | 'ornate' | 'bold';
+  sceneBreakStyle?: 'asterism' | 'dots' | 'line' | 'space' | 'fleuron';
   hyphenation?: boolean;
+  dnaTensionStyle?: 'normal' | 'fractured' | 'rigid' | 'fluid' | 'compressed';
+  dropCapsStyle?: 'standard' | 'gothic' | 'minimal' | 'modern';
 }
 
 export interface Chapter {
