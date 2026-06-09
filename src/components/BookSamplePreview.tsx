@@ -7,6 +7,7 @@ import { PagedjsPreview } from './PagedjsPreview';
 import { cn } from '../lib/utils';
 import { TOCPreview } from '../catalogue/TOCPreview';
 import { INITIAL_DESIGN_CONFIG } from '../catalogue/presets';
+import { toast } from 'sonner';
 
 interface BookSamplePreviewProps {
   isOpen: boolean;
@@ -16,7 +17,8 @@ interface BookSamplePreviewProps {
 }
 
 export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSamplePreviewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const currentLanguage = i18n.language || 'zh';
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [scale, setScale] = useState(1);
@@ -251,6 +253,20 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
     .pagedjs_margin-bottom-center {
        padding-bottom: 20px;
     }
+
+    @media print {
+      .pagedjs_page {
+        border: none !important;
+        background-image: none !important; /* Removes SVG noise texture for pure vector export */
+        box-shadow: none !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .pagedjs_left_page, .pagedjs_right_page, .pagedjs_first_page {
+        box-shadow: none !important;
+        background-image: none !important;
+      }
+    }
     
     .book-content-wrapper {
       font-family: ${fontFamilyCss};
@@ -305,7 +321,19 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    window.print();
+    const showPrintInstructions = () => {
+       toast.success(currentLanguage === 'zh' ? '请在系统打印对话框中选择「另存为 PDF」并设置「无边距」。' : 'Select "Save as PDF" and "No Margins" in the print dialog.', { duration: 5000 });
+       setTimeout(() => window.print(), 500);
+    };
+
+    if (!usePagedJs) {
+       setUsePagedJs(true);
+       // We need to wait for Paged.js to render before printing
+       toast.info(currentLanguage === 'zh' ? '正在准备矢量 PDF 版式...' : 'Preparing Vector PDF layout...');
+       setTimeout(showPrintInstructions, 2000);
+    } else {
+       showPrintInstructions();
+    }
   };
 
   const nextPage = () => {
@@ -368,6 +396,100 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
       const nextChapterStartPage = getChapterStartPage(currentIdx + 1);
       setCurrentPage(nextChapterStartPage);
     }
+  };
+
+  const renderBookContent = (forPagedJs: boolean = false) => {
+    return (
+      <div 
+        className={cn(
+          "book-content-wrapper prose max-w-none antialiased break-words",
+          baseLayout.paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
+          // Drop Caps variants
+          baseLayout.dropCaps && baseLayout.dropCapsStyle === 'gothic' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-6xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-bold [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:mt-1 [&_.chapter-body-content>p:first-of-type]:first-letter:font-serif",
+          baseLayout.dropCaps && baseLayout.dropCapsStyle === 'minimal' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-light [&_.chapter-body-content>p:first-of-type]:first-letter:pr-3 [&_.chapter-body-content>p:first-of-type]:first-letter:-mt-1",
+          baseLayout.dropCaps && baseLayout.dropCapsStyle === 'modern' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-black [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:pt-1 [&_.chapter-body-content>p:first-of-type]:first-letter:font-sans",
+          baseLayout.dropCaps && (!baseLayout.dropCapsStyle || baseLayout.dropCapsStyle === 'standard') && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-bold [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:-mt-1",
+          
+          "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
+        )}
+        style={{ 
+          width: forPagedJs ? 'auto' : `${SINGLE_PAGE_WIDTH - (baseLayout.marginLeft ?? 80) - (baseLayout.marginRight ?? 80)}px`,
+          marginLeft: forPagedJs ? 0 : (baseLayout.marginLeft ?? 80),
+          marginRight: forPagedJs ? 0 : (baseLayout.marginRight ?? 80),
+          columnCount: baseLayout.columns || 1,
+          columnGap: '2em',
+          fontFamily: fontFamilyCss,
+          fontSize: `${baseLayout.fontSize || 16}px`,
+          lineHeight: baseLayout.lineHeight || 1.6,
+          textAlign: baseLayout.justifyText !== false ? 'justify' : 'left',
+          hyphens: baseLayout.hyphenation ? 'auto' : 'none',
+          textRendering: 'optimizeLegibility',
+          fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
+          '--paragraph-spacing': `${baseLayout.paragraphSpacing ?? 16}px`,
+          '--first-line-indent': `${baseLayout.firstLineIndent ?? 0}em`,
+          letterSpacing: baseLayout.dnaTensionStyle === 'rigid' ? '-0.01em' : 
+                         baseLayout.dnaTensionStyle === 'fluid' ? '0.02em' : 
+                         baseLayout.dnaTensionStyle === 'fractured' ? '0.04em' : 
+                         baseLayout.dnaTensionStyle === 'compressed' ? '-0.03em' : 'normal',
+          wordSpacing: baseLayout.dnaTensionStyle === 'fractured' ? '0.15em' : 'normal',
+        } as React.CSSProperties}
+      >
+         {/* Title Page */}
+         <div style={{ breakAfter: forPagedJs ? 'page' : 'column', height: `${SINGLE_PAGE_HEIGHT - (baseLayout.marginTop ?? 60) - (baseLayout.marginBottom ?? 60)}px`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', width: '100%', paddingLeft: '40px', paddingRight: '40px' }}>
+            <div className="mb-8 text-xs font-bold tracking-[0.3em] uppercase opacity-50">InkSpire Edition</div>
+            <h1 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight !text-center !break-before-auto">{book.title}</h1>
+            <div className="w-12 h-1 bg-current opacity-20 mb-8"></div>
+            <p className="text-lg italic opacity-80 max-w-xs mx-auto leading-relaxed !text-indent-0 !text-center">{book.summary}</p>
+         </div>
+
+         <TOCPreview 
+           bookInfo={{ title: book.title, subtitle: book.designTheme?.typography?.headingFont || 'Catalogue', author: book.coverAuthor || 'Author' }}
+           chapters={catalogueChapters}
+           config={book.catalogueConfig?.designConfig || INITIAL_DESIGN_CONFIG}
+           selectedLayout={book.catalogueConfig?.selectedLayout || 'classic'}
+           printMode={true}
+         />
+
+         {chapters.map((chapter, idx) => (
+           <div key={chapter.id} id={`chapter-${chapter.id}`} className="chapter-start break-before-column" style={{ breakBefore: forPagedJs ? 'page' : 'column' }} data-chapter-id={chapter.id} data-chapter-index={idx}>
+             {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
+                <div className={cn(
+                  "mb-12 break-after-avoid whitespace-pre-wrap",
+                  baseLayout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
+                  baseLayout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-inherit pb-4 mb-10" : 
+                  baseLayout.chapterTitleStyle === 'ornate' ? "text-center mt-16 mb-20 border-y py-4 border-inherit" :
+                  baseLayout.chapterTitleStyle === 'bold' ? "text-left mt-8 mb-16" :
+                  "text-left" // minimal
+                )}>
+                  {baseLayout.chapterTitleStyle === 'ornate' && <div className="text-center text-xl opacity-50 mb-2">❦</div>}
+                  <h2 className={cn(
+                    "!m-0 !border-none leading-tight",
+                    baseLayout.chapterTitleStyle === 'classical' ? "!text-4xl !font-normal !font-serif" : 
+                    baseLayout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
+                    baseLayout.chapterTitleStyle === 'ornate' ? "!text-4xl !font-serif italic tracking-widest uppercase" :
+                    baseLayout.chapterTitleStyle === 'bold' ? "!text-6xl !font-sans font-black tracking-tighter uppercase" :
+                    "!text-2xl !font-serif italic"
+                  )}>
+                    {chapter.title}
+                  </h2>
+                  {baseLayout.chapterTitleStyle === 'ornate' && <div className="text-center text-xl opacity-50 mt-2">❦</div>}
+                </div>
+             ) : (null)}
+             
+             <div className="chapter-body-content">
+               <MarkdownRenderer 
+                 floatingImages={chapter.floatingImages || []}
+                 sceneBreakStyle={baseLayout.sceneBreakStyle}
+               >
+                 {(chapter.content || '').replace(/^\s*#\s+[^\n]+(?:\n+|$)/, '')}
+               </MarkdownRenderer>
+             </div>
+             
+             {idx < chapters.length - 1 && !forPagedJs && <hr />}
+           </div>
+         ))}
+      </div>
+    );
   };
 
   return (
@@ -584,96 +706,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                     width: 'max-content',
                   }}
                 >
-                  {/* Render Content */}
-                  <div 
-                    className={cn(
-                      "prose max-w-none antialiased break-words",
-                      baseLayout.paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
-                      // Drop Caps variants
-                      baseLayout.dropCaps && baseLayout.dropCapsStyle === 'gothic' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-6xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-bold [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:mt-1 [&_.chapter-body-content>p:first-of-type]:first-letter:font-serif",
-                      baseLayout.dropCaps && baseLayout.dropCapsStyle === 'minimal' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-light [&_.chapter-body-content>p:first-of-type]:first-letter:pr-3 [&_.chapter-body-content>p:first-of-type]:first-letter:-mt-1",
-                      baseLayout.dropCaps && baseLayout.dropCapsStyle === 'modern' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-black [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:pt-1 [&_.chapter-body-content>p:first-of-type]:first-letter:font-sans",
-                      baseLayout.dropCaps && (!baseLayout.dropCapsStyle || baseLayout.dropCapsStyle === 'standard') && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-bold [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:-mt-1",
-                      
-                      "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
-                    )}
-                    style={{ 
-                      width: `${SINGLE_PAGE_WIDTH - (baseLayout.marginLeft ?? 80) - (baseLayout.marginRight ?? 80)}px`,
-                      marginLeft: baseLayout.marginLeft ?? 80,
-                      marginRight: baseLayout.marginRight ?? 80,
-                      columnCount: baseLayout.columns || 1,
-                      columnGap: '2em',
-                      fontFamily: fontFamilyCss,
-                      fontSize: `${baseLayout.fontSize || 16}px`,
-                      lineHeight: baseLayout.lineHeight || 1.6,
-                      textAlign: baseLayout.justifyText !== false ? 'justify' : 'left',
-                      hyphens: baseLayout.hyphenation ? 'auto' : 'none',
-                      textRendering: 'optimizeLegibility',
-                      fontFeatureSettings: '"liga" 1, "kern" 1, "onum" 1, "pnum" 1',
-                      '--paragraph-spacing': `${baseLayout.paragraphSpacing ?? 16}px`,
-                      '--first-line-indent': `${baseLayout.firstLineIndent ?? 0}em`,
-                      letterSpacing: baseLayout.dnaTensionStyle === 'rigid' ? '-0.01em' : 
-                                     baseLayout.dnaTensionStyle === 'fluid' ? '0.02em' : 
-                                     baseLayout.dnaTensionStyle === 'fractured' ? '0.04em' : 
-                                     baseLayout.dnaTensionStyle === 'compressed' ? '-0.03em' : 'normal',
-                      wordSpacing: baseLayout.dnaTensionStyle === 'fractured' ? '0.15em' : 'normal',
-                    } as React.CSSProperties}
-                  >
-                     {/* Title Page */}
-                       <div style={{ breakAfter: 'column', height: `${SINGLE_PAGE_HEIGHT - (baseLayout.marginTop ?? 60) - (baseLayout.marginBottom ?? 60)}px`, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', width: '100%', paddingLeft: '40px', paddingRight: '40px' }}>
-                          <div className="mb-8 text-xs font-bold tracking-[0.3em] uppercase opacity-50">InkSpire Edition</div>
-                          <h1 className="text-4xl md:text-5xl font-bold mb-8 tracking-tight !text-center !break-before-auto">{book.title}</h1>
-                          <div className="w-12 h-1 bg-current opacity-20 mb-8"></div>
-                          <p className="text-lg italic opacity-80 max-w-xs mx-auto leading-relaxed !text-indent-0 !text-center">{book.summary}</p>
-                       </div>
-
-                       <TOCPreview 
-                         bookInfo={{ title: book.title, subtitle: book.designTheme?.typography?.headingFont || 'Catalogue', author: book.coverAuthor || 'Author' }}
-                         chapters={catalogueChapters}
-                         config={book.catalogueConfig?.designConfig || INITIAL_DESIGN_CONFIG}
-                         selectedLayout={book.catalogueConfig?.selectedLayout || 'classic'}
-                         printMode={true}
-                       />
-
-                       {chapters.map((chapter, idx) => (
-                         <div key={chapter.id} id={`chapter-${chapter.id}`} className="chapter-start break-before-column" style={{ breakBefore: 'column' }} data-chapter-id={chapter.id} data-chapter-index={idx}>
-                           {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
-                              <div className={cn(
-                                "mb-12",
-                                baseLayout.chapterTitleStyle === 'classical' ? "text-center mt-12 mb-16" : 
-                                baseLayout.chapterTitleStyle === 'modern' ? "text-left border-b-2 border-inherit pb-4 mb-10" : 
-                                baseLayout.chapterTitleStyle === 'ornate' ? "text-center mt-16 mb-20 border-y py-4 border-inherit" :
-                                baseLayout.chapterTitleStyle === 'bold' ? "text-left mt-8 mb-16" :
-                                "text-left" // minimal
-                              )}>
-                                {baseLayout.chapterTitleStyle === 'ornate' && <div className="text-center text-xl opacity-50 mb-2">❦</div>}
-                                <h2 className={cn(
-                                  "!m-0 !border-none leading-tight",
-                                  baseLayout.chapterTitleStyle === 'classical' ? "!text-4xl !font-normal !font-serif" : 
-                                  baseLayout.chapterTitleStyle === 'modern' ? "!text-5xl !font-sans font-bold tracking-tight" : 
-                                  baseLayout.chapterTitleStyle === 'ornate' ? "!text-4xl !font-serif italic tracking-widest uppercase" :
-                                  baseLayout.chapterTitleStyle === 'bold' ? "!text-6xl !font-sans font-black tracking-tighter uppercase" :
-                                  "!text-2xl !font-serif italic"
-                                )}>
-                                  {chapter.title}
-                                </h2>
-                                {baseLayout.chapterTitleStyle === 'ornate' && <div className="text-center text-xl opacity-50 mt-2">❦</div>}
-                              </div>
-                           ) : (null)}
-                           
-                           <div className="chapter-body-content">
-                             <MarkdownRenderer 
-                               floatingImages={chapter.floatingImages || []}
-                               sceneBreakStyle={baseLayout.sceneBreakStyle}
-                             >
-                               {(chapter.content || '').replace(/^\s*#\s+[^\n]+(?:\n+|$)/, '')}
-                             </MarkdownRenderer>
-                           </div>
-                           
-                           {idx < chapters.length - 1 && <hr />}
-                         </div>
-                       ))}
-                  </div>
+                  {renderBookContent(false)}
                 </div>
               </div>
             </div>
@@ -715,66 +748,8 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
         style={{ display: 'none' }}
         className="book-content-wrapper pagedjs-content"
       >
-        {/* Title Page */}
-        <div className="chapter-start" style={{ textAlign: 'center', width: '100%', breakAfter: 'page' }}>
-           <div style={{ marginBottom: '2rem', fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.3em', textTransform: 'uppercase', opacity: 0.5 }}>InkSpire Edition</div>
-           <h1 style={{ fontSize: '3rem', fontWeight: 'bold', marginBottom: '2rem' }}>{book.title}</h1>
-           <div style={{ width: '3rem', height: '0.25rem', background: 'currentColor', opacity: 0.2, margin: '0 auto 2rem auto' }}></div>
-           <p style={{ fontSize: '1.25rem', fontStyle: 'italic', opacity: 0.8, maxWidth: '20rem', margin: '0 auto' }}>{book.summary}</p>
-        </div>
-
-        <TOCPreview 
-          bookInfo={{ title: book.title, subtitle: book.designTheme?.typography?.headingFont || 'Catalogue', author: book.coverAuthor || 'Author' }}
-          chapters={catalogueChapters}
-          config={book.catalogueConfig?.designConfig || INITIAL_DESIGN_CONFIG}
-          selectedLayout={book.catalogueConfig?.selectedLayout || 'classic'}
-          printMode={true}
-        />
-
-        {chapters.map((chapter, idx) => (
-          <div key={chapter.id} id={`chapter-${chapter.id}`} className="chapter-start" data-chapter-id={chapter.id} data-chapter-index={idx}>
-            {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
-               <div style={{
-                 marginBottom: '3rem',
-                 ...(baseLayout.chapterTitleStyle === 'classical' ? { textAlign: 'center', marginTop: '3rem', marginBottom: '4rem' } : 
-                     baseLayout.chapterTitleStyle === 'modern' ? { textAlign: 'left', borderBottom: '2px solid', paddingBottom: '1rem', marginBottom: '2.5rem' } : 
-                     { textAlign: 'left' })
-               }}>
-                 <h2 style={{
-                   margin: 0, border: 'none', lineHeight: 1.1,
-                   ...(baseLayout.chapterTitleStyle === 'classical' ? { fontSize: '2.5rem', fontWeight: 'normal', fontFamily: 'serif' } : 
-                       baseLayout.chapterTitleStyle === 'modern' ? { fontSize: '3rem', fontFamily: 'sans-serif', fontWeight: 'bold', letterSpacing: '-0.025em' } : 
-                       { fontSize: '1.5rem', fontFamily: 'serif', fontStyle: 'italic' })
-                 }}>
-                   {chapter.title}
-                 </h2>
-               </div>
-            ) : null}
-            
-            <div className="chapter-body-content">
-              <MarkdownRenderer 
-                floatingImages={chapter.floatingImages || []}
-                sceneBreakStyle={baseLayout.sceneBreakStyle}
-              >
-                {(chapter.content || '').replace(/^\s*#\s+[^\n]+(?:\n+|$)/, '')}
-              </MarkdownRenderer>
-            </div>
-          </div>
-        ))}
+        {renderBookContent(true)}
       </div>
-
-      {/* Print Styles (Hidden in UI, visible when printing) */}
-      <style>{`
-        @media print {
-          @page { margin: 2cm; size: A4; }
-          body * { visibility: hidden; }
-          #print-container, #print-container * { visibility: visible; }
-          #print-container { position: absolute; left: 0; top: 0; width: 100%; }
-          .break-inside-avoid { break-inside: avoid; }
-          /* Reset colors for print */
-          #print-container { color: black; background: white; }
-        }
-      `}</style>
     </div>
   );
 }

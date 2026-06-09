@@ -27,29 +27,40 @@
 @variant dark (&:where(.dark, .dark *));
 
 @media print {
-  /* Hide all UI elements by default */
+  html, body, #root {
+    background: transparent !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   body * {
     visibility: hidden;
   }
 
-  /* Only show the print container and its children */
-  #print-container, #print-container * {
+  .pagedjs-container, .pagedjs-container * {
     visibility: visible;
   }
 
-  #print-container {
-    position: absolute;
+  .pagedjs-container {
+    position: absolute !important;
     left: 0;
     top: 0;
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    background: white;
-    color: black;
+    width: 100vw;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: none !important;
   }
 
-  /* Reset page margins and padding */
-  @page {
-    margin: 2cm;
+  .pagedjs_pages {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }

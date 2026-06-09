@@ -1008,8 +1008,8 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
               className={`chapter-start pagedjs-toc-page`}
               style={{
                 page: 'toc',
-                breakBefore: 'page',
-                breakAfter: 'page',
+                breakBefore: printMode ? 'page' : 'column',
+                breakAfter: printMode ? 'page' : 'column',
                 width: '100%',
                 height: '100%',
                 position: 'relative',

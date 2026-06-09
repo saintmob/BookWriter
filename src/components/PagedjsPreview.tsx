@@ -30,6 +30,7 @@ export function PagedjsPreview({ contentElement, contentHtml, css, onProcessed, 
       
       try {
         const input = contentElement ? contentElement.innerHTML : contentHtml;
+        
         const flow = await previewer.preview(input, [cssUrl], containerRef.current);
         URL.revokeObjectURL(cssUrl);
         setIsProcessing(false);
