@@ -208,27 +208,31 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     // -----------------------------------------------------------------
     // LAYOUT 1: CLASSIC (经典书籍目录)
     // -----------------------------------------------------------------
-    const renderClassicLayout = (pageChapters: any[]) => {
+    const renderClassicLayout = (pageChapters: any[], pageIndex: number) => {
       const charGap = getChapterGap(config.density);
       const secGap = getSectionGap(config.density);
 
       return (
         <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
           <div>
-            {/* Header section with book info */}
-            <div className="flex justify-between items-baseline border-b border-stone-200 pb-3 mb-8">
-              <span className="text-xs uppercase tracking-widest font-sans opacity-60 truncate max-w-[65%]">
-                {bookInfo.title}
-              </span>
-              <span className="text-xs font-serif italic opacity-60">CONTENTS</span>
-            </div>
+            {pageIndex === 0 && (
+              <>
+                {/* Header section with book info */}
+                <div className="flex justify-between items-baseline border-b border-stone-200 pb-3 mb-8">
+                  <span className="text-xs uppercase tracking-widest font-sans opacity-60 truncate max-w-[65%]">
+                    {bookInfo.title}
+                  </span>
+                  <span className="text-xs font-serif italic opacity-60">CONTENTS</span>
+                </div>
 
-            {/* Document Header Title */}
-            <div className="text-center mb-12">
-              <h1 className="text-3xl font-semibold tracking-wide font-serif mb-2">目录</h1>
-              <p className="text-xs uppercase tracking-widest text-stone-400 font-mono">Table of Contents</p>
-              <div className="w-12 h-[1px] bg-stone-300 mx-auto mt-4" style={{ backgroundColor: primaryColor }} />
-            </div>
+                {/* Document Header Title */}
+                <div className="text-center mb-12">
+                  <h1 className="text-3xl font-semibold tracking-wide font-serif mb-2">目录</h1>
+                  <p className="text-xs uppercase tracking-widest text-stone-400 font-mono">Table of Contents</p>
+                  <div className="w-12 h-[1px] bg-stone-300 mx-auto mt-4" style={{ backgroundColor: primaryColor }} />
+                </div>
+              </>
+            )}
 
             {/* Core Chapters */}
             <div className={`${charGap}`}>
@@ -304,27 +308,31 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     // -----------------------------------------------------------------
     // LAYOUT 2: MODERN MINIMAL (现代极简目录)
     // -----------------------------------------------------------------
-    const renderMinimalLayout = (pageChapters: any[]) => {
+    const renderMinimalLayout = (pageChapters: any[], pageIndex: number) => {
       const charGap = getChapterGap(config.density);
       const secGap = getSectionGap(config.density);
 
       return (
         <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
           <div>
-            {/* Header: Clean thin title */}
-            <div className="mb-14">
-              <span className="text-[10px] uppercase tracking-widest font-mono opacity-40 block mb-2">Book Index</span>
-              <h1 className="text-xl tracking-tight font-light opacity-80" style={{ color: secondaryColor }}>
-                {bookInfo.title}
-              </h1>
-            </div>
+            {pageIndex === 0 && (
+              <>
+                {/* Header: Clean thin title */}
+                <div className="mb-14">
+                  <span className="text-[10px] uppercase tracking-widest font-mono opacity-40 block mb-2">Book Index</span>
+                  <h1 className="text-xl tracking-tight font-light opacity-80" style={{ color: secondaryColor }}>
+                    {bookInfo.title}
+                  </h1>
+                </div>
 
-            {/* Huge Contents Indicator */}
-            <div className="mb-12">
-              <span className="text-6xl font-light tracking-tighter opacity-10 block pr-8 -ml-1">
-                CONTENTS
-              </span>
-            </div>
+                {/* Huge Contents Indicator */}
+                <div className="mb-12">
+                  <span className="text-6xl font-light tracking-tighter opacity-10 block pr-8 -ml-1">
+                    CONTENTS
+                  </span>
+                </div>
+              </>
+            )}
 
             {/* Content List */}
             <div className={`${charGap} border-l border-stone-100 pl-4`} style={{ borderColor: `${primaryColor}15` }}>
@@ -388,26 +396,30 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     // -----------------------------------------------------------------
     // LAYOUT 3: MAGAZINE (杂志感目录)
     // -----------------------------------------------------------------
-    const renderMagazineLayout = (pageChapters: any[]) => {
+    const renderMagazineLayout = (pageChapters: any[], pageIndex: number) => {
       // Divided into elegant split grids or columns
       return (
         <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
           <div>
-            {/* Rich Magazine Banner */}
-            <div className="grid grid-cols-3 gap-4 border-b-2 border-current pb-4 mb-8">
-              <div className="col-span-2">
-                <p className="text-[10px] font-mono tracking-wider uppercase opacity-65">EDITORIAL PORTFOLIO</p>
-                <h1 className="text-3xl font-black uppercase tracking-tighter mt-1">
-                  CONTENTS
-                </h1>
+            {pageIndex === 0 && (
+              <>
+              {/* Rich Magazine Banner */}
+              <div className="grid grid-cols-3 gap-4 border-b-2 border-current pb-4 mb-8">
+                <div className="col-span-2">
+                  <p className="text-[10px] font-mono tracking-wider uppercase opacity-65">EDITORIAL PORTFOLIO</p>
+                  <h1 className="text-3xl font-black uppercase tracking-tighter mt-1">
+                    CONTENTS
+                  </h1>
+                </div>
+                <div className="text-right flex flex-col justify-end">
+                  <span className="text-xs uppercase font-extrabold px-3 py-1 text-white inline-block self-end" style={{ backgroundColor: accentColor }}>
+                    ISSUE #04
+                  </span>
+                  <span className="text-[9px] font-mono opacity-50 mt-1">VOL. 26</span>
+                </div>
               </div>
-              <div className="text-right flex flex-col justify-end">
-                <span className="text-xs uppercase font-extrabold px-3 py-1 text-white inline-block self-end" style={{ backgroundColor: accentColor }}>
-                  ISSUE #04
-                </span>
-                <span className="text-[9px] font-mono opacity-50 mt-1">VOL. 26</span>
-              </div>
-            </div>
+              </>
+            )}
 
             {/* Featured Article Layout Block */}
             <div className="grid grid-cols-12 gap-6">
@@ -481,26 +493,32 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     // -----------------------------------------------------------------
     // LAYOUT 4: POSTER (海报错位目录)
     // -----------------------------------------------------------------
-    const renderPosterLayout = (pageChapters: any[]) => {
+    const renderPosterLayout = (pageChapters: any[], pageIndex: number) => {
       return (
         <div className="h-full flex flex-col justify-between relative overflow-hidden" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
-          {/* Rotated structural background giant word */}
-          <div className="absolute -left-10 top-20 text-[100px] font-black tracking-widest text-stone-100 select-none rotate-90 origin-top-left pointer-events-none uppercase opacity-[0.06]" style={{ color: `${accentColor}10` }}>
-            INDEX
-          </div>
+          {pageIndex === 0 && (
+            <>
+              {/* Rotated structural background giant word */}
+              <div className="absolute -left-10 top-20 text-[100px] font-black tracking-widest text-stone-100 select-none rotate-90 origin-top-left pointer-events-none uppercase opacity-[0.06]" style={{ color: `${accentColor}10` }}>
+                INDEX
+              </div>
+
+              <div>
+                {/* Header with visual weight */}
+                <div className="mb-14 relative z-10">
+                  <div className="w-10 h-1.5 mb-3" style={{ backgroundColor: accentColor }} />
+                  <h1 className="text-4xl font-extrabold tracking-tight font-display mb-1">
+                    {bookInfo.title}
+                  </h1>
+                  <p className="text-xs uppercase tracking-widest font-mono opacity-50 mt-1">
+                    {bookInfo.subtitle}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
 
           <div>
-            {/* Header with visual weight */}
-            <div className="mb-14 relative z-10">
-              <div className="w-10 h-1.5 mb-3" style={{ backgroundColor: accentColor }} />
-              <h1 className="text-4xl font-extrabold tracking-tight font-display mb-1">
-                {bookInfo.title}
-              </h1>
-              <p className="text-xs uppercase tracking-widest font-mono opacity-50 mt-1">
-                {bookInfo.subtitle}
-              </p>
-            </div>
-
             {/* Poster Alternating Chapters */}
             <div className="space-y-6 relative z-10">
               {pageChapters.map((ch, localIdx) => { const idx = (ch as any).originalIdx ?? localIdx;
@@ -558,31 +576,35 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     // -----------------------------------------------------------------
     // LAYOUT 5: GRID SYSTEM (网格系统目录)
     // -----------------------------------------------------------------
-    const renderGridLayout = (pageChapters: any[]) => {
+    const renderGridLayout = (pageChapters: any[], pageIndex: number) => {
       return (
         <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
           <div>
-            {/* Structured blueprint details */}
-            <div className="grid grid-cols-4 gap-2 text-[9px] font-mono uppercase opacity-50 border-b pb-4 mb-6">
-              <div>
-                <span className="block text-stone-400">Scale:</span>
-                <span className="font-semibold text-stone-800">1 : 1.25</span>
-              </div>
-              <div>
-                <span className="block text-stone-400">Type:</span>
-                <span className="font-semibold text-stone-800">Grid Catalog</span>
-              </div>
-              <div className="col-span-2 text-right">
-                <span className="block text-stone-400">Document Source:</span>
-                <span className="font-semibold text-stone-800 truncate block">{bookInfo.title}</span>
-              </div>
-            </div>
+            {pageIndex === 0 && (
+              <>
+                {/* Structured blueprint details */}
+                <div className="grid grid-cols-4 gap-2 text-[9px] font-mono uppercase opacity-50 border-b pb-4 mb-6">
+                  <div>
+                    <span className="block text-stone-400">Scale:</span>
+                    <span className="font-semibold text-stone-800">1 : 1.25</span>
+                  </div>
+                  <div>
+                    <span className="block text-stone-400">Type:</span>
+                    <span className="font-semibold text-stone-800">Grid Catalog</span>
+                  </div>
+                  <div className="col-span-2 text-right">
+                    <span className="block text-stone-400">Document Source:</span>
+                    <span className="font-semibold text-stone-800 truncate block">{bookInfo.title}</span>
+                  </div>
+                </div>
 
-            {/* Huge Grid Headline */}
-            <div className="mb-6 flex justify-between items-baseline">
-              <h1 className="text-xl font-bold tracking-wide font-mono">GRID SCHEMA SPEC.</h1>
-              <span className="text-xs font-mono font-bold" style={{ color: accentColor }}>[00 / INDEX]</span>
-            </div>
+                {/* Huge Grid Headline */}
+                <div className="mb-6 flex justify-between items-baseline">
+                  <h1 className="text-xl font-bold tracking-wide font-mono">GRID SCHEMA SPEC.</h1>
+                  <span className="text-xs font-mono font-bold" style={{ color: accentColor }}>[00 / INDEX]</span>
+                </div>
+              </>
+            )}
 
             {/* Clean grid boxes */}
             <div className="grid grid-cols-2 gap-px bg-stone-300 border border-stone-300 rounded overflow-hidden">
@@ -639,19 +661,23 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     // -----------------------------------------------------------------
     // LAYOUT 6: TIMELINE (时间轴目录)
     // -----------------------------------------------------------------
-    const renderTimelineLayout = (pageChapters: any[]) => {
+    const renderTimelineLayout = (pageChapters: any[], pageIndex: number) => {
       const charGap = getChapterGap(config.density);
 
       return (
         <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
           <div>
-            {/* Timeline Header */}
-            <div className="mb-10 text-center relative">
-              <span className="text-[10px] uppercase tracking-[0.2em] font-mono opacity-50 block mb-1">CHRONOLOGICAL SUMMARY</span>
-              <h1 className="text-2xl font-light font-serif">{bookInfo.title}</h1>
-              <p className="text-xs italic text-stone-400 mt-1">时空之镜 · 目录索引</p>
-              <div className="w-8 h-[2px] bg-stone-200 mx-auto mt-3" style={{ backgroundColor: accentColor }} />
-            </div>
+            {pageIndex === 0 && (
+              <>
+              {/* Timeline Header */}
+              <div className="mb-10 text-center relative">
+                <span className="text-[10px] uppercase tracking-[0.2em] font-mono opacity-50 block mb-1">CHRONOLOGICAL SUMMARY</span>
+                <h1 className="text-2xl font-light font-serif">{bookInfo.title}</h1>
+                <p className="text-xs italic text-stone-400 mt-1">时空之镜 · 目录索引</p>
+                <div className="w-8 h-[2px] bg-stone-200 mx-auto mt-3" style={{ backgroundColor: accentColor }} />
+              </div>
+              </>
+            )}
 
             {/* Timeline Grid Flow */}
             <div className={`relative pl-8 ${charGap}`}>
@@ -737,24 +763,28 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     // -----------------------------------------------------------------
     // LAYOUT 7: IMAGE-TEXT (图文混排目录)
     // -----------------------------------------------------------------
-    const renderImageTextLayout = (pageChapters: any[]) => {
+    const renderImageTextLayout = (pageChapters: any[], pageIndex: number) => {
       return (
         <div className="h-full flex flex-col justify-between" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
           <div>
-            {/* High-end design layout header */}
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <h1 className="text-xl font-bold uppercase tracking-tight font-sans">
-                  EXHIBIT INDEX
-                </h1>
-                <p className="text-[10px] font-mono opacity-50 uppercase tracking-widest mt-0.5">
-                  Visual Gallery List
-                </p>
+            {pageIndex === 0 && (
+              <>
+              {/* High-end design layout header */}
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h1 className="text-xl font-bold uppercase tracking-tight font-sans">
+                    EXHIBIT INDEX
+                  </h1>
+                  <p className="text-[10px] font-mono opacity-50 uppercase tracking-widest mt-0.5">
+                    Visual Gallery List
+                  </p>
+                </div>
+                <div className="text-right text-[9px] font-mono uppercase opacity-50">
+                  <span>{bookInfo.title.substring(0, 16)}...</span>
+                </div>
               </div>
-              <div className="text-right text-[9px] font-mono uppercase opacity-50">
-                <span>{bookInfo.title.substring(0, 16)}...</span>
-              </div>
-            </div>
+              </>
+            )}
 
             {/* Visual Book Catalog items */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-6">
@@ -813,30 +843,36 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     // -----------------------------------------------------------------
     // LAYOUT 8: EXPERIMENTAL (实验性目录)
     // -----------------------------------------------------------------
-    const renderExperimentalLayout = (pageChapters: any[]) => {
+    const renderExperimentalLayout = (pageChapters: any[], pageIndex: number) => {
       return (
         <div className="h-full flex flex-col justify-between relative overflow-hidden" style={{ padding: `${config.pagePadding * MM_TO_PX}px` }}>
-          {/* Subtle design crop marks in the corners */}
-          <div className="absolute top-2 left-2 text-[9px] font-mono opacity-25 select-none">[+] CROP_L_TOP</div>
-          <div className="absolute top-2 right-2 text-[9px] font-mono opacity-25 select-none">CROP_R_TOP [+]</div>
-          <div className="absolute bottom-2 left-2 text-[9px] font-mono opacity-25 select-none">[+] CROP_L_BOT</div>
-          <div className="absolute bottom-2 right-2 text-[9px] font-mono opacity-25 select-none">CROP_R_BOT [+]</div>
+          {pageIndex === 0 && (
+            <>
+              {/* Subtle design crop marks in the corners */}
+              <div className="absolute top-2 left-2 text-[9px] font-mono opacity-25 select-none">[+] CROP_L_TOP</div>
+              <div className="absolute top-2 right-2 text-[9px] font-mono opacity-25 select-none">CROP_R_TOP [+]</div>
+              <div className="absolute bottom-2 left-2 text-[9px] font-mono opacity-25 select-none">[+] CROP_L_BOT</div>
+              <div className="absolute bottom-2 right-2 text-[9px] font-mono opacity-25 select-none">CROP_R_BOT [+]</div>
+
+              <div>
+                {/* Header: Disordered design */}
+                <div className="mb-10 relative">
+                  <div className="absolute top-0 right-0 border-r-2 border-b-2 border-current w-12 h-12" style={{ color: accentColor }} />
+                  <span className="inline-block bg-black text-white px-2 py-0.5 text-[9px] font-mono font-bold leading-none mb-3 rotate-[-3deg]" style={{ backgroundColor: accentColor }}>
+                    AVANT-GARDE SPECS
+                  </span>
+                  <h1 className="text-3xl font-black italic tracking-widest font-mono uppercase mt-1">
+                    KINETIC
+                  </h1>
+                  <h2 className="text-sm font-bold uppercase tracking-tighter opacity-80" style={{ color: secondaryColor }}>
+                    INDEX OF WORKFLOWS
+                  </h2>
+                </div>
+              </div>
+            </>
+          )}
 
           <div>
-            {/* Header: Disordered design */}
-            <div className="mb-10 relative">
-              <div className="absolute top-0 right-0 border-r-2 border-b-2 border-current w-12 h-12" style={{ color: accentColor }} />
-              <span className="inline-block bg-black text-white px-2 py-0.5 text-[9px] font-mono font-bold leading-none mb-3 rotate-[-3deg]" style={{ backgroundColor: accentColor }}>
-                AVANT-GARDE SPECS
-              </span>
-              <h1 className="text-3xl font-black italic tracking-widest font-mono uppercase mt-1">
-                KINETIC
-              </h1>
-              <h2 className="text-sm font-bold uppercase tracking-tighter opacity-80" style={{ color: secondaryColor }}>
-                INDEX OF WORKFLOWS
-              </h2>
-            </div>
-
             {/* Scattered index rows */}
             <div className="space-y-4">
               {pageChapters.map((ch, localIdx) => { const idx = (ch as any).originalIdx ?? localIdx;
@@ -897,25 +933,25 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
     };
 
     // Routing Layout Component
-    const renderLayout = (pageChapters: any[]) => {
+    const renderLayout = (pageChapters: any[], pageIndex: number = 0) => {
       switch (selectedLayout) {
         case 'minimal':
-          return renderMinimalLayout(pageChapters);
+          return renderMinimalLayout(pageChapters, pageIndex);
         case 'magazine':
-          return renderMagazineLayout(pageChapters);
+          return renderMagazineLayout(pageChapters, pageIndex);
         case 'poster':
-          return renderPosterLayout(pageChapters);
+          return renderPosterLayout(pageChapters, pageIndex);
         case 'grid':
-          return renderGridLayout(pageChapters);
+          return renderGridLayout(pageChapters, pageIndex);
         case 'timeline':
-          return renderTimelineLayout(pageChapters);
+          return renderTimelineLayout(pageChapters, pageIndex);
         case 'imagetext':
-          return renderImageTextLayout(pageChapters);
+          return renderImageTextLayout(pageChapters, pageIndex);
         case 'experimental':
-          return renderExperimentalLayout(pageChapters);
+          return renderExperimentalLayout(pageChapters, pageIndex);
         case 'classic':
         default:
-          return renderClassicLayout(pageChapters);
+          return renderClassicLayout(pageChapters, pageIndex);
       }
     };
 
@@ -982,7 +1018,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                 backgroundColor: 'transparent',
               }}
             >
-              {renderLayout(pageChapters)}
+              {renderLayout(pageChapters, pageIndex)}
             </div>
           ))}
         </>
@@ -1005,7 +1041,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
               className={`relative shrink-0 overflow-hidden ${config.paperTexture ? 'paper-grain' : ''}`}
             >
               <div style={marginGuideStyle} />
-              {renderLayout(pageChapters)}
+              {renderLayout(pageChapters, pageIndex)}
               
               {pages.length > 1 && (
                 <div className="absolute bottom-2 left-0 w-full text-center text-[9px] scale-90 opacity-40 font-mono p-1 mix-blend-multiply">

@@ -666,7 +666,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                                floatingImages={chapter.floatingImages || []}
                                sceneBreakStyle={baseLayout.sceneBreakStyle}
                              >
-                               {chapter.content || ''}
+                               {(chapter.content || '').replace(/^\s*#\s+[^\n]+(?:\n+|$)/, '')}
                              </MarkdownRenderer>
                            </div>
                            
@@ -756,7 +756,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                 floatingImages={chapter.floatingImages || []}
                 sceneBreakStyle={baseLayout.sceneBreakStyle}
               >
-                {chapter.content || ''}
+                {(chapter.content || '').replace(/^\s*#\s+[^\n]+(?:\n+|$)/, '')}
               </MarkdownRenderer>
             </div>
           </div>

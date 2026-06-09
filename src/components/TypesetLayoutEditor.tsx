@@ -732,7 +732,7 @@ export function TypesetLayoutEditor({
                         showBlockIndices={true}
                         sceneBreakStyle={layout.sceneBreakStyle}
                       >
-                        {content || ''}
+                        {(content || '').replace(/^\s*#\s+[^\n]+(?:\n+|$)/, '')}
                       </MarkdownRenderer>
                     </div>
                   </div>
