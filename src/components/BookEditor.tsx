@@ -65,6 +65,7 @@ export function BookEditor() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSamplePreviewOpen, setIsSamplePreviewOpen] = useState(false);
+  const [autoPrintSample, setAutoPrintSample] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -403,7 +404,8 @@ export function BookEditor() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setAutoPrintSample(true);
+    setIsSamplePreviewOpen(true);
     setShowExportMenu(false);
   };
 
@@ -770,8 +772,10 @@ export function BookEditor() {
                   onClick={handlePrint}
                   className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                 >
-                  <Printer className="w-4 h-4" />
-                  {t('print_pdf')}
+                  <Printer className="w-4 h-4 text-emerald-500" />
+                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                    {language === 'zh' ? '印刷排版与 PDF 导出' : 'Press-Ready PDF Export'}
+                  </span>
                 </button>
                 <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1"></div>
                 <button
@@ -887,9 +891,13 @@ export function BookEditor() {
       {book && (
         <BookSamplePreview
           isOpen={isSamplePreviewOpen}
-          onClose={() => setIsSamplePreviewOpen(false)}
+          onClose={() => {
+            setIsSamplePreviewOpen(false);
+            setAutoPrintSample(false);
+          }}
           book={book}
           chapters={chapters}
+          autoPrint={autoPrintSample}
         />
       )}
 
