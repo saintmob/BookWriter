@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'sonner';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { BatchOutlineEditor } from './BatchOutlineEditor';
+import { BatchOutlineEditor, generateMarkdownString, parseMarkdownString } from './BatchOutlineEditor';
 
 interface OutlineEditorModalProps {
   isOpen: boolean;
@@ -35,6 +35,7 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
   
   // Local state for chapters (preview)
   const [chapters, setChapters] = useState<Chapter[]>(initialChapters);
+  const [batchRawText, setBatchRawText] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: t('outline_editor_welcome') || "I can help you modify the book outline. You can ask me to add, remove, or rename chapters." }
   ]);
@@ -49,6 +50,12 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
       setMessages([{ role: 'assistant', content: t('outline_editor_welcome') || "I can help you modify the book outline. You can ask me to add, remove, or rename chapters." }]);
     }
   }, [isOpen, initialChapters, t]);
+
+  useEffect(() => {
+    if (book) {
+      setBatchRawText(generateMarkdownString(chapters, book.title));
+    }
+  }, [chapters, book?.title]);
 
   useEffect(() => {
     if (viewMode === 'ai') {
@@ -112,10 +119,36 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
     }
   };
 
+  const handleParseBatch = () => {
+    try {
+      const newChapters = parseMarkdownString(batchRawText, chapters);
+      setChapters(newChapters);
+      toast.success(isZh ? `成功解析预览！点击左下方保存以生效。` : `Successfully previewed! Click Save below to apply.`);
+    } catch (e: any) {
+      toast.error(isZh ? '解析异常，请检查文本格式' : 'Parse error, please check text format');
+    }
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
+    let finalChaptersToSave = chapters;
+    
+    if (viewMode === 'batch') {
+       const currentGen = generateMarkdownString(chapters, book?.title || 'Book Title');
+       if (batchRawText !== currentGen) {
+         try {
+           finalChaptersToSave = parseMarkdownString(batchRawText, chapters);
+           setChapters(finalChaptersToSave); // Update local state to reflect the latest changes
+         } catch(e: any) {
+           toast.error(isZh ? '批量编辑格式有误，请修复后保存' : 'Batch edit format error, please fix before saving.');
+           setIsSaving(false);
+           return;
+         }
+       }
+    }
+
     try {
-      await onSave(chapters);
+      await onSave(finalChaptersToSave);
       toast.success(t('outline_saved_success'));
       onClose();
     } catch (error: any) {
@@ -256,9 +289,9 @@ export function OutlineEditorModal({ isOpen, onClose, bookId, initialChapters, o
 
             {viewMode === 'batch' ? (
               <BatchOutlineEditor 
-                chapters={chapters} 
-                onImport={(nc) => setChapters(nc)} 
-                bookTitle={book?.title || 'Book Title'} 
+                rawText={batchRawText} 
+                onRawTextChange={setBatchRawText} 
+                onParseAndImport={handleParseBatch}
               />
             ) : (
               <>
