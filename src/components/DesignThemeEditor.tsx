@@ -1519,8 +1519,8 @@ Book DNA (Semantic Context):
                            {/* Wireframe Preview Box */}
                            <div className="w-[65px] h-[90px] rounded-[3px] shadow border relative overflow-hidden shrink-0" 
                                 style={{ 
-                                  backgroundColor: (t.paperStyle === 'dark' || t.paperStyle === 'slate') ? '#18181b' : (t.paperStyle === 'warm' || t.paperStyle === 'vintage') ? '#fdf6e3' : '#ffffff',
-                                  borderColor: (t.paperStyle === 'dark' || t.paperStyle === 'slate') ? '#3f3f46' : '#e4e4e7'
+                                  backgroundColor: t.paperStyle === 'dark' ? '#18181b' : (t.paperStyle === 'warm' || t.paperStyle === 'vintage') ? '#fdf6e3' : '#ffffff',
+                                  borderColor: t.paperStyle === 'dark' ? '#3f3f46' : '#e4e4e7'
                                 }}>
                               <div className="absolute border border-indigo-500/30 bg-indigo-500/10 flex gap-[2px] p-[1px]" style={{
                                 top: `${Math.min(20, (t.marginTop || 48) / 3.5)}px`, 
@@ -1580,7 +1580,7 @@ Book DNA (Semantic Context):
                                : 'border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
                            }`}
                            style={{
-                             backgroundColor: (ref.wireframeMock.paperStyle === 'dark' || ref.wireframeMock.paperStyle === 'slate') ? '#18181b' : (ref.wireframeMock.paperStyle === 'warm' || ref.wireframeMock.paperStyle === 'vintage' || ref.wireframeMock.paperStyle === 'kraft') ? '#fdf6e3' : '#ffffff',
+                             backgroundColor: ref.wireframeMock.paperStyle === 'dark' ? '#18181b' : (ref.wireframeMock.paperStyle === 'warm' || ref.wireframeMock.paperStyle === 'vintage' || ref.wireframeMock.paperStyle === 'kraft') ? '#fdf6e3' : '#ffffff',
                            }}
                          >
                            {/* Wireframe background elements */}

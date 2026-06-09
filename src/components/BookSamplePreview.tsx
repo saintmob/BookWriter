@@ -46,7 +46,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
     const result: any[] = [];
     let currentChapter: any = null;
     const pageMap: Record<string, number> = {};
-    let pageCounter = 12;
+    let pageCounter = 3; // Title + TOC take about 2 pages
 
     // Calculate deterministic starting pages for all chapters
     chapters.forEach((ch) => {
@@ -195,6 +195,13 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
         color: #999;
       }
     }
+
+    @page toc {
+      margin: 0;
+      @bottom-center {
+        content: none;
+      }
+    }
     
     .pagedjs_pages {
       display: flex;
@@ -267,21 +274,31 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
       text-indent: var(--first-line-indent);
     }
     ${baseLayout.dropCaps ? `
-      .book-content-wrapper p:first-of-type::first-letter {
-         float: left;
-         font-size: ${baseLayout.dropCapsStyle === 'gothic' ? '3.8em' : baseLayout.dropCapsStyle === 'minimal' ? '3.2em' : '3em'};
-         font-weight: ${baseLayout.dropCapsStyle === 'gothic' || baseLayout.dropCapsStyle === 'standard' ? 'bold' : baseLayout.dropCapsStyle === 'minimal' ? '300' : '900'};
-         font-family: ${baseLayout.dropCapsStyle === 'gothic' ? 'Georgia, serif' : baseLayout.dropCapsStyle === 'modern' ? 'ui-sans-serif, sans-serif' : 'inherit'};
-         padding-right: ${baseLayout.dropCapsStyle === 'minimal' ? '12px' : '8px'};
-         padding-top: ${baseLayout.dropCapsStyle === 'modern' ? '4px' : '0'};
-         line-height: 0.8;
-      }
+    .book-content-wrapper .chapter-body-content > p:first-of-type::first-letter {
+       float: left;
+       font-size: ${baseLayout.dropCapsStyle === 'gothic' ? '3.8em' : baseLayout.dropCapsStyle === 'minimal' ? '3.2em' : '3em'};
+       font-weight: ${baseLayout.dropCapsStyle === 'gothic' || baseLayout.dropCapsStyle === 'standard' ? 'bold' : baseLayout.dropCapsStyle === 'minimal' ? '300' : '900'};
+       font-family: ${baseLayout.dropCapsStyle === 'gothic' ? 'Georgia, serif' : baseLayout.dropCapsStyle === 'modern' ? 'ui-sans-serif, sans-serif' : 'inherit'};
+       padding-right: ${baseLayout.dropCapsStyle === 'minimal' ? '12px' : '8px'};
+       padding-top: ${baseLayout.dropCapsStyle === 'modern' ? '4px' : '0'};
+       line-height: 0.8;
+    }
     ` : ''}
     .chapter-start {
       break-before: page;
     }
     .break-before-column {
       break-before: page;
+    }
+    
+    /* TOC Dynamic Page Numbers for Paged.js */
+    .toc-dynamic-page::after {
+      content: target-counter(attr(href), page);
+    }
+    a.toc-dynamic-page {
+      text-decoration: none;
+      color: inherit;
+      cursor: pointer;
     }
   `;
 
@@ -572,7 +589,12 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                     className={cn(
                       "prose max-w-none antialiased break-words",
                       baseLayout.paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
-                      baseLayout.dropCaps && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
+                      // Drop Caps variants
+                      baseLayout.dropCaps && baseLayout.dropCapsStyle === 'gothic' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-6xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-bold [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:mt-1 [&_.chapter-body-content>p:first-of-type]:first-letter:font-serif",
+                      baseLayout.dropCaps && baseLayout.dropCapsStyle === 'minimal' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-light [&_.chapter-body-content>p:first-of-type]:first-letter:pr-3 [&_.chapter-body-content>p:first-of-type]:first-letter:-mt-1",
+                      baseLayout.dropCaps && baseLayout.dropCapsStyle === 'modern' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-black [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:pt-1 [&_.chapter-body-content>p:first-of-type]:first-letter:font-sans",
+                      baseLayout.dropCaps && (!baseLayout.dropCapsStyle || baseLayout.dropCapsStyle === 'standard') && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-bold [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:-mt-1",
+                      
                       "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
                     )}
                     style={{ 
@@ -614,7 +636,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                        />
 
                        {chapters.map((chapter, idx) => (
-                         <div key={chapter.id} className="chapter-start break-before-column" style={{ breakBefore: 'column' }} data-chapter-id={chapter.id} data-chapter-index={idx}>
+                         <div key={chapter.id} id={`chapter-${chapter.id}`} className="chapter-start break-before-column" style={{ breakBefore: 'column' }} data-chapter-id={chapter.id} data-chapter-index={idx}>
                            {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
                               <div className={cn(
                                 "mb-12",
@@ -639,12 +661,14 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                               </div>
                            ) : (null)}
                            
-                           <MarkdownRenderer 
-                             floatingImages={chapter.floatingImages || []}
-                             sceneBreakStyle={baseLayout.sceneBreakStyle}
-                           >
-                             {chapter.content || ''}
-                           </MarkdownRenderer>
+                           <div className="chapter-body-content">
+                             <MarkdownRenderer 
+                               floatingImages={chapter.floatingImages || []}
+                               sceneBreakStyle={baseLayout.sceneBreakStyle}
+                             >
+                               {chapter.content || ''}
+                             </MarkdownRenderer>
+                           </div>
                            
                            {idx < chapters.length - 1 && <hr />}
                          </div>
@@ -708,7 +732,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
         />
 
         {chapters.map((chapter, idx) => (
-          <div key={chapter.id} className="chapter-start" data-chapter-id={chapter.id} data-chapter-index={idx}>
+          <div key={chapter.id} id={`chapter-${chapter.id}`} className="chapter-start" data-chapter-id={chapter.id} data-chapter-index={idx}>
             {baseLayout.chapterTitleStyle && baseLayout.chapterTitleStyle !== 'hidden' ? (
                <div style={{
                  marginBottom: '3rem',
@@ -727,12 +751,14 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSampl
                </div>
             ) : null}
             
-            <MarkdownRenderer 
-              floatingImages={chapter.floatingImages || []}
-              sceneBreakStyle={baseLayout.sceneBreakStyle}
-            >
-              {chapter.content || ''}
-            </MarkdownRenderer>
+            <div className="chapter-body-content">
+              <MarkdownRenderer 
+                floatingImages={chapter.floatingImages || []}
+                sceneBreakStyle={baseLayout.sceneBreakStyle}
+              >
+                {chapter.content || ''}
+              </MarkdownRenderer>
+            </div>
           </div>
         ))}
       </div>

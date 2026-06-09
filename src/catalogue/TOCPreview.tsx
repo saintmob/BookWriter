@@ -39,23 +39,17 @@ export function getChapterPrefix(index: number, style: string): string {
   }
 }
 
-// Helper to format page numbers
-export function formatPageNumber(page: string, style: string, prefix: string): string {
-  if (!page) return '';
+const RenderFormattedPage = ({ page, id, style, prefix, printMode }: { page?: string, id: string, style: string, prefix: string, printMode?: boolean }) => {
+  if (style === 'HIDDEN') return null;
+  const num = <DynamicPageNumber page={page} id={id} printMode={printMode} />;
   switch (style) {
-    case 'NUM_ONLY':
-      return page;
-    case 'CHAPTER_NUM':
-      return prefix ? `${prefix} — ${page}` : page;
-    case 'DOTS':
-      return `· ${page} ·`;
-    case 'RIGHT_VERTICAL':
-      return page;
-    case 'HIDDEN':
-    default:
-      return '';
+    case 'NUM_ONLY': return num;
+    case 'CHAPTER_NUM': return prefix ? <>{prefix} — {num}</> : num;
+    case 'DOTS': return <>· {num} ·</>;
+    case 'RIGHT_VERTICAL': return num;
+    default: return null;
   }
-}
+};
 
 // Helper to get abstract geometric gradient background based on chapter seed
 function getSeedGradient(seed: number): string {
@@ -81,6 +75,10 @@ function getDecorativeShape(seed: number) {
   ];
   return shapes[(seed - 1) % shapes.length] || shapes[0];
 }
+
+const DynamicPageNumber = ({ page, id, printMode }: { page?: string, id: string, printMode?: boolean }) => {
+  return <>{page || ''}</>;
+};
 
 export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
   ({ bookInfo, chapters, config, selectedLayout, printMode }, ref) => {
@@ -237,7 +235,6 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
               {pageChapters.map((ch, localIdx) => { const idx = (ch as any).originalIdx ?? localIdx;
                 const prefix = getChapterPrefix(idx, config.prefixStyle);
                 const showPrefix = config.prefixStyle !== 'NONE';
-                const formattedPage = formatPageNumber(ch.page, config.numberStyle, prefix);
 
                 return (
                   <div key={ch.id} className="group">
@@ -259,7 +256,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
 
                       {config.numberStyle !== 'HIDDEN' && (
                         <span className="font-mono text-sm font-medium pr-1" style={{ color: accentColor }}>
-                          {formattedPage}
+                          <RenderFormattedPage page={ch.page} id={ch.id} style={config.numberStyle} prefix={prefix} printMode={printMode} />
                         </span>
                       )}
                     </div>
@@ -281,7 +278,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                             </span>
                             {config.numberStyle !== 'HIDDEN' && (
                               <span className="font-mono text-xs text-stone-400 pl-2">
-                                {sec.page}
+                                <DynamicPageNumber page={sec.page} id={sec.id} printMode={printMode} />
                               </span>
                             )}
                           </div>
@@ -340,7 +337,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                     {/* Floating mini page marker */}
                     {config.numberStyle !== 'HIDDEN' && (
                       <span className="absolute -left-12 top-0.5 text-xs font-mono tracking-widest opacity-60 text-right w-6" style={{ color: accentColor }}>
-                        {ch.page}
+                        <DynamicPageNumber page={ch.page} id={ch.id} printMode={printMode} />
                       </span>
                     )}
 
@@ -365,7 +362,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                         <div className={`${secGap} text-[11px] text-stone-500`}>
                           {ch.sections.map((sec) => (
                             <span key={sec.id} className="inline-block mr-4 opacity-75 hover:opacity-100">
-                              <span className="font-mono text-[9px] mr-1 text-stone-400">{sec.page}</span>
+                              <span className="font-mono text-[9px] mr-1 text-stone-400"><DynamicPageNumber page={sec.page} id={sec.id} printMode={printMode} /></span>
                               {sec.title}
                               <span className="ml-3 opacity-30 select-none">/</span>
                             </span>
@@ -426,7 +423,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                       <div className="col-span-2 flex flex-col justify-start">
                         {config.numberStyle !== 'HIDDEN' && (
                           <span className="text-3xl font-black font-mono leading-none group-hover:scale-110 duration-250 tracking-tighter" style={{ color: accentColor }}>
-                            {ch.page}
+                            <DynamicPageNumber page={ch.page} id={ch.id} printMode={printMode} />
                           </span>
                         )}
                         {showPrefix && (
@@ -458,7 +455,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                             {ch.sections.map((sec) => (
                               <div key={sec.id} className="text-[10px] bg-stone-50 px-2 py-0.5 rounded flex items-center gap-1.5 opacity-80 hover:opacity-100 border border-stone-100">
                                 <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accentColor }} />
-                                <span className="font-mono text-stone-400">{sec.page}</span>
+                                <span className="font-mono text-stone-400"><DynamicPageNumber page={sec.page} id={sec.id} printMode={printMode} /></span>
                                 <span className="text-stone-600 font-medium">{sec.title}</span>
                               </div>
                             ))}
@@ -522,7 +519,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                         </span>
                         {config.numberStyle !== 'HIDDEN' && (
                           <span className="text-lg font-black font-mono" style={{ color: accentColor }}>
-                            {ch.page}
+                            <DynamicPageNumber page={ch.page} id={ch.id} printMode={printMode} />
                           </span>
                         )}
                       </div>
@@ -536,7 +533,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-stone-500 font-mono">
                           {ch.sections.map((sec) => (
                             <span key={sec.id} className="hover:text-stone-900 duration-100">
-                              <span className="mr-1 underline" style={{ textDecorationColor: `${accentColor}50` }}>{sec.page}</span>
+                              <span className="mr-1 underline" style={{ textDecorationColor: `${accentColor}50` }}><DynamicPageNumber page={sec.page} id={sec.id} printMode={printMode} /></span>
                               {sec.title}
                             </span>
                           ))}
@@ -606,7 +603,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                           {showPrefix ? prefix : `0${idx + 1}`}
                         </span>
                         {config.numberStyle !== 'HIDDEN' && (
-                          <span className="text-stone-400 font-medium">PG.{ch.page}</span>
+                          <span className="text-stone-400 font-medium">PG.<DynamicPageNumber page={ch.page} id={ch.id} printMode={printMode} /></span>
                         )}
                       </div>
 
@@ -687,7 +684,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                       <div className="flex items-baseline gap-2">
                         {config.numberStyle !== 'HIDDEN' && (
                           <span className="font-mono text-xs font-bold" style={{ color: accentColor }}>
-                            {ch.page}p
+                            <DynamicPageNumber page={ch.page} id={ch.id} printMode={printMode} />p
                           </span>
                         )}
                         <span className="text-[9px] font-mono text-stone-400">/</span>
@@ -715,7 +712,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                             <li key={sec.id} className="text-[10px] text-stone-500 flex justify-between max-w-[80%]">
                               <span>{sec.title}</span>
                               {config.numberStyle !== 'HIDDEN' && (
-                                <span className="font-mono text-stone-400">{sec.page}</span>
+                                <span className="font-mono text-stone-400"><DynamicPageNumber page={sec.page} id={sec.id} printMode={printMode} /></span>
                               )}
                             </li>
                           ))}
@@ -782,7 +779,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                         </span>
                         {config.numberStyle !== 'HIDDEN' && (
                           <span className="text-xs font-mono font-black tracking-tighter text-white">
-                            P.{ch.page}
+                            P.<DynamicPageNumber page={ch.page} id={ch.id} printMode={printMode} />
                           </span>
                         )}
                       </div>
@@ -857,7 +854,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                     {/* Visual overlapping giant number in backgrounds */}
                     {config.numberStyle !== 'HIDDEN' && (
                       <span className="absolute right-2 -bottom-2 text-4xl font-mono font-black text-stone-100 select-none group-hover:text-stone-200 transition-colors pointer-events-none opacity-[0.4]" style={{ color: `${accentColor}12` }}>
-                        #{ch.page}
+                        #<DynamicPageNumber page={ch.page} id={ch.id} printMode={printMode} />
                       </span>
                     )}
 
@@ -867,7 +864,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                       </span>
                       {config.numberStyle !== 'HIDDEN' && (
                         <span className="text-xs font-mono font-bold" style={{ color: accentColor }}>
-                          {ch.page}
+                          <DynamicPageNumber page={ch.page} id={ch.id} printMode={printMode} />
                         </span>
                       )}
                     </div>
@@ -972,8 +969,9 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
           {pages.map((pageChapters, pageIndex) => (
             <div
               key={pageIndex}
-              className={`chapter-start pagedjs-toc-page ${config.paperTexture ? 'paper-grain' : ''}`}
+              className={`chapter-start pagedjs-toc-page`}
               style={{
+                page: 'toc',
                 breakBefore: 'page',
                 breakAfter: 'page',
                 width: '100%',
@@ -981,7 +979,7 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
                 position: 'relative',
                 color: textMainColor,
                 fontFamily: fontClass,
-                backgroundColor: config.paperTexture ? bgColor : 'transparent',
+                backgroundColor: 'transparent',
               }}
             >
               {renderLayout(pageChapters)}

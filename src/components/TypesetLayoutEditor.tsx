@@ -261,7 +261,40 @@ export function TypesetLayoutEditor({
       // 1. Sync Book layout
       const isBookLayoutEqual = JSON.stringify(localBookLayout) === JSON.stringify(book.layout || {});
       if (!isBookLayoutEqual) {
-        const updatedBook = { ...book, layout: localBookLayout as PageLayout, updatedAt: Date.now() };
+        let updatedBook = { ...book, layout: localBookLayout as PageLayout, updatedAt: Date.now() };
+
+        // Smart Sync TOC Theme with Paper Style
+        const oldPaper = book.layout?.paperStyle || 'warm';
+        const newPaper = localBookLayout.paperStyle || 'warm';
+        
+        if (oldPaper !== newPaper) {
+           const syncPresetMap: Record<string, string> = {
+              'dark': 'LUXE_GOLD',
+              'warm': 'CREAM_PAPER',
+              'vintage': 'RETRO_BROWN',
+              'kraft': 'RETRO_BROWN',
+              'white': 'BLACK_WHITE',
+              'glossy': 'BOLD_ART',
+              'newsprint': 'CREAM_PAPER'
+           };
+           const newPreset = syncPresetMap[newPaper];
+           const currentTOCPreset = book.catalogueConfig?.designConfig?.themePreset || 'CREAM_PAPER';
+           
+           if (newPreset && newPreset !== currentTOCPreset) {
+              updatedBook = {
+                 ...updatedBook,
+                 catalogueConfig: {
+                    ...(updatedBook.catalogueConfig || {}),
+                    designConfig: {
+                       ...(updatedBook.catalogueConfig?.designConfig || {}),
+                       themePreset: newPreset
+                    }
+                 }
+              };
+              toast.info(currentLanguage === 'zh' ? '目录配色已智能适配当前纸张，可在目录设置独立调整' : 'TOC theme auto-adapted to paper style, can be adjusted in Catalogue menu');
+           }
+        }
+
         await db.saveBook(updatedBook);
         onUpdateBook(updatedBook);
       }
@@ -647,10 +680,10 @@ export function TypesetLayoutEditor({
                       paperStyle === 'dark' ? 'prose-invert text-zinc-100' : 'prose-zinc text-zinc-850',
                       
                       // Drop Caps variants
-                      layout.dropCaps && layout.dropCapsStyle === 'gothic' && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-6xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:mt-1 prose-p:first-of-type:first-letter:font-serif",
-                      layout.dropCaps && layout.dropCapsStyle === 'minimal' && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-light prose-p:first-of-type:first-letter:pr-3 prose-p:first-of-type:first-letter:-mt-1",
-                      layout.dropCaps && layout.dropCapsStyle === 'modern' && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-black prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:pt-1 prose-p:first-of-type:first-letter:font-sans",
-                      layout.dropCaps && (!layout.dropCapsStyle || layout.dropCapsStyle === 'standard') && "prose-p:first-of-type:first-letter:float-left prose-p:first-of-type:first-letter:text-5xl prose-p:first-of-type:first-letter:font-bold prose-p:first-of-type:first-letter:pr-2 prose-p:first-of-type:first-letter:-mt-1",
+                      layout.dropCaps && layout.dropCapsStyle === 'gothic' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-6xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-bold [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:mt-1 [&_.chapter-body-content>p:first-of-type]:first-letter:font-serif",
+                      layout.dropCaps && layout.dropCapsStyle === 'minimal' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-light [&_.chapter-body-content>p:first-of-type]:first-letter:pr-3 [&_.chapter-body-content>p:first-of-type]:first-letter:-mt-1",
+                      layout.dropCaps && layout.dropCapsStyle === 'modern' && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-black [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:pt-1 [&_.chapter-body-content>p:first-of-type]:first-letter:font-sans",
+                      layout.dropCaps && (!layout.dropCapsStyle || layout.dropCapsStyle === 'standard') && "[&_.chapter-body-content>p:first-of-type]:first-letter:float-left [&_.chapter-body-content>p:first-of-type]:first-letter:text-5xl [&_.chapter-body-content>p:first-of-type]:first-letter:font-bold [&_.chapter-body-content>p:first-of-type]:first-letter:pr-2 [&_.chapter-body-content>p:first-of-type]:first-letter:-mt-1",
                       
                       "[&>p]:mt-0 [&>p]:mb-[var(--paragraph-spacing)] [&>p]:indent-[var(--first-line-indent)]"
                     )}
@@ -679,27 +712,29 @@ export function TypesetLayoutEditor({
                       </div>
                     ) : (null)}
                     
-                    <MarkdownRenderer 
-                      floatingImages={floatingImages}
-                      selectedImageId={selectedImageId}
-                      croppingImageId={croppingImageId}
-                      onImageClick={(id) => {
-                         setSelectedImageId(id);
-                         setActiveAssetTab('details');
-                      }}
-                      onImageDoubleClick={(id) => {
-                         if (croppingImageId === id) setCroppingImageId(null);
-                         else setCroppingImageId(id);
-                      }}
-                      onImageDragStart={(e, id) => {
-                         const img = floatingImages.find(i => i.id === id);
-                         if (img) handleMaskDragStart(e, img);
-                      }}
-                      showBlockIndices={true}
-                      sceneBreakStyle={layout.sceneBreakStyle}
-                    >
-                      {content || ''}
-                    </MarkdownRenderer>
+                    <div className="chapter-body-content">
+                      <MarkdownRenderer 
+                        floatingImages={floatingImages}
+                        selectedImageId={selectedImageId}
+                        croppingImageId={croppingImageId}
+                        onImageClick={(id) => {
+                           setSelectedImageId(id);
+                           setActiveAssetTab('details');
+                        }}
+                        onImageDoubleClick={(id) => {
+                           if (croppingImageId === id) setCroppingImageId(null);
+                           else setCroppingImageId(id);
+                        }}
+                        onImageDragStart={(e, id) => {
+                           const img = floatingImages.find(i => i.id === id);
+                           if (img) handleMaskDragStart(e, img);
+                        }}
+                        showBlockIndices={true}
+                        sceneBreakStyle={layout.sceneBreakStyle}
+                      >
+                        {content || ''}
+                      </MarkdownRenderer>
+                    </div>
                   </div>
                 </div>
 
