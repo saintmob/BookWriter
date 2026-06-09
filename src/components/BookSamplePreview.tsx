@@ -566,7 +566,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900/95 backdrop-blur-sm text-zinc-100 animate-in fade-in duration-200">
+    <div id="pagedjs-print-modal-root" className="fixed inset-0 z-50 flex flex-col bg-zinc-900/95 backdrop-blur-sm text-zinc-100 animate-in fade-in duration-200">
       {/* Header / Toolbar */}
       <div className="flex items-center justify-between px-6 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0 z-50">
         <div className="flex items-center gap-4">
@@ -624,10 +624,11 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
       {/* Main Preview Area */}
       <div 
         ref={wrapperRef}
+        id="pagedjs-print-modal-wrapper"
         className="flex-1 flex items-center justify-center p-4 overflow-hidden relative bg-zinc-950"
       >
         {usePagedJs ? (
-          <div className="absolute inset-0 w-full h-full overflow-hidden flex flex-col md:flex-row">
+          <div id="pagedjs-print-modal-inner" className="absolute inset-0 w-full h-full overflow-hidden flex flex-col md:flex-row">
             {/* Left Assistant Panel */}
             {showExportAssistant && (
               <div id="vector-export-sidebar" className="w-full md:w-96 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-900/95 flex flex-col justify-between p-5 overflow-y-auto shrink-0 z-20 shadow-2xl relative">
@@ -773,7 +774,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
             )}
 
             {/* Paged.js Typeset Engine Viewer View */}
-            <div className="flex-1 h-full overflow-hidden relative flex flex-col">
+            <div id="pagedjs-print-modal-content-area" className="flex-1 h-full overflow-hidden relative flex flex-col">
               <PagedjsPreview 
                  contentHtml={htmlContent} 
                  css={pagedJsCss} 
@@ -1120,50 +1121,106 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
       <style>{`
         @media print {
           ${usePagedJs ? `
+            /* 1. Page definition for Paged.js printed format */
             @page { 
-              margin: 0; 
+              margin: 0 !important; 
               size: ${getPhysicalPageSize(baseLayout.format || 'a4')}; 
             }
-            body * { 
-              visibility: hidden; 
+
+            /* 2. Reset html & body layout to support pure natural scrolling page-breaks */
+            html, body {
+              background: #ffffff !important;
+              color: #000000 !important;
+              overflow: visible !important;
+              height: auto !important;
+              min-height: 0 !important;
+              max-height: none !important;
+              position: static !important;
+              margin: 0 !important;
+              padding: 0 !important;
             }
+
+            /* 3. Hide all screen elements by default */
+            body * { 
+              visibility: hidden !important; 
+            }
+
+            /* 4. Force all ancestors of Paged.js page-wrapper to be static flow blocks. 
+               This is CRITICAL: it prevents fixed / overflow:hidden parent frameworks 
+               from clipping pages at page 1 fold. */
+            #root,
+            #root > div,
+            #pagedjs-print-modal-root,
+            #pagedjs-print-modal-wrapper,
+            #pagedjs-print-modal-inner,
+            #pagedjs-print-modal-content-area {
+              position: static !important;
+              display: block !important;
+              overflow: visible !important;
+              height: auto !important;
+              min-height: 0 !important;
+              max-height: none !important;
+              width: auto !important;
+              transform: none !important;
+              background: transparent !important;
+              box-shadow: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+              border: none !important;
+              opacity: 1 !important;
+              visibility: visible !important;
+            }
+
+            /* 5. Force the Paged.js container wrappers to be fully visible and naturally sized */
             .pagedjs-wrapper,
-            .pagedjs-wrapper *,
-            .pagedjs-container,
-            .pagedjs-container * { 
+            .pagedjs-wrapper * { 
               visibility: visible !important; 
             }
+            .pagedjs-container,
+            .pagedjs-container * {
+              visibility: visible !important;
+            }
+
             .pagedjs-wrapper {
+              display: block !important;
               position: absolute !important;
               left: 0 !important;
               top: 0 !important;
               width: 100% !important;
               height: auto !important;
-              background: white !important;
+              background: #ffffff !important;
               padding: 0 !important;
               margin: 0 !important;
               overflow: visible !important;
             }
             .pagedjs-container {
-              transform: scale(1) !important;
-              transform-origin: top left !important;
+              display: block !important;
+              position: static !important;
               padding: 0 !important;
               margin: 0 !important;
               width: 100% !important;
               height: auto !important;
+              transform: scale(1) !important;
+              transform-origin: top left !important;
+              overflow: visible !important;
             }
             .pagedjs_pages {
+              display: flex !important;
+              flex-direction: column !important;
               padding: 0 !important;
               gap: 0 !important;
               max-width: none !important;
               background: none !important;
+              background-color: transparent !important;
+              height: auto !important;
+              overflow: visible !important;
             }
             .pagedjs_page {
+              display: block !important;
               background-color: #ffffff !important;
-              background-image: none !important;
-              color: #000000 !important;
-              border: none !important;
-              box-shadow: none !important;
+              background-image: none !important; /* Strip noise fiber */
+              border: none !important;           /* Strip borders */
+              box-shadow: none !important;       /* Strip card shadows */
               border-radius: 0 !important;
               margin: 0 !important;
               page-break-after: always !important;
@@ -1173,11 +1230,33 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
             .pagedjs_right_page, 
             .pagedjs_first_page {
               border-radius: 0 !important;
-              background-image: none !important;
+              background-image: none !important; /* Strip bindings shadow */
+              box-shadow: none !important;
+              background-color: #ffffff !important;
+            }
+            .pagedjs_page .book-content-wrapper,
+            .pagedjs_page .prose {
+              color: #000000 !important; /* Dense publication-quality black vector text */
+            }
+            .pagedjs_page * {
+              background: transparent !important;
+              text-shadow: none !important;
               box-shadow: none !important;
             }
+
+            /* Explicitly hide the sidebar panel and header/navigation elements */
+            #vector-export-sidebar,
+            header,
+            footer,
+            nav,
+            button,
+            .bg-zinc-900,
             #print-container {
               display: none !important;
+              visibility: hidden !important;
+              height: 0 !important;
+              width: 0 !important;
+              overflow: hidden !important;
             }
           ` : `
             @page { margin: 2cm; size: A4; }
