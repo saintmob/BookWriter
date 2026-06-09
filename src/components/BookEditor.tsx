@@ -772,10 +772,8 @@ export function BookEditor() {
                   onClick={handlePrint}
                   className="w-full text-left px-4 py-2 text-sm text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                 >
-                  <Printer className="w-4 h-4 text-emerald-500" />
-                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                    {language === 'zh' ? '印刷排版与 PDF 导出' : 'Press-Ready PDF Export'}
-                  </span>
+                  <Printer className="w-4 h-4" />
+                  {t('print_pdf')}
                 </button>
                 <div className="h-px bg-zinc-100 dark:bg-zinc-700 my-1"></div>
                 <button

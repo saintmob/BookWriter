@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Book, Chapter, PageLayout } from '../lib/db';
-import { X, ChevronLeft, ChevronRight, Printer, BookOpen, Minus, Plus, Maximize, FileText, Check, Layers, Settings, Info, Sliders, Download, Sparkles, HelpCircle, CheckSquare, Square, DownloadCloud, AlertTriangle, ExternalLink } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Printer, BookOpen, Minus, Plus, Maximize, FileText } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { PagedjsPreview } from './PagedjsPreview';
 import { cn } from '../lib/utils';
@@ -29,17 +29,8 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
   const sourceHiddenRef = useRef<HTMLDivElement>(null);
   const [htmlContent, setHtmlContent] = useState<string>('');
 
-  const [showExportAssistant, setShowExportAssistant] = useState(true);
-  const [checkedSteps, setCheckedSteps] = useState({
-    destination: true,
-    margins: false,
-    headers: false,
-    background: false,
-  });
-
   const [hasAutoPrinted, setHasAutoPrinted] = useState(false);
   const [autoPrintOnce, setAutoPrintOnce] = useState(false);
-  const [showSandboxWarning, setShowSandboxWarning] = useState(false);
 
   // Sync state when open changes or autoPrint is passed
   useEffect(() => {
@@ -73,139 +64,6 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
         window.print();
       }, 500);
     }
-  };
-
-  const handleDownloadPressHtml = () => {
-    const physicalSize = getPhysicalPageSize(baseLayout.format || 'a4');
-    
-    // Construct self-contained bundle
-    const htmlBundle = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8">
-  <title>${book.title} - Press-Ready Typeset Build</title>
-  <!-- Load Paged.js library from unpkg CDN -->
-  <script src="https://unpkg.com/pagedjs/dist/paged.js"></script>
-  <style>
-    /* 1. Core Browser Print Rules */
-    @page {
-      size: ${physicalSize};
-      margin: 0;
-    }
-    
-    /* 2. Remove all screen-only preview styles during print */
-    @media print {
-      body * {
-        visibility: hidden;
-      }
-      .pagedjs-wrapper,
-      .pagedjs-wrapper *,
-      .pagedjs-container,
-      .pagedjs-container * {
-        visibility: visible !important;
-      }
-      .pagedjs-wrapper {
-        position: absolute !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 100% !important;
-        height: auto !important;
-        background: #ffffff !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        overflow: visible !important;
-      }
-      .pagedjs-container {
-        transform: scale(1) !important;
-        transform-origin: top left !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        width: 100% !important;
-        height: auto !important;
-      }
-      .pagedjs_pages {
-        padding: 0 !important;
-        gap: 0 !important;
-        max-width: none !important;
-        background: none !important;
-        background-color: transparent !important;
-      }
-      .pagedjs_page {
-        background-color: #ffffff !important;
-        background-image: none !important; /* Strip noise fiber */
-        border: none !important;           /* Strip borders */
-        box-shadow: none !important;       /* Strip card shadows */
-        border-radius: 0 !important;
-        margin: 0 !important;
-        page-break-after: always !important;
-        page-break-inside: avoid !important;
-      }
-      .pagedjs_left_page, 
-      .pagedjs_right_page, 
-      .pagedjs_first_page {
-        background-color: #ffffff !important;
-        background-image: none !important; /* Strip bindings shadow */
-        box-shadow: none !important;
-        border-radius: 0 !important;
-      }
-      .pagedjs_page .book-content-wrapper,
-      .pagedjs_page .prose {
-        color: #000000 !important; /* Dense publication-quality black vector text */
-      }
-      .pagedjs_page * {
-        background: transparent !important;
-        text-shadow: none !important;
-        box-shadow: none !important;
-      }
-    }
-    
-    /* 3. Base layout for browser preview (dark mode desktop background for screen inspection) */
-    body {
-      background-color: #09090b;
-      color: #fafafa;
-      margin: 0;
-      padding: 0;
-      font-family: ${fontFamilyCss};
-    }
-    
-    .pagedjs_pages {
-      display: flex;
-      flex-direction: row;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 32px;
-      padding: 40px;
-      background-color: #09090b;
-    }
-    
-    .pagedjs_page {
-      background-color: #ffffff !important; /* Standard pure paper for screen inspection */
-      color: #000000 !important;
-      border: 1px solid rgba(255,255,255,0.1);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      position: relative;
-    }
-    
-    /* 4. Active Typesetting CSS config */
-    ${pagedJsCss.replace(/\.pagedjs_page\s*\{\s*background-color:[^;]+;/g, '')}
-  </style>
-</head>
-<body>
-  <div class="book-content-wrapper pagedjs-content">
-    ${htmlContent}
-  </div>
-</body>
-</html>`;
-
-    const blob = new Blob([htmlBundle], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${book.title.replace(/\s+/g, '_')}_PressReady_Typeset.html`;
-    document.body.appendChild(a);
-    a.click();
-    if (a.parentNode) a.parentNode.removeChild(a);
-    URL.revokeObjectURL(url);
   };
 
   const baseLayout: Partial<PageLayout> = book.layout || chapters[0]?.layout || {};
@@ -484,22 +342,12 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
 
   if (!isOpen) return null;
 
-  const handlePrint = (force: boolean = false) => {
-    const isSandboxed = window.self !== window.top;
-    if (isSandboxed && !force) {
-      setShowSandboxWarning(true);
-      return;
-    }
-
+  const handlePrint = () => {
     if (!usePagedJs) {
       setUsePagedJs(true);
       setAutoPrintOnce(true);
     } else {
-      try {
-        window.print();
-      } catch (err) {
-        console.error("Window print error", err);
-      }
+      window.print();
     }
   };
 
@@ -566,7 +414,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
   };
 
   return (
-    <div id="pagedjs-print-modal-root" className="fixed inset-0 z-50 flex flex-col bg-zinc-900/95 backdrop-blur-sm text-zinc-100 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex flex-col bg-zinc-900/95 backdrop-blur-sm text-zinc-100 animate-in fade-in duration-200">
       {/* Header / Toolbar */}
       <div className="flex items-center justify-between px-6 py-4 bg-zinc-900 border-b border-zinc-800 shrink-0 z-50">
         <div className="flex items-center gap-4">
@@ -592,20 +440,9 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">Paged.js</span>
           </button>
-          {usePagedJs && (
-            <button
-              onClick={() => setShowExportAssistant(prev => !prev)}
-              className={cn("px-4 py-2 rounded-lg transition-colors flex items-center gap-2 font-medium border text-xs", 
-                showExportAssistant ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400" : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700")}
-              title="切换数字印前矢量导出助手"
-            >
-              <Settings className="w-4 h-4" />
-              <span className="hidden sm:inline">矢量导出助手</span>
-            </button>
-          )}
           <button
             onClick={handlePrint}
-            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors text-zinc-200 flex items-center gap-2 font-medium text-xs"
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors text-zinc-200 flex items-center gap-2 font-medium"
             title={t('print_sample')}
           >
             <Printer className="w-4 h-4" />
@@ -624,181 +461,33 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
       {/* Main Preview Area */}
       <div 
         ref={wrapperRef}
-        id="pagedjs-print-modal-wrapper"
         className="flex-1 flex items-center justify-center p-4 overflow-hidden relative bg-zinc-950"
       >
         {usePagedJs ? (
-          <div id="pagedjs-print-modal-inner" className="absolute inset-0 w-full h-full overflow-hidden flex flex-col md:flex-row">
-            {/* Left Assistant Panel */}
-            {showExportAssistant && (
-              <div id="vector-export-sidebar" className="w-full md:w-96 border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-900/95 flex flex-col justify-between p-5 overflow-y-auto shrink-0 z-20 shadow-2xl relative">
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Layers className="w-5 h-5 text-emerald-500" />
-                      <h3 className="font-bold text-zinc-100 text-sm tracking-wide">数码印前矢量导出中心</h3>
-                    </div>
-                    <button 
-                      onClick={() => setShowExportAssistant(false)}
-                      className="p-1 hover:bg-zinc-800 rounded-md text-zinc-500 hover:text-zinc-300 transition-colors"
-                      title="关闭助手"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                  
-                  <p className="text-xs text-zinc-400 leading-relaxed mb-5">
-                    采用 Paged.js 精准物理分页。导出的 PDF 具备物理出版标准参数，文本在矢量软件（AI, InDesign, Figma）中<b>100% 保持为可选择、可二次编辑的文字图层</b>。
-                  </p>
-
-                  {/* Automatic Press-Ready Assurances */}
-                  <div className="space-y-2.5 mb-6">
-                    <div className="bg-zinc-950/60 rounded-lg p-3 border border-zinc-800/80">
-                      <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-2">印前自动保障机制：</h4>
-                      <ul className="space-y-1.5 text-xs text-zinc-300">
-                        <li className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                          <span><b>去除背景色与阴影</b>：滤除屏幕预览的纸张光晕、纹理与装订侧影，仅输出纯白背景和高反差文字。</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                          <span><b>完整无损矢量化</b>：保留文字真实流式字形，可在编辑软件中一键整体更换字体 / 调整颜色。</span>
-                        </li>
-                        <li className="flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                          <span><b>精准物理尺寸</b>：强制设定页面尺寸为 <span className="font-mono text-emerald-400">{getPhysicalPageSize(baseLayout.format || 'a4')}</span> ({baseLayout.format?.toUpperCase()}) 及其对应版口宽度。</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* Browser Interactive Setup Checklist */}
-                  <div className="space-y-3 mb-6">
-                    <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">浏览器 PDF 导出配合设置：</h4>
-                    
-                    <div className="space-y-2">
-                      <button 
-                        onClick={() => setCheckedSteps(prev => ({ ...prev, destination: !prev.destination }))}
-                        className="w-full text-left p-2.5 rounded-lg bg-zinc-950/40 hover:bg-zinc-950/85 border border-zinc-800/60 flex items-center justify-between text-xs transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 text-zinc-300">
-                          {checkedSteps.destination ? (
-                            <CheckSquare className="w-4 h-4 text-emerald-400" />
-                          ) : (
-                            <Square className="w-4 h-4 text-zinc-500" />
-                          )}
-                          <div>
-                            <span className="block font-medium">1. 目标：保存为 PDF (Save as PDF)</span>
-                            <span className="text-[10px] text-zinc-500">在打印目标处选择 PDF 导出</span>
-                          </div>
-                        </div>
-                      </button>
-
-                      <button 
-                        onClick={() => setCheckedSteps(prev => ({ ...prev, margins: !prev.margins }))}
-                        className="w-full text-left p-2.5 rounded-lg bg-zinc-950/40 hover:bg-zinc-950/85 border border-zinc-800/60 flex items-center justify-between text-xs transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 text-zinc-300">
-                          {checkedSteps.margins ? (
-                            <CheckSquare className="w-4 h-4 text-emerald-400" />
-                          ) : (
-                            <Square className="w-4 h-4 text-zinc-500" />
-                          )}
-                          <div>
-                            <span className="block font-medium">2. 边距设定：无 (None)</span>
-                            <span className="text-[10px] text-zinc-500">必须设为无边距，防止增加多余的页边白边</span>
-                          </div>
-                        </div>
-                      </button>
-
-                      <button 
-                        onClick={() => setCheckedSteps(prev => ({ ...prev, headers: !prev.headers }))}
-                        className="w-full text-left p-2.5 rounded-lg bg-zinc-950/40 hover:bg-zinc-950/85 border border-zinc-800/60 flex items-center justify-between text-xs transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 text-zinc-300">
-                          {checkedSteps.headers ? (
-                            <CheckSquare className="w-4 h-4 text-emerald-400" />
-                          ) : (
-                            <Square className="w-4 h-4 text-zinc-500" />
-                          )}
-                          <div>
-                            <span className="block font-medium">3. 页眉和页脚：取消勾选</span>
-                            <span className="text-[10px] text-zinc-500">取消多余的网页 URL 与日期页脚标记</span>
-                          </div>
-                        </div>
-                      </button>
-
-                      <button 
-                        onClick={() => setCheckedSteps(prev => ({ ...prev, background: !prev.background }))}
-                        className="w-full text-left p-2.5 rounded-lg bg-zinc-950/40 hover:bg-zinc-950/85 border border-zinc-800/60 flex items-center justify-between text-xs transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 text-zinc-300">
-                          {checkedSteps.background ? (
-                            <CheckSquare className="w-4 h-4 text-emerald-400" />
-                          ) : (
-                            <Square className="w-4 h-4 text-zinc-500" />
-                          )}
-                          <div>
-                            <span className="block font-medium">4. 背景图形：必须勾选 (On)</span>
-                            <span className="text-[10px] text-zinc-500">确保精美线条、分界图、目录填充正常渲染</span>
-                          </div>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Bottom Action Area */}
-                <div className="pt-4 border-t border-zinc-800 space-y-2.5">
-                  <button
-                    onClick={handlePrint}
-                    className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-medium rounded-lg text-xs transition-all flex items-center justify-center gap-2 shadow-lg"
-                  >
-                    <Printer className="w-4 h-4" />
-                    <span>启动矢量 PDF 导出</span>
-                  </button>
-
-                  <button
-                    onClick={handleDownloadPressHtml}
-                    className="w-full py-2 bg-zinc-850 hover:bg-zinc-850/80 active:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-zinc-100 font-medium rounded-lg text-xs transition-all flex items-center justify-center gap-2"
-                  >
-                    <DownloadCloud className="w-4 h-4 text-emerald-500" />
-                    <span>下载单网页排版 HTML 源码</span>
-                  </button>
-
-                  <div className="text-[10px] text-zinc-500 text-center leading-normal">
-                    高保真 HTML 源码已内嵌 Paged.js 排版内核，在本地双击即可实现 100% 一致的物理印前排版并随时渲染成 PDF。
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Paged.js Typeset Engine Viewer View */}
-            <div id="pagedjs-print-modal-content-area" className="flex-1 h-full overflow-hidden relative flex flex-col">
-              <PagedjsPreview 
-                 contentHtml={htmlContent} 
-                 css={pagedJsCss} 
-                 onProcessed={handleProcessed} 
-                 scale={scale}
-              />
-              {/* Zoom Controls for Pagedjs */}
-              <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-zinc-900/90 backdrop-blur px-2 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg">
-                 <button 
-                   onClick={() => setScale(s => Math.max(0.2, s - 0.1))}
-                   className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
-                   title="Zoom Out"
-                 >
-                   <Minus className="w-4 h-4" />
-                 </button>
-                 <span className="text-xs font-mono w-12 text-center text-zinc-300 select-none">{Math.round(scale * 100)}%</span>
-                 <button 
-                   onClick={() => setScale(s => Math.min(2.0, s + 0.1))}
-                   className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
-                   title="Zoom In"
-                 >
-                   <Plus className="w-4 h-4" />
-                 </button>
-              </div>
+          <div className="absolute inset-0 w-full h-full overflow-hidden">
+            <PagedjsPreview 
+               contentHtml={htmlContent} 
+               css={pagedJsCss} 
+               onProcessed={handleProcessed} 
+               scale={scale}
+            />
+            {/* Zoom Controls for Pagedjs */}
+            <div className="absolute bottom-6 right-6 flex items-center gap-1 bg-zinc-900/90 backdrop-blur px-2 py-1.5 rounded-lg border border-zinc-800 z-40 shadow-lg">
+               <button 
+                 onClick={() => setScale(s => Math.max(0.2, s - 0.1))}
+                 className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                 title="Zoom Out"
+               >
+                 <Minus className="w-4 h-4" />
+               </button>
+               <span className="text-xs font-mono w-12 text-center text-zinc-300 select-none">{Math.round(scale * 100)}%</span>
+               <button 
+                 onClick={() => setScale(s => Math.min(2.0, s + 0.1))}
+                 className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white transition-colors"
+                 title="Zoom In"
+               >
+                 <Plus className="w-4 h-4" />
+               </button>
             </div>
           </div>
         ) : (
@@ -1121,106 +810,50 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
       <style>{`
         @media print {
           ${usePagedJs ? `
-            /* 1. Page definition for Paged.js printed format */
             @page { 
-              margin: 0 !important; 
+              margin: 0; 
               size: ${getPhysicalPageSize(baseLayout.format || 'a4')}; 
             }
-
-            /* 2. Reset html & body layout to support pure natural scrolling page-breaks */
-            html, body {
-              background: #ffffff !important;
-              color: #000000 !important;
-              overflow: visible !important;
-              height: auto !important;
-              min-height: 0 !important;
-              max-height: none !important;
-              position: static !important;
-              margin: 0 !important;
-              padding: 0 !important;
-            }
-
-            /* 3. Hide all screen elements by default */
             body * { 
-              visibility: hidden !important; 
+              visibility: hidden; 
             }
-
-            /* 4. Force all ancestors of Paged.js page-wrapper to be static flow blocks. 
-               This is CRITICAL: it prevents fixed / overflow:hidden parent frameworks 
-               from clipping pages at page 1 fold. */
-            #root,
-            #root > div,
-            #pagedjs-print-modal-root,
-            #pagedjs-print-modal-wrapper,
-            #pagedjs-print-modal-inner,
-            #pagedjs-print-modal-content-area {
-              position: static !important;
-              display: block !important;
-              overflow: visible !important;
-              height: auto !important;
-              min-height: 0 !important;
-              max-height: none !important;
-              width: auto !important;
-              transform: none !important;
-              background: transparent !important;
-              box-shadow: none !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              border: none !important;
-              opacity: 1 !important;
-              visibility: visible !important;
-            }
-
-            /* 5. Force the Paged.js container wrappers to be fully visible and naturally sized */
             .pagedjs-wrapper,
-            .pagedjs-wrapper * { 
+            .pagedjs-wrapper *,
+            .pagedjs-container,
+            .pagedjs-container * { 
               visibility: visible !important; 
             }
-            .pagedjs-container,
-            .pagedjs-container * {
-              visibility: visible !important;
-            }
-
             .pagedjs-wrapper {
-              display: block !important;
               position: absolute !important;
               left: 0 !important;
               top: 0 !important;
               width: 100% !important;
               height: auto !important;
-              background: #ffffff !important;
+              background: white !important;
               padding: 0 !important;
               margin: 0 !important;
               overflow: visible !important;
             }
             .pagedjs-container {
-              display: block !important;
-              position: static !important;
+              transform: scale(1) !important;
+              transform-origin: top left !important;
               padding: 0 !important;
               margin: 0 !important;
               width: 100% !important;
               height: auto !important;
-              transform: scale(1) !important;
-              transform-origin: top left !important;
-              overflow: visible !important;
             }
             .pagedjs_pages {
-              display: flex !important;
-              flex-direction: column !important;
               padding: 0 !important;
               gap: 0 !important;
               max-width: none !important;
               background: none !important;
-              background-color: transparent !important;
-              height: auto !important;
-              overflow: visible !important;
             }
             .pagedjs_page {
-              display: block !important;
               background-color: #ffffff !important;
-              background-image: none !important; /* Strip noise fiber */
-              border: none !important;           /* Strip borders */
-              box-shadow: none !important;       /* Strip card shadows */
+              background-image: none !important;
+              color: #000000 !important;
+              border: none !important;
+              box-shadow: none !important;
               border-radius: 0 !important;
               margin: 0 !important;
               page-break-after: always !important;
@@ -1230,33 +863,11 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
             .pagedjs_right_page, 
             .pagedjs_first_page {
               border-radius: 0 !important;
-              background-image: none !important; /* Strip bindings shadow */
-              box-shadow: none !important;
-              background-color: #ffffff !important;
-            }
-            .pagedjs_page .book-content-wrapper,
-            .pagedjs_page .prose {
-              color: #000000 !important; /* Dense publication-quality black vector text */
-            }
-            .pagedjs_page * {
-              background: transparent !important;
-              text-shadow: none !important;
+              background-image: none !important;
               box-shadow: none !important;
             }
-
-            /* Explicitly hide the sidebar panel and header/navigation elements */
-            #vector-export-sidebar,
-            header,
-            footer,
-            nav,
-            button,
-            .bg-zinc-900,
             #print-container {
               display: none !important;
-              visibility: hidden !important;
-              height: 0 !important;
-              width: 0 !important;
-              overflow: hidden !important;
             }
           ` : `
             @page { margin: 2cm; size: A4; }
@@ -1267,101 +878,6 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
           `}
         }
       `}</style>
-
-      {showSandboxWarning && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 max-w-xl w-full shadow-2xl space-y-6 relative text-zinc-100">
-            <button 
-              onClick={() => setShowSandboxWarning(false)}
-              className="absolute top-4 right-4 text-zinc-400 hover:text-zinc-200 p-1 rounded-lg hover:bg-zinc-800 transition"
-              title="关闭解释窗层"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 shrink-0 text-amber-500">
-                <AlertTriangle className="w-6 h-6 animate-pulse" />
-              </div>
-              <div className="space-y-1 bg-transparent">
-                <h3 className="text-base font-bold text-zinc-100">
-                  由于平台预览区安全限制，打印弹窗被浏览器拦截
-                </h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  系统检测到您目前处于 <b>AI Studio 内置预览 Iframe（沙箱环境）</b> 中。出于浏览器安全考虑，沙箱 iframe 内部的代码默认会被禁用 <code>window.print()</code> 唤起权。
-                </p>
-              </div>
-            </div>
-
-            <div className="h-px bg-zinc-800" />
-
-            <div className="space-y-4">
-              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">请选择以下 2 种无痛、极速的矢量 PDF 导出通道：</h4>
-              
-              <div className="grid gap-3">
-                {/* Channel 1: Download HTML */}
-                <div className="bg-zinc-950/60 p-4 rounded-lg border border-zinc-805/80 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold text-xs">1</span>
-                    <span className="text-xs font-bold text-zinc-200">极力推荐：高保真离线本地导出 (100% 成功、免网速限制) 🚀</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 leading-relaxed pl-7">
-                    点击下方按钮，直接下载包含 Paged.js 排版内核及您图书 HTML 数据的单网页源码文件。下载好后：
-                    <br />
-                    在电脑上<b>直接双击打开该文件</b> 👉 按键盘 <b>Ctrl + P (Windows) / Cmd + P (Mac)</b>，即可 100% 直接生成完美的矢量的、文字可随意选择和二次编辑的高保真 PDF。
-                  </p>
-                  <div className="pl-7">
-                    <button
-                      onClick={() => {
-                        handleDownloadPressHtml();
-                        setShowSandboxWarning(false);
-                      }}
-                      className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 hover:scale-[1.02] text-white rounded-lg text-xs font-semibold transition-all shadow-md"
-                    >
-                      <DownloadCloud className="w-4 h-4" />
-                      <span>立即下载单文件离线排版 HTML</span>
-                    </button>
-                    <span className="block text-[10px] text-zinc-500 mt-1.5">
-                      (非常快，一键下载，双击即用，最受设计师和二次印刷用户喜好)
-                    </span>
-                  </div>
-                </div>
-
-                {/* Channel 2: Open in new window */}
-                <div className="bg-zinc-950/60 p-4 rounded-lg border border-zinc-805/80 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center justify-center w-5 h-5 rounded-full bg-blue-500/10 text-blue-400 font-bold text-xs">2</span>
-                    <span className="text-xs font-bold text-zinc-200">在新标签页/主视窗中打开运行 🌐</span>
-                  </div>
-                  <p className="text-[11px] text-zinc-400 leading-relaxed pl-7">
-                    点击平台右侧开发预览视窗右上角的 <b>“在新标签页打开” (Open in new tab，带向右上箭头的图标)</b> 按钮。
-                    <br />
-                    在独立的浏览器纯净页签中再次打开此预览页面，并点击此 <b>【启动矢量 PDF 导出】</b>，即可一键完美唤起浏览器的 PDF 预览导出气泡！
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => {
-                  setShowSandboxWarning(false);
-                  handlePrint(true);
-                }}
-                className="px-3 py-1.5 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 rounded-md text-xs transition"
-              >
-                忽略提示强制唤起尝试
-              </button>
-              <button
-                onClick={() => setShowSandboxWarning(false)}
-                className="px-5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-md text-xs font-medium transition"
-              >
-                我知道了
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
