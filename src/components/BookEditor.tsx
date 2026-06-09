@@ -65,7 +65,6 @@ export function BookEditor() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSamplePreviewOpen, setIsSamplePreviewOpen] = useState(false);
-  const [autoPrintSample, setAutoPrintSample] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showAIMenu, setShowAIMenu] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
@@ -404,8 +403,7 @@ export function BookEditor() {
   };
 
   const handlePrint = () => {
-    setAutoPrintSample(true);
-    setIsSamplePreviewOpen(true);
+    window.print();
     setShowExportMenu(false);
   };
 
@@ -889,13 +887,9 @@ export function BookEditor() {
       {book && (
         <BookSamplePreview
           isOpen={isSamplePreviewOpen}
-          onClose={() => {
-            setIsSamplePreviewOpen(false);
-            setAutoPrintSample(false);
-          }}
+          onClose={() => setIsSamplePreviewOpen(false)}
           book={book}
           chapters={chapters}
-          autoPrint={autoPrintSample}
         />
       )}
 

@@ -13,10 +13,9 @@ interface BookSamplePreviewProps {
   onClose: () => void;
   book: Book;
   chapters: Chapter[];
-  autoPrint?: boolean;
 }
 
-export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint = false }: BookSamplePreviewProps) {
+export function BookSamplePreview({ isOpen, onClose, book, chapters }: BookSamplePreviewProps) {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -25,46 +24,9 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
   const containerRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
-  const [usePagedJs, setUsePagedJs] = useState(autoPrint || false);
+  const [usePagedJs, setUsePagedJs] = useState(false);
   const sourceHiddenRef = useRef<HTMLDivElement>(null);
   const [htmlContent, setHtmlContent] = useState<string>('');
-
-  const [hasAutoPrinted, setHasAutoPrinted] = useState(false);
-  const [autoPrintOnce, setAutoPrintOnce] = useState(false);
-
-  // Sync state when open changes or autoPrint is passed
-  useEffect(() => {
-    if (isOpen) {
-      setHasAutoPrinted(false);
-      setAutoPrintOnce(false);
-      if (autoPrint) {
-        setUsePagedJs(true);
-      }
-    }
-  }, [isOpen, autoPrint]);
-
-  const getPhysicalPageSize = (format: string): string => {
-    switch (format) {
-      case 'a4': return '210mm 297mm';
-      case 'letter': return '8.5in 11in';
-      case 'trade': return '6in 9in';
-      case 'pocket': return '4.25in 6.87in';
-      case 'landscape': return '297mm 210mm';
-      case 'square': return '8.5in 8.5in';
-      default: return '210mm 297mm';
-    }
-  };
-
-  const handleProcessed = (total: number) => {
-    setTotalPages(total);
-    if ((autoPrint || autoPrintOnce) && !hasAutoPrinted && total > 0) {
-      setHasAutoPrinted(true);
-      setAutoPrintOnce(false);
-      setTimeout(() => {
-        window.print();
-      }, 500);
-    }
-  };
 
   const baseLayout: Partial<PageLayout> = book.layout || chapters[0]?.layout || {};
   
@@ -343,12 +305,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
   if (!isOpen) return null;
 
   const handlePrint = () => {
-    if (!usePagedJs) {
-      setUsePagedJs(true);
-      setAutoPrintOnce(true);
-    } else {
-      window.print();
-    }
+    window.print();
   };
 
   const nextPage = () => {
@@ -468,7 +425,7 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
             <PagedjsPreview 
                contentHtml={htmlContent} 
                css={pagedJsCss} 
-               onProcessed={handleProcessed} 
+               onProcessed={setTotalPages} 
                scale={scale}
             />
             {/* Zoom Controls for Pagedjs */}
@@ -809,73 +766,13 @@ export function BookSamplePreview({ isOpen, onClose, book, chapters, autoPrint =
       {/* Print Styles (Hidden in UI, visible when printing) */}
       <style>{`
         @media print {
-          ${usePagedJs ? `
-            @page { 
-              margin: 0; 
-              size: ${getPhysicalPageSize(baseLayout.format || 'a4')}; 
-            }
-            body * { 
-              visibility: hidden; 
-            }
-            .pagedjs-wrapper,
-            .pagedjs-wrapper *,
-            .pagedjs-container,
-            .pagedjs-container * { 
-              visibility: visible !important; 
-            }
-            .pagedjs-wrapper {
-              position: absolute !important;
-              left: 0 !important;
-              top: 0 !important;
-              width: 100% !important;
-              height: auto !important;
-              background: white !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              overflow: visible !important;
-            }
-            .pagedjs-container {
-              transform: scale(1) !important;
-              transform-origin: top left !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              width: 100% !important;
-              height: auto !important;
-            }
-            .pagedjs_pages {
-              padding: 0 !important;
-              gap: 0 !important;
-              max-width: none !important;
-              background: none !important;
-            }
-            .pagedjs_page {
-              background-color: #ffffff !important;
-              background-image: none !important;
-              color: #000000 !important;
-              border: none !important;
-              box-shadow: none !important;
-              border-radius: 0 !important;
-              margin: 0 !important;
-              page-break-after: always !important;
-              page-break-inside: avoid !important;
-            }
-            .pagedjs_left_page, 
-            .pagedjs_right_page, 
-            .pagedjs_first_page {
-              border-radius: 0 !important;
-              background-image: none !important;
-              box-shadow: none !important;
-            }
-            #print-container {
-              display: none !important;
-            }
-          ` : `
-            @page { margin: 2cm; size: A4; }
-            body * { visibility: hidden; }
-            #print-container, #print-container * { visibility: visible; }
-            #print-container { position: absolute; left: 0; top: 0; width: 100%; color: black; background: white; }
-            .break-inside-avoid { break-inside: avoid; }
-          `}
+          @page { margin: 2cm; size: A4; }
+          body * { visibility: hidden; }
+          #print-container, #print-container * { visibility: visible; }
+          #print-container { position: absolute; left: 0; top: 0; width: 100%; }
+          .break-inside-avoid { break-inside: avoid; }
+          /* Reset colors for print */
+          #print-container { color: black; background: white; }
         }
       `}</style>
     </div>
