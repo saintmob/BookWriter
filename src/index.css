@@ -39,24 +39,17 @@
     visibility: hidden;
   }
 
-  .pagedjs-container, .pagedjs-container * {
+  .print-container, .print-container * {
     visibility: visible;
   }
 
-  .pagedjs-container {
-    position: absolute !important;
-    left: 0;
-    top: 0;
-    width: 100vw;
-    margin: 0 !important;
-    padding: 0 !important;
-    transform: none !important;
-  }
-
-  .pagedjs_pages {
+  .print-container {
+    position: static !important;
     width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
+    transform: none !important;
+    display: block !important;
   }
 
   body {

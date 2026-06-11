@@ -39,9 +39,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     const idx = elementIndex++;
     const imgs = floatingImages.filter(img => {
       if (img.paragraphIndex !== idx) return false;
-      if (showBlockIndices) {
-        return img.layoutMode && img.layoutMode !== 'absolute';
-      }
+      if (!img.layoutMode || img.layoutMode === 'absolute') return false;
       return true;
     });
     

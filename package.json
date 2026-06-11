@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "tsx server.ts",
+    "build": "vite build --outDir dist/client && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"
   },
@@ -28,6 +28,7 @@
     "motion": "^12.23.24",
     "pagedjs": "^0.4.3",
     "pretext": "^0.3.0",
+    "puppeteer": "^25.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-i18next": "^16.5.4",

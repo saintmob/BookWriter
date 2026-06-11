@@ -403,7 +403,7 @@ export function BookEditor() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setIsSamplePreviewOpen(true);
     setShowExportMenu(false);
   };
 

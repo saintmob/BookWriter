@@ -78,13 +78,18 @@ function aiStudioNoAutoreloadGuard(): Plugin {
       if (NativeWebSocket) {
         class MockViteWebSocket {
           constructor(url, protocols) {
-            this.url = url;
-            this.protocols = protocols;
-            this.readyState = 1; // OPEN
-            this.binaryType = 'blob';
-            this.bufferedAmount = 0;
-            this.extensions = '';
-            this.protocol = typeof protocols === 'string' ? protocols : (Array.isArray(protocols) ? protocols[0] : '');
+            Object.defineProperty(this, 'url', { value: url, writable: true, configurable: true, enumerable: true });
+            Object.defineProperty(this, 'protocols', { value: protocols, writable: true, configurable: true, enumerable: true });
+            Object.defineProperty(this, 'readyState', { value: 1, writable: true, configurable: true, enumerable: true });
+            Object.defineProperty(this, 'binaryType', { value: 'blob', writable: true, configurable: true, enumerable: true });
+            Object.defineProperty(this, 'bufferedAmount', { value: 0, writable: true, configurable: true, enumerable: true });
+            Object.defineProperty(this, 'extensions', { value: '', writable: true, configurable: true, enumerable: true });
+            Object.defineProperty(this, 'protocol', { 
+              value: typeof protocols === 'string' ? protocols : (Array.isArray(protocols) ? protocols[0] : ''), 
+              writable: true, 
+              configurable: true, 
+              enumerable: true 
+            });
 
             this.onopen = null;
             this.onclose = null;

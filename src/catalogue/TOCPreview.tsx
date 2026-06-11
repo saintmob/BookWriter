@@ -13,6 +13,7 @@ interface TOCPreviewProps {
   config: DesignConfig;
   selectedLayout: string;
   printMode?: boolean;
+  singlePageWidth?: number;
 }
 
 export interface TOCPreviewHandle {
@@ -81,7 +82,7 @@ const DynamicPageNumber = ({ page, id, printMode }: { page?: string, id: string,
 };
 
 export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
-  ({ bookInfo, chapters, config, selectedLayout, printMode }, ref) => {
+  ({ bookInfo, chapters, config, selectedLayout, printMode, singlePageWidth }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const paperRef = useRef<HTMLDivElement>(null);
     const [scale, setScale] = useState(1);
@@ -1005,12 +1006,13 @@ export const TOCPreview = forwardRef<TOCPreviewHandle, TOCPreviewProps>(
           {pages.map((pageChapters, pageIndex) => (
             <div
               key={pageIndex}
-              className={`chapter-start pagedjs-toc-page`}
+              className="chapter-start pagedjs-toc-page shrink-0"
               style={{
                 page: 'toc',
                 breakBefore: printMode ? 'page' : 'column',
                 breakAfter: printMode ? 'page' : 'column',
-                width: '100%',
+                width: singlePageWidth ? `${singlePageWidth}px` : '100%',
+                flex: singlePageWidth ? `0 0 ${singlePageWidth}px` : '0 0 100%',
                 height: '100%',
                 position: 'relative',
                 color: textMainColor,
